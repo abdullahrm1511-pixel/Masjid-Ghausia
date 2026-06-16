@@ -1,0 +1,145 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { formatIban } from "@/lib/iban";
+import { formatCurrency, formatDate } from "@/lib/display";
+import { calculateDonorCharges, getPricingConfig } from "@/lib/pricing";
+
+export const dynamic = "force-dynamic";
+
+function statusText(status: string, message?: string | null) {
+  if (status === "PENDING") return "Uw aanvraag is in afwachting van beoordeling.";
+  if (status === "ACTION_REQUIRED") return message ? `Actie vereist: ${message}` : "Actie vereist: het bestuur vraagt om een correctie.";
+  if (status === "PAYMENT_REQUIRED") return "Uw aanvraag is goedgekeurd. Eerste betaling is vereist.";
+  if (status === "ACTIVE") return "Uw account is actief.";
+  if (status === "INACTIVE") return "Uw account is niet actief. Neem contact op met het bestuur.";
+  if (status === "REJECTED") return message ? `Uw aanvraag is afgewezen. ${message}` : "Uw aanvraag is afgewezen.";
+  if (status === "DECEASED") return "Status: overleden.";
+  return status;
+}
+
+export default async function DashboardPage() {
+  const session = await auth();
+  if (!session?.user.id) {
+    redirect("/login");
+  }
+
+  const profile = await prisma.donorProfile.findUnique({
+    where: { userId: session.user.id },
+    include: {
+      user: true,
+      familyMembers: true,
+      paymentObligations: { orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }] },
+      registrationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
+      changeRequests: { orderBy: { createdAt: "desc" }, take: 1 }
+    }
+  });
+
+  if (!profile) {
+    redirect("/");
+  }
+
+  const latestRegistration = profile.registrationRequests[0];
+  const latestChange = profile.changeRequests[0];
+  const visibleMessage = latestRegistration?.donorMessage ?? latestChange?.donorMessage;
+  const totalPaid = profile.paymentObligations.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountCents, 0);
+  const openRegisteredTotal = profile.paymentObligations.filter((item) => item.status === "DUE").reduce((sum, item) => sum + item.amountCents, 0);
+  const latestPaymentDate = profile.paymentObligations.find((item) => item.status === "PAID")?.paidAt;
+  const pricing = await getPricingConfig();
+  const mainCharge = calculateDonorCharges(profile, profile.familyMembers, pricing, { hasAnnualPayment: false })[0];
+  const oneTimePaid = profile.paymentObligations
+    .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME")
+    .reduce((sum, item) => sum + item.amountCents, 0);
+  const oneTimeRequired = profile.approvedAt ? (mainCharge?.oneTimeContribution ?? 0) * 100 : 0;
+  const oneTimeRemaining = Math.max(oneTimeRequired - oneTimePaid, 0);
+  const totalDue = openRegisteredTotal + oneTimeRemaining;
+  const oneTimeDaysRemaining = mainCharge?.oneTimeDaysRemaining;
+  const oneTimeTimerText =
+    oneTimeDaysRemaining === null || oneTimeDaysRemaining === undefined
+      ? "De termijn start vanaf goedkeuring."
+      : oneTimeDaysRemaining >= 0
+        ? `Nog ${oneTimeDaysRemaining} dagen tot de deadline.`
+        : `De deadline is ${Math.abs(oneTimeDaysRemaining)} dagen geleden verlopen.`;
+
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-10">
+      <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+      <section className="mt-8 rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+        <p className="text-sm font-bold uppercase text-emerald-800">Status</p>
+        <p className="mt-2 text-lg font-semibold text-slate-900">{statusText(profile.status, visibleMessage)}</p>
+      </section>
+
+      {profile.registrationNumber ? (
+        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold text-slate-600">Lidnummer</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-800">{profile.registrationNumber}</p>
+        </section>
+      ) : null}
+
+      <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-900">Betaaloverzicht</h2>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div><dt className="text-sm font-semibold text-slate-600">Totaal openstaand</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(totalDue)}</dd></div>
+          <div><dt className="text-sm font-semibold text-slate-600">Totaal betaald</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(totalPaid)}</dd></div>
+          <div><dt className="text-sm font-semibold text-slate-600">Openstaand bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(totalDue)}</dd></div>
+          <div><dt className="text-sm font-semibold text-slate-600">Laatste betaling</dt><dd className="mt-1 font-bold text-slate-900">{formatDate(latestPaymentDate)}</dd></div>
+        </dl>
+      </section>
+
+      {oneTimeRequired > 0 ? (
+        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Eenmalige bijdrage</h2>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div><dt className="text-sm font-semibold text-slate-600">Bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(oneTimeRequired)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Restant</dt><dd className={`mt-1 font-bold ${oneTimeRemaining > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(oneTimeRemaining)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Deadline</dt><dd className="mt-1 font-bold text-slate-900">{formatDate(mainCharge.oneTimeDeadline)}</dd></div>
+          </dl>
+          <p className={`mt-3 text-sm font-bold ${oneTimeRemaining > 0 && typeof oneTimeDaysRemaining === "number" && oneTimeDaysRemaining < 0 ? "text-red-700" : "text-slate-700"}`}>
+            {oneTimeTimerText}
+          </p>
+        </section>
+      ) : null}
+
+      {profile.status === "PAYMENT_REQUIRED" ? (
+        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Betaling</h2>
+          <p className="mt-2 text-slate-700">Uw betaling wordt extern verwerkt. Zodra het bestuur uw betaling heeft bevestigd, wordt uw status bijgewerkt.</p>
+        </section>
+      ) : null}
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Account</h2>
+          <dl className="mt-4 grid gap-2 text-sm">
+            <div><dt className="font-semibold">Naam</dt><dd>{profile.firstName} {profile.lastName}</dd></div>
+            <div><dt className="font-semibold">IBAN</dt><dd>{formatIban(profile.iban)}</dd></div>
+          </dl>
+          <Link className="mt-5 inline-flex rounded-md border border-stone-300 px-4 py-2 font-semibold text-slate-800" href="/account">
+            Mijn account bekijken
+          </Link>
+          {latestRegistration ? (
+            <Link className="ml-3 mt-5 inline-flex rounded-md border border-stone-300 px-4 py-2 font-semibold text-slate-800" href="/dashboard/registration-pdf">
+              Inschrijfoverzicht downloaden
+            </Link>
+          ) : null}
+        </section>
+        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Gezin</h2>
+          <div className="mt-4 grid gap-2 text-sm">
+            {profile.familyMembers.length ? (
+              profile.familyMembers.map((member) => <p key={member.id}>{member.type === "PARTNER" ? "Partner" : "Kind"}: {member.firstName} {member.lastName}</p>)
+            ) : (
+              <p>Geen gezinsleden geregistreerd.</p>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-900">Laatste wijzigingsverzoek</h2>
+        <p className="mt-2 text-slate-700">{latestChange ? `${latestChange.changeType}: ${latestChange.status}` : "Geen wijzigingsverzoeken."}</p>
+      </section>
+    </main>
+  );
+}

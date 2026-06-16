@@ -1,0 +1,406 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  DONOR
+  REGISTRATION_ADMIN
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum DonorStatus {
+  PENDING
+  ACTIVE
+  ACTION_REQUIRED
+  INACTIVE
+  REJECTED
+  DECEASED
+  PAYMENT_REQUIRED
+}
+
+enum FamilyMemberType {
+  PARTNER
+  CHILD
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  WIDOWED
+  DIVORCED
+}
+
+enum RegistrationRequestStatus {
+  DRAFT
+  PENDING
+  ACTION_REQUIRED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  STATUS_CHANGE
+}
+
+enum PaymentObligationType {
+  ONE_TIME
+  ANNUAL
+  MANUAL
+}
+
+enum PaymentObligationStatus {
+  DUE
+  PAID
+  WAIVED
+  MANUAL_CORRECTION
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  EXTERNAL_IDEAL
+  EXTERNAL_SEPA
+  OTHER
+}
+
+enum EmailLogStatus {
+  PREPARED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          UserRole  @default(DONOR)
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts                Account[]
+  sessions                Session[]
+  donorProfile            DonorProfile?
+  adminProfile            AdminProfile?
+  auditLogs               AuditLog[]
+  updatedPayments         PaymentObligation[]   @relation("PaymentUpdatedBy")
+  statusChanges           DonorStatusHistory[]  @relation("StatusChangedBy")
+  passwordResetTokens     PasswordResetToken[]
+  registrationRequests    RegistrationRequest[]
+  reviewedRegistrations   RegistrationRequest[] @relation("ReviewedRegistrations")
+  submittedChangeRequests ChangeRequest[]       @relation("SubmittedChangeRequests")
+  reviewedChangeRequests  ChangeRequest[]       @relation("ReviewedChangeRequests")
+}
+
+model DonorProfile {
+  id                   String         @id @default(cuid())
+  userId               String         @unique
+  registrationNumber   String?        @unique
+  status               DonorStatus    @default(PENDING)
+  firstName            String
+  lastName             String
+  gender               Gender?
+  phone                String
+  addressLine1         String
+  addressLine2         String?
+  postalCode           String
+  city                 String
+  country              String         @default("NL")
+  dateOfBirth          DateTime
+  birthPlace           String
+  iban                 String
+  accountHolderName    String
+  maritalStatus        MaritalStatus?
+  pakistanContactName  String?
+  pakistanContactPhone String?
+  funeralWishes        String?
+  notes                String?
+  approvedAt           DateTime?
+  statusChangedAt      DateTime?
+  activeSince          DateTime?
+  inactiveSince        DateTime?
+  deceasedAt           DateTime?
+  statusInternalNote   String?
+  statusDonorMessage   String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyMembers        FamilyMember[]
+  registrationRequests RegistrationRequest[]
+  changeRequests       ChangeRequest[]
+  paymentObligations   PaymentObligation[]
+  statusHistory        DonorStatusHistory[]
+
+  @@index([registrationNumber])
+  @@index([status])
+  @@index([iban])
+}
+
+model DonorStatusHistory {
+  id             String       @id @default(cuid())
+  donorProfileId String
+  changedById    String?
+  fromStatus     DonorStatus?
+  toStatus       DonorStatus
+  internalNote   String
+  donorMessage   String
+  createdAt      DateTime     @default(now())
+
+  donorProfile DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  changedBy    User?        @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([donorProfileId])
+  @@index([changedById])
+  @@index([toStatus])
+  @@index([createdAt])
+}
+
+model FamilyMember {
+  id             String           @id @default(cuid())
+  donorProfileId String
+  type           FamilyMemberType
+  firstName      String
+  lastName       String
+  gender         Gender?
+  dateOfBirth    DateTime
+  birthPlace     String?
+  relationship   String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  donorProfile DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+}
+
+model RegistrationRequest {
+  id              String                    @id @default(cuid())
+  requestedById   String
+  donorProfileId  String?
+  reviewedById    String?
+  status          RegistrationRequestStatus @default(PENDING)
+  submittedData   Json
+  reviewNotes     String?
+  donorMessage    String?
+  rejectionReason String?
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  requestedBy  User          @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  donorProfile DonorProfile? @relation(fields: [donorProfileId], references: [id], onDelete: SetNull)
+  reviewedBy   User?         @relation("ReviewedRegistrations", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ChangeRequest {
+  id             String              @id @default(cuid())
+  donorProfileId String
+  submittedById  String
+  reviewedById   String?
+  status         ChangeRequestStatus @default(PENDING)
+  changeType     String
+  requestedData  Json
+  currentData    Json
+  donorNote      String?
+  adminNote      String?
+  donorMessage   String?
+  submittedAt    DateTime            @default(now())
+  reviewedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  donorProfile DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  submittedBy  User         @relation("SubmittedChangeRequests", fields: [submittedById], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("ReviewedChangeRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([submittedAt])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  actorId    String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  message    String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+}
+
+model AdminProfile {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  displayName         String
+  twoFactorRequired   Boolean   @default(true)
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
+  twoFactorVerifiedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AppConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RegistrationCounter {
+  id        String   @id @default(cuid())
+  prefix    String   @unique
+  current   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PaymentObligation {
+  id               String                  @id @default(cuid())
+  donorProfileId   String
+  updatedByAdminId String?
+  lidnummer        String?
+  obligationType   PaymentObligationType
+  amountCents      Int
+  status           PaymentObligationStatus @default(DUE)
+  paymentMethod    PaymentMethod?
+  dueDate          DateTime?
+  paidAt           DateTime?
+  notes            String?
+  adminNote        String?
+  source           String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  donorProfile   DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  updatedByAdmin User?        @relation("PaymentUpdatedBy", fields: [updatedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([donorProfileId])
+  @@index([updatedByAdminId])
+  @@index([lidnummer])
+  @@index([status])
+  @@index([source])
+}
+
+model EmailTemplate {
+  id                    String   @id @default(cuid())
+  key                   String   @unique
+  name                  String
+  subject               String
+  bodyHtml              String
+  bodyText              String?
+  availablePlaceholders Json
+  isSystem              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([key])
+}
+
+model EmailLog {
+  id          String         @id @default(cuid())
+  templateKey String
+  recipient   String
+  subject     String
+  bodyHtml    String
+  bodyText    String?
+  status      EmailLogStatus @default(PREPARED)
+  entityType  String?
+  entityId    String?
+  createdAt   DateTime       @default(now())
+
+  @@index([templateKey])
+  @@index([recipient])
+  @@index([entityType, entityId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
