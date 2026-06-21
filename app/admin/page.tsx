@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { syncAdultChildTransitions } from "@/lib/adult-child-transitions";
 import { canManageDonors } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { fullMonthsOld, isNearlyEighteen } from "@/lib/pricing";
+import { isNearlyEighteen } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -11,36 +12,70 @@ type DashboardCard = readonly [string, number, string];
 export default async function AdminDashboardPage() {
   const session = await auth();
   const fullAdmin = canManageDonors(session?.user.role);
-  const [pendingRegistrations, actionRequired, activeDonors, inactiveDonors, rejected, deceased, children] = await Promise.all([
+  if (fullAdmin) await syncAdultChildTransitions();
+  const registeredDonorWhere = { registrationNumber: { not: null } };
+  const [pendingRegistrations, registrationCorrections, donorActionRequired, activeDonors, inactiveDonors, rejected, deceased, children, adultTransitions, householdsNeedingGuardian] = await Promise.all([
     prisma.registrationRequest.count({ where: { status: "PENDING" } }),
-    prisma.donorProfile.count({ where: { status: "ACTION_REQUIRED" } }),
-    prisma.donorProfile.count({ where: { status: "ACTIVE", NOT: { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } } } }),
-    prisma.donorProfile.count({ where: { OR: [{ status: { in: ["INACTIVE", "PAYMENT_REQUIRED"] } }, { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }] } }),
-    prisma.donorProfile.count({ where: { status: "REJECTED" } }),
-    prisma.donorProfile.count({ where: { status: "DECEASED" } }),
+    prisma.registrationRequest.count({ where: { status: "ACTION_REQUIRED" } }),
+    prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "ACTION_REQUIRED" }] } }),
+    prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "ACTIVE", NOT: { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } } }] } }),
+    prisma.donorProfile.count({
+      where: {
+        AND: [
+          registeredDonorWhere,
+          { OR: [{ status: { in: ["INACTIVE", "PAYMENT_REQUIRED"] } }, { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }] }
+        ]
+      }
+    }),
+    prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "REJECTED" }] } }),
+    prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "DECEASED" }] } }),
     prisma.familyMember.findMany({
-      where: { type: "CHILD", isActive: true },
+      where: { type: "CHILD", isActive: true, status: { in: ["UNDER_18", "ACTIVE_DEPENDENT"] } },
       include: { donorProfile: { include: { paymentObligations: true } } },
       orderBy: { dateOfBirth: "asc" }
+    }),
+    prisma.adultChildTransition.findMany({
+      where: { status: "NEEDS_REGISTRATION" },
+      include: { familyMember: true, previousDonorProfile: true },
+      orderBy: { turned18At: "asc" },
+      take: 25
+    }),
+    prisma.donorProfile.findMany({
+      where: {
+        status: "DECEASED",
+        familyMembers: {
+          some: {
+            type: "CHILD",
+            status: "UNDER_18"
+          }
+        },
+        NOT: {
+          familyMembers: {
+            some: {
+              type: "PARTNER",
+              status: "ACTIVE_DEPENDENT"
+            }
+          }
+        }
+      },
+      include: {
+        familyMembers: true
+      },
+      take: 20
     })
   ]);
 
   const nearlyAdults = children.filter((child) => isNearlyEighteen(child.dateOfBirth));
-  const adultChildrenWithOpenAnnualPayment = children.filter(
-    (child) =>
-      fullMonthsOld(child.dateOfBirth) >= 18 * 12 &&
-      child.donorProfile.status !== "DECEASED" &&
-      child.donorProfile.status !== "REJECTED" &&
-      child.donorProfile.paymentObligations.some((item) => item.status === "DUE" && item.obligationType === "ANNUAL")
-  );
 
   const actionItems: DashboardCard[] = [["Registraties beoordelen", pendingRegistrations, "/admin/registrations"]];
   if (fullAdmin) {
     actionItems.push(
-      ["Correcties nodig", actionRequired, "/admin/donors?status=ACTION_REQUIRED"],
+      ["Registratiecorrecties nodig", registrationCorrections, "/admin/registrations"],
+      ["Donateuractie nodig", donorActionRequired, "/admin/donors?status=ACTION_REQUIRED"],
       ["Betaling afwachtend", inactiveDonors, "/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED"],
       ["Kinderen bijna 18", nearlyAdults.length, "#bijna-18"],
-      ["18+ kinderen controleren", adultChildrenWithOpenAnnualPayment.length, "#kinderen-18"]
+      ["18+ inschrijving nodig", adultTransitions.length, "/admin/family-transitions"],
+      ["Voogd/contact nodig", householdsNeedingGuardian.length, "/admin/family-transitions"]
     );
   }
 
@@ -49,7 +84,8 @@ export default async function AdminDashboardPage() {
     cards.push(
       ["Actieve donateurs", activeDonors, "/admin/donors?status=ACTIVE"],
       ["Inactief / betaling afwachtend", inactiveDonors, "/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED"],
-      ["Actie vereist", actionRequired, "/admin/donors?status=ACTION_REQUIRED"],
+      ["Registratiecorrecties", registrationCorrections, "/admin/registrations"],
+      ["Donateuractie vereist", donorActionRequired, "/admin/donors?status=ACTION_REQUIRED"],
       ["Afgewezen", rejected, "/admin/donors?status=REJECTED"],
       ["Overleden", deceased, "/admin/donors?status=DECEASED"]
     );
@@ -105,17 +141,32 @@ export default async function AdminDashboardPage() {
             </div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" id="kinderen-18">
-            <h2 className="text-xl font-black text-slate-950">18+ kinderen controleren</h2>
-            <p className="mt-2 text-sm text-slate-600">Controleer of hun jaarbetaling en eventuele boete verwerkt zijn.</p>
+            <h2 className="text-xl font-black text-slate-950">18+ inschrijving nodig</h2>
+            <p className="mt-2 text-sm text-slate-600">Deze personen zijn 18+ geworden, tellen niet meer mee onder het gezin en moeten zichzelf inschrijven.</p>
             <div className="mt-4 grid gap-2 text-sm">
-              {adultChildrenWithOpenAnnualPayment.length ? (
-                adultChildrenWithOpenAnnualPayment.map((child) => (
-                  <p className="rounded-md bg-red-50 p-3 text-red-900" key={child.id}>
-                    <strong>{child.firstName} {child.lastName}</strong> - geboren {child.dateOfBirth.toLocaleDateString("nl-NL")} - hoofddonateur: {child.donorProfile.firstName} {child.donorProfile.lastName}
+              {adultTransitions.length ? (
+                adultTransitions.map((item) => (
+                  <p className="rounded-md bg-red-50 p-3 text-red-900" key={item.id}>
+                    <strong>{item.familyMember.firstName} {item.familyMember.lastName}</strong> - 18 geworden op {item.turned18At.toLocaleDateString("nl-NL")} - oud gezin: {item.previousDonorProfile.firstName} {item.previousDonorProfile.lastName}
                   </p>
                 ))
               ) : (
-                <p className="rounded-md bg-slate-50 p-3 text-slate-600">Geen 18+ kinderen gevonden voor controle.</p>
+                <p className="rounded-md bg-slate-50 p-3 text-slate-600">Geen 18+ personen gevonden die zichzelf nog moeten inschrijven.</p>
+              )}
+            </div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2" id="voogd-nodig">
+            <h2 className="text-xl font-black text-slate-950">Huishoudens zonder actieve ouder</h2>
+            <p className="mt-2 text-sm text-slate-600">Primaire persoon is overleden, er is geen actieve partner geregistreerd en er zijn nog kinderen onder 18.</p>
+            <div className="mt-4 grid gap-2 text-sm">
+              {householdsNeedingGuardian.length ? (
+                householdsNeedingGuardian.map((donor) => (
+                  <Link className="rounded-md bg-red-50 p-3 text-red-900 hover:bg-red-100" href={`/admin/donors/${donor.id}?tab=family`} key={donor.id}>
+                    <strong>{donor.firstName} {donor.lastName}</strong> - {donor.familyMembers.filter((member) => member.type === "CHILD" && member.status === "UNDER_18").length} kind(eren) onder 18 - voogd/contactpersoon nodig
+                  </Link>
+                ))
+              ) : (
+                <p className="rounded-md bg-slate-50 p-3 text-slate-600">Geen huishoudens gevonden waar een voogd/contactpersoon nodig is.</p>
               )}
             </div>
           </div>

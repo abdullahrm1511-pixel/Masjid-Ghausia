@@ -20,6 +20,11 @@ const groups = [
         title: "Export",
         description: "Donateurslijsten downloaden voor administratie en controle.",
         href: "/admin/export"
+      },
+      {
+        title: "Betaling/schuld corrigeren",
+        description: "Afgeschermde super-admin correcties op lidnummer met extra code.",
+        href: "/admin/settings/payment-corrections"
       }
     ]
   },
@@ -41,6 +46,11 @@ const groups = [
   {
     title: "Beheer",
     items: [
+      {
+        title: "Controlecentrum",
+        description: "Dagelijkse werklijst voor betalingen, importsignalen, gezinswijzigingen en statussen.",
+        href: "/admin/control-center"
+      },
       {
         title: "Registraties",
         description: "Nieuwe aanvragen beoordelen en subadmins laten meekijken.",

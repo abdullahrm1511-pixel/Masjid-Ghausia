@@ -4,7 +4,6 @@ import { formatCurrency, formatDate } from "@/lib/display";
 import { renderEmailTemplate } from "@/lib/email/templates";
 import { formatIban } from "@/lib/iban";
 import { donorStatusBadgeClass, donorStatusLabel } from "@/lib/labels";
-import { calculateCurrentAnnualAmount, calculateDonorCharges, getPricingConfig } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import { activateDonorManually, markAnnualPaymentDue, registerBankPayment, resetRegisteredPayments } from "./actions";
 
@@ -14,6 +13,11 @@ function paymentYear(item: { paidAt: Date | null; dueDate: Date | null; createdA
   const yearFromNotes = item.notes?.match(/\bContributiejaar:\s*(20\d{2})\b/i)?.[1];
   if (yearFromNotes) return Number(yearFromNotes);
   return (item.paidAt ?? item.dueDate ?? item.createdAt).getFullYear();
+}
+
+function noteValue(notes: string | null, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return notes?.match(new RegExp(`^${escaped}:\\s*(.+)$`, "im"))?.[1]?.trim() ?? "";
 }
 
 export default async function FinancialPage({
@@ -35,44 +39,40 @@ export default async function FinancialPage({
 
   if (!donor) notFound();
 
-  const pricing = await getPricingConfig();
   const paidItems = donor.paymentObligations.filter((item) => item.status === "PAID");
+  const dueItems = donor.paymentObligations.filter((item) => item.status === "DUE" && item.amountCents > 0);
   const receivedTotal = paidItems.filter((item) => item.amountCents > 0).reduce((sum, item) => sum + item.amountCents, 0);
   const deductionTotal = Math.abs(paidItems.filter((item) => item.amountCents < 0).reduce((sum, item) => sum + item.amountCents, 0));
   const paidTotal = receivedTotal - deductionTotal;
   const currentYear = new Date().getFullYear();
+  const annualDueItems = dueItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
+  const annualDueTotal = annualDueItems.reduce((sum, item) => sum + item.amountCents, 0);
   const annualPaidItems = paidItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
   const annualPaidTotal = Math.max(annualPaidItems.reduce((sum, item) => sum + item.amountCents, 0), 0);
   const latestAnnualPaid = annualPaidItems.find((item) => item.amountCents > 0);
-  const calculated = calculateDonorCharges(donor, donor.familyMembers, pricing, { hasAnnualPayment: false });
-  const mainCharge = calculated[0];
   const latestPaid = paidItems.find((item) => item.amountCents > 0);
+  const paymentHistory = donor.paymentObligations
+    .filter((item) => item.status === "PAID" && item.amountCents !== 0)
+    .slice(0, 50);
   const paidOneTimeTotal = paidItems
+    .filter((item) => item.obligationType === "ONE_TIME")
+    .reduce((sum, item) => sum + item.amountCents, 0);
+  const oneTimeDueTotal = dueItems
     .filter((item) => item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
   const extraReceivedTotal = Math.max(paidItems.filter((item) => item.obligationType === "MANUAL" && item.amountCents > 0).reduce((sum, item) => sum + item.amountCents, 0), 0);
 
-  const oneTimeTotal = donor.approvedAt && mainCharge ? mainCharge.oneTimeContribution * 100 : paidOneTimeTotal;
-  const annualTotal = calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, new Date(`${currentYear}-01-01T00:00:00.000Z`)) * 100;
-  const annualRemaining = Math.max(annualTotal - annualPaidTotal, 0);
-  const annualIsPaid = annualTotal > 0 && annualRemaining === 0;
+  const oneTimeTotal = paidOneTimeTotal + oneTimeDueTotal;
+  const annualTotal = annualPaidTotal + annualDueTotal;
+  const annualRemaining = annualDueTotal;
+  const annualIsPaid = annualTotal > 0 && annualDueTotal === 0;
   const annualIsPartial = annualPaidTotal > 0 && annualRemaining > 0;
-  const penaltyTotal = mainCharge ? mainCharge.penaltyContribution * 100 : 0;
-  const expectedTotal = oneTimeTotal + annualTotal + penaltyTotal;
-  const remainingOneTime = Math.max(oneTimeTotal - paidOneTimeTotal, 0);
+  const penaltyTotal = 0;
+  const remainingOneTime = oneTimeDueTotal;
   const displayedOneTimePaid = Math.max(0, Math.min(paidOneTimeTotal, oneTimeTotal));
-  const oneTimeDeadlineText = mainCharge?.oneTimeDeadline ? formatDate(mainCharge.oneTimeDeadline) : "-";
-  const oneTimeDaysRemaining = mainCharge?.oneTimeDaysRemaining;
-  const oneTimeTimerText =
-    oneTimeDaysRemaining === null || oneTimeDaysRemaining === undefined
-      ? "Timer start na goedkeuring"
-      : oneTimeDaysRemaining >= 0
-        ? `${oneTimeDaysRemaining} dagen over`
-        : `${Math.abs(oneTimeDaysRemaining)} dagen verlopen`;
-  const balanceCents = expectedTotal - paidTotal;
-  const remainingTotal = Math.max(balanceCents, 0);
-  const creditTotal = Math.max(-balanceCents, 0);
-  const canActivate = donor.status === "PAYMENT_REQUIRED" && annualIsPaid;
+  const remainingTotal = dueItems.reduce((sum, item) => sum + item.amountCents, 0);
+  const creditTotal = remainingTotal === 0 ? Math.max(paidTotal - oneTimeTotal - annualTotal, 0) : 0;
+  const canActivate = donor.status === "PAYMENT_REQUIRED" && remainingTotal === 0 && annualIsPaid;
   const paymentPreview = latestPaid
     ? await renderEmailTemplate("PAYMENT_CONFIRMED", {
         naam: `${donor.firstName} ${donor.lastName}`.trim(),
@@ -120,7 +120,7 @@ export default async function FinancialPage({
                   {formatCurrency(remainingTotal)}
                 </p>
                   <p className="mt-2 text-sm font-bold text-red-800">
-                  Jaarlijks{donor.approvedAt ? " + eenmalig" : ""} + boete, min ontvangen betalingen
+                  Alleen geregistreerde open posten worden als schuld getoond
                 </p>
               </div>
             </div>
@@ -133,7 +133,9 @@ export default async function FinancialPage({
                       ? `Betaald: ${formatCurrency(annualPaidTotal)}${latestAnnualPaid ? `, laatste betaling ${formatDate(latestAnnualPaid.paidAt)}` : ""}`
                       : annualIsPartial
                         ? `Gedeeltelijk betaald: ${formatCurrency(annualPaidTotal)}, restant ${formatCurrency(annualRemaining)}`
-                        : `${mainCharge?.annualYearsDue ?? 1} jaar open. ${mainCharge?.annualPaymentWindowLabel ?? "Niet betaald"}`}
+                        : annualDueTotal > 0
+                          ? `Openstaand: ${formatCurrency(annualDueTotal)}`
+                          : "Geen open jaarbetaling geregistreerd"}
                   </p>
                 </div>
                 <div className="rounded-md bg-slate-100 p-3">
@@ -142,9 +144,7 @@ export default async function FinancialPage({
                   {donor.approvedAt ? (
                     <>
                       <p className="mt-1 text-xs text-slate-600">Betaald {formatCurrency(displayedOneTimePaid)}, restant {formatCurrency(remainingOneTime)}</p>
-                      <p className={`mt-1 text-xs font-bold ${remainingOneTime > 0 && typeof oneTimeDaysRemaining === "number" && oneTimeDaysRemaining < 0 ? "text-red-700" : "text-slate-600"}`}>
-                        Deadline {oneTimeDeadlineText}. {oneTimeTimerText}
-                      </p>
+                      <p className="mt-1 text-xs font-bold text-slate-600">Nieuwe leden worden pas actief na volledige betaling.</p>
                     </>
                   ) : (
                     <p className="mt-1 text-xs text-slate-600">Niet van toepassing voor geimporteerde bestaande donateurs.</p>
@@ -257,7 +257,7 @@ export default async function FinancialPage({
       {canActivate ? (
         <form action={activateDonorManually} className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
           <input name="donorId" type="hidden" value={donor.id} />
-          <p className="font-semibold text-emerald-900">De eerste jaarlijkse betaling is bevestigd. Deze donateur kan actief worden gezet.</p>
+          <p className="font-semibold text-emerald-900">De jaarbijdrage en eenmalige bijdrage zijn volledig betaald. Deze donateur kan actief worden gezet.</p>
           <button className="mt-3 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" type="submit">
             Donateur actief zetten
           </button>
@@ -273,6 +273,41 @@ export default async function FinancialPage({
           <pre className="mt-1 whitespace-pre-wrap rounded-md bg-stone-100 p-3 text-sm">{paymentPreview.bodyText}</pre>
         </section>
       ) : null}
+
+      <section className="mt-6 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-900">Betaalhistorie</h2>
+        <p className="mt-1 text-sm text-slate-600">Hier staat wat er via bankimport of handmatige registratie is verwerkt. IBAN is alleen betaalbewijs en bepaalt niet voor welk lid betaald is.</p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[950px] text-left text-sm">
+            <thead className="bg-slate-100 text-slate-700">
+              <tr>
+                <th className="p-3">Datum</th>
+                <th className="p-3">Bedrag</th>
+                <th className="p-3">IBAN betaler</th>
+                <th className="p-3">Importbestand</th>
+                <th className="p-3">Omschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentHistory.length ? (
+                paymentHistory.map((item) => (
+                  <tr className="border-t border-slate-200 align-top" key={item.id}>
+                    <td className="p-3">{formatDate(item.paidAt)}</td>
+                    <td className="p-3 font-bold">{formatCurrency(item.amountCents)}</td>
+                    <td className="p-3">{noteValue(item.notes, "IBAN betaler") || "-"}</td>
+                    <td className="p-3">{noteValue(item.notes, "Importbestand") || (item.source ?? "-")}</td>
+                    <td className="p-3">{noteValue(item.notes, "Omschrijving") || item.adminNote || item.notes || "-"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="p-3 text-slate-600" colSpan={5}>Nog geen betalingen verwerkt.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }

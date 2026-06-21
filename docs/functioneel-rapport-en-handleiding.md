@@ -28,6 +28,12 @@ Kind betekent een opgegeven kind binnen het gezin van de hoofddonateur.
 
 Lidnummer betekent het registratienummer van de donateur. De opbouw begint met `11-001` tot en met `11-999`. Als die reeks vol is, start een nieuwe reeks met een extra cijfer: `11-0001` tot en met `11-9999`. Daarna gaat het verder met `11-00001` enzovoort. `11-054` en `11-0054` zijn dus twee verschillende lidnummers.
 
+Lidmaatschap betekent de huishoudlaag onder een lidnummer. Onder een lidmaatschap kunnen een primary member, partner en kinderen vallen. Bankbetalingen en jaarbijdragen horen bij het lidmaatschap/lidnummer.
+
+Primary member betekent de persoon die financieel verantwoordelijk is voor het lidmaatschap. Bij een getrouwd stel betaalt de primary member voor het gezin zolang de partner onder hetzelfde lidmaatschap valt.
+
+Partnerprofiel betekent een volledig profiel van de partner onder hetzelfde lidmaatschap. De partner is dan niet automatisch een aparte betalende donateur. Het profiel bestaat zodat gegevens bewaard blijven en de partner bij scheiding of eigen lidmaatschap niet opnieuw vanaf nul hoeft te beginnen.
+
 IBAN betekent het bankrekeningnummer van de donateur.
 
 Rekeninghouder betekent de naam die hoort bij de opgegeven bankrekening.
@@ -111,6 +117,8 @@ Status toont de huidige stand van de aanvraag of donateur. Voorbeelden:
 - "Status: overleden" betekent dat de persoon als overleden is geregistreerd.
 
 Lidnummer verschijnt wanneer er een lidnummer is toegewezen.
+
+Het lidnummer is leidend. Bij een gezin vallen primary member, partner en kinderen administratief onder hetzelfde lidnummer/lidmaatschap zolang zij samen geregistreerd zijn.
 
 Betaling verschijnt wanneer de status `PAYMENT_REQUIRED` is. Op dit moment staat daar dat betaling later volgt en dat online betalen nog niet beschikbaar is.
 
@@ -327,6 +335,12 @@ Bij import kunnen ook betalingsverplichtingen worden aangemaakt, zodat oude beta
 
 Bankbetalingen uit een bankexport worden als jaarlijkse bijdrage verwerkt. Een donateur kan de jaarbijdrage in meerdere termijnen betalen, bijvoorbeeld in januari, februari en maart. Het systeem telt deze betalingen bij elkaar op. Als het totaal lager is dan de jaarbijdrage, blijft alleen het restant openstaan. Als het totaal voldoende is, wordt de jaarbetaling als betaald behandeld.
 
+Na de betaalperiode, dus na 31 maart volgens de standaardinstellingen, zet het systeem leden zonder volledige jaarbetaling bij het verwerken van een bankimport automatisch op `INACTIVE`. Het open bedrag bestaat dan uit de jaarbijdrage min ontvangen betalingen plus de maandelijkse boete.
+
+De boete is standaard 5 euro per maand vanaf april. Op 1 april telt het systeem dus 5 euro boete mee. Daarna komt er iedere maand 5 euro bij zolang de jaarbetaling niet volledig is betaald.
+
+Als een bankomschrijving geen lidnummer bevat, gaat de regel altijd naar tweede opinie. Het systeem mag wel een suggestie tonen op basis van naam of IBAN, maar verwerkt de betaling dan niet automatisch.
+
 Als hetzelfde bankbestand per ongeluk opnieuw wordt geimporteerd, probeert het systeem dubbele betalingen te herkennen op basis van dezelfde donateur, betaaldatum, bedrag en importsbron. Zulke regels worden als dubbele betaling getoond en niet opnieuw verwerkt.
 
 Bestaande donateurs die via oude Excelbestanden of bankimports worden geimporteerd krijgen geen eenmalige inschrijfschuld. De eenmalige bijdrage geldt alleen voor mensen die zich nu via het portaal inschrijven en daarna door het bestuur worden goedgekeurd.
@@ -373,11 +387,15 @@ Ongeldig betekent dat de rij blokkerende fouten bevat.
 
 Gedeeltelijk betaald betekent dat er al een deel van de jaarbijdrage is ontvangen, maar dat er nog een restant openstaat.
 
+Inactief gezet betekent dat een lid na de betaalperiode geen volledige jaarbetaling heeft. Dit gebeurt niet voor rijen die nog in tweede opinie staan, zodat mogelijke betalingen zonder lidnummer eerst handmatig beoordeeld kunnen worden.
+
 ### 16.4 Mogelijke meldingen bij import
 
 IBAN komt bij meerdere lidnummers voor; kies handmatig op lidnummer of zorg dat de omschrijving een lidnummer bevat betekent dat dezelfde IBAN bij meerdere donateurs voorkomt en het systeem niet zelfstandig mag kiezen.
 
 Betalingsdoel komt overeen met meerdere donateurs betekent dat meerdere personen op de gevonden naam lijken.
+
+Geen lidnummer in de omschrijving; controleer de voorgestelde koppeling handmatig betekent dat het systeem wel een mogelijke persoon kan herkennen, maar de betaling niet automatisch verwerkt omdat het lidnummer ontbreekt.
 
 Omschrijving ontbreekt betekent dat een bankexportregel geen omschrijving bevat.
 
@@ -479,6 +497,10 @@ Gezinsverwijzingen die alleen uit bankimport komen, tellen niet automatisch mee 
 
 De eenmalige bijdrage wordt alleen gebruikt bij nieuwe inschrijvingen via het portaal. Voor bestaande geimporteerde donateurs telt standaard alleen de jaarlijkse bijdrage.
 
+Bij huwelijk of partnerregistratie onder hetzelfde lidmaatschap betaalt de primary member het gezinstarief. Als de partner als partnerprofiel onder hetzelfde lidnummer staat, krijgt de partner geen aparte jaarlijkse betaalplicht. Als de partner voor zichzelf betaalt of apart lid wil zijn, krijgt de partner een eigen lidnummer en wordt die persoon primary member van een eigen lidmaatschap.
+
+Als een partner wordt toegevoegd in een lopend jaar, geldt voor dat jaar het gezinstarief voor het lidmaatschap. De partner krijgt geen aparte jaarlijkse bijdrage voor datzelfde jaar. De eenmalige bijdrage van de partner kan wel openstaan en heeft dezelfde betalingsruimte als een nieuwe inschrijving.
+
 ## 22. Rollen en rechten
 
 Donateur heeft toegang tot eigen dashboard en eigen account.
@@ -517,9 +539,27 @@ Adminrechten moeten beperkt blijven tot personen die deze toegang echt nodig heb
 
 Bij bankimport wordt een betaling gekoppeld aan het betalingsdoel. Als persoon 1 betaalt voor persoon 2, wordt alleen de bijdrage van persoon 2 als betaald geregistreerd. Persoon 1 wordt dan alleen als betaler of rekeninghouder in de notitie genoemd.
 
-Jaarbetalingen mogen in termijnen binnen januari tot en met maart binnenkomen. Het systeem telt termijnen op. Bij een gedeeltelijke betaling blijft het restant zichtbaar als open jaarbetaling. Uitzonderingen kunnen handmatig via het financieel overzicht worden toegevoegd of gecorrigeerd.
+Voor een gezin onder één lidnummer wordt de bankbetaling gekoppeld aan het lidmaatschap/huishouden. De primary member is de betaler. Partnerprofielen onder hetzelfde lidnummer krijgen geen aparte jaarlijkse betaalstatus zolang zij geen eigen lidnummer hebben.
 
-Als bij een volgende jaarimport blijkt dat iemand geen betaling voor dat jaar heeft, moet deze persoon administratief op betaling afwachtend of inactief worden gezet of moet er een open jaarbetaling worden geregistreerd. Dit kan handmatig via het financieel overzicht.
+Jaarbetalingen mogen in termijnen binnen januari tot en met maart binnenkomen. Het systeem telt termijnen op. Bij een gedeeltelijke betaling blijft het restant zichtbaar als open jaarbetaling. Na 31 maart komt daar standaard 5 euro boete per maand bij. Uitzonderingen kunnen handmatig via het financieel overzicht worden toegevoegd of gecorrigeerd.
+
+Als bij een volgende jaarimport blijkt dat iemand geen betaling voor dat jaar heeft, wordt deze persoon na de betaalperiode administratief op `INACTIVE` gezet. In het profiel blijft het lidnummer gekoppeld aan de naam. Als de persoon later opnieuw wil deelnemen, moet het bestuur het normale proces opnieuw volgen, inclusief screening, eenmalige betaling op basis van leeftijd en de nieuwe jaarlijkse bijdrage.
+
+Wanneer iemand tot 31 december niet volledig heeft betaald, kan het profiel vanaf 1 januari als geannuleerd wegens niet-betalen zichtbaar zijn. De technische status blijft `INACTIVE`, zodat het oude lidnummer en de historie bewaard blijven.
+
+## 25.1 Proces: trouwen, scheiden en partnerprofielen
+
+Wanneer een primary member trouwt en de partner onder hetzelfde lidmaatschap wordt toegevoegd, blijft het lidnummer leidend. De partner krijgt een partnerprofiel onder dat lidnummer. De primary member betaalt dan de gezamenlijke jaarbijdrage voor het gezin.
+
+Als de partner apart wil betalen of niet onder het lidmaatschap van de primary member valt, krijgt de partner een eigen lidnummer en wordt die persoon primary member van een eigen lidmaatschap.
+
+Bij scheiding behoudt de oorspronkelijke primary member het bestaande lidnummer. De partner krijgt een nieuw lidnummer en wordt primary member van een eigen lidmaatschap. Vanaf het volgende kalenderjaar betaalt ieder lidmaatschap volgens de eigen gezinssituatie.
+
+Bij scheiding met kinderen wordt via een wijzigingsverzoek vastgelegd bij welk lidmaatschap de kinderen administratief horen. Vanaf het volgende kalenderjaar betaalt de ouder met kinderen bijvoorbeeld het alleenstaande-oudertarief en de ouder zonder kinderen het individuele tarief.
+
+Als een partner overlijdt, wordt die partner administratief inactief. Het lidmaatschap rekent daarna niet meer als getrouwd gezin voor de jaarlijkse bijdrage, tenzij er nog kinderen of andere prijsregels gelden.
+
+Wijzigingen zoals partner toevoegen, scheiding doorgeven, partner overleden, kind bij een ouder plaatsen of partner eigen lidnummer geven worden voorbereid via lidmaatschapswijzigingsverzoeken. De admin controleert en keurt deze wijzigingen goed.
 
 ## 26. Proces: overlijden
 

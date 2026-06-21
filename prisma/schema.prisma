@@ -31,6 +31,15 @@ enum FamilyMemberType {
   OTHER
 }
 
+enum FamilyMemberStatus {
+  ACTIVE_DEPENDENT
+  UNDER_18
+  ADULT_NEEDS_REGISTRATION
+  REGISTERED_SEPARATELY
+  NOT_A_MEMBER
+  DECEASED
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -93,6 +102,35 @@ enum PaymentMethod {
   OTHER
 }
 
+enum MembershipMemberRole {
+  PRIMARY
+  PARTNER
+  CHILD
+}
+
+enum MembershipChangeType {
+  ADD_PARTNER
+  DIVORCE
+  PARTNER_DECEASED
+  CHILD_CUSTODY_CHANGE
+  PARTNER_OWN_MEMBERSHIP
+  CHILD_TURNING_18
+}
+
+enum MembershipChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AdultChildTransitionStatus {
+  NEEDS_REGISTRATION
+  INVITED
+  REGISTERED
+  DISMISSED
+}
+
 enum EmailLogStatus {
   PREPARED
 }
@@ -110,24 +148,31 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts                Account[]
-  sessions                Session[]
-  donorProfile            DonorProfile?
-  adminProfile            AdminProfile?
-  auditLogs               AuditLog[]
-  updatedPayments         PaymentObligation[]   @relation("PaymentUpdatedBy")
-  statusChanges           DonorStatusHistory[]  @relation("StatusChangedBy")
-  passwordResetTokens     PasswordResetToken[]
-  registrationRequests    RegistrationRequest[]
-  reviewedRegistrations   RegistrationRequest[] @relation("ReviewedRegistrations")
-  submittedChangeRequests ChangeRequest[]       @relation("SubmittedChangeRequests")
-  reviewedChangeRequests  ChangeRequest[]       @relation("ReviewedChangeRequests")
+  accounts                   Account[]
+  sessions                   Session[]
+  donorProfile               DonorProfile?
+  adminProfile               AdminProfile?
+  auditLogs                  AuditLog[]
+  updatedPayments            PaymentObligation[]         @relation("PaymentUpdatedBy")
+  statusChanges              DonorStatusHistory[]        @relation("StatusChangedBy")
+  familyStatusChanges        FamilyMemberStatusHistory[] @relation("FamilyStatusChangedBy")
+  adultTransitionsResolved   AdultChildTransition[]      @relation("AdultTransitionResolvedBy")
+  passwordResetTokens        PasswordResetToken[]
+  registrationRequests       RegistrationRequest[]
+  reviewedRegistrations      RegistrationRequest[]       @relation("ReviewedRegistrations")
+  submittedChangeRequests    ChangeRequest[]             @relation("SubmittedChangeRequests")
+  reviewedChangeRequests     ChangeRequest[]             @relation("ReviewedChangeRequests")
+  submittedMembershipChanges MembershipChangeRequest[]   @relation("SubmittedMembershipChanges")
+  reviewedMembershipChanges  MembershipChangeRequest[]   @relation("ReviewedMembershipChanges")
 }
 
 model DonorProfile {
   id                   String         @id @default(cuid())
   userId               String         @unique
+  currentMembershipId  String?
   registrationNumber   String?        @unique
+  legacyMemberDetailKey String?
+  legacyAddressKey     String?
   status               DonorStatus    @default(PENDING)
   firstName            String
   lastName             String
@@ -157,14 +202,24 @@ model DonorProfile {
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentMembership    Membership?                 @relation("CurrentMembership", fields: [currentMembershipId], references: [id], onDelete: SetNull)
+  primaryMemberships   Membership[]                @relation("MembershipPrimary")
+  payerMemberships     Membership[]                @relation("MembershipPayer")
+  membershipMembers    MembershipMember[]
   familyMembers        FamilyMember[]
   registrationRequests RegistrationRequest[]
   changeRequests       ChangeRequest[]
   paymentObligations   PaymentObligation[]
   statusHistory        DonorStatusHistory[]
+  familyStatusHistory  FamilyMemberStatusHistory[]
+  previousAdultChildTransitions AdultChildTransition[] @relation("AdultTransitionPreviousDonor")
+  newAdultChildTransitions      AdultChildTransition[] @relation("AdultTransitionNewDonor")
 
   @@index([registrationNumber])
+  @@index([legacyMemberDetailKey])
+  @@index([legacyAddressKey])
+  @@index([currentMembershipId])
   @@index([status])
   @@index([iban])
 }
@@ -191,7 +246,10 @@ model DonorStatusHistory {
 model FamilyMember {
   id             String           @id @default(cuid())
   donorProfileId String
+  legacyMemberDetailKey String?
+  legacyAddressKey String?
   type           FamilyMemberType
+  status         FamilyMemberStatus @default(ACTIVE_DEPENDENT)
   firstName      String
   lastName       String
   gender         Gender?
@@ -202,7 +260,138 @@ model FamilyMember {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
+  donorProfile      DonorProfile                @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  membershipMembers MembershipMember[]
+  statusHistory     FamilyMemberStatusHistory[]
+  adultTransition    AdultChildTransition?
+
+  @@index([legacyMemberDetailKey])
+  @@index([legacyAddressKey])
+  @@index([status])
+  @@index([type, status])
+}
+
+model FamilyMemberStatusHistory {
+  id             String   @id @default(cuid())
+  familyMemberId String
+  donorProfileId String
+  changedById    String?
+  fromStatus     String
+  toStatus       String
+  internalNote   String
+  donorMessage   String
+  createdAt      DateTime @default(now())
+
+  familyMember FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
   donorProfile DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  changedBy    User?        @relation("FamilyStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([familyMemberId])
+  @@index([donorProfileId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model AdultChildTransition {
+  id                    String                     @id @default(cuid())
+  familyMemberId        String                     @unique
+  previousDonorProfileId String
+  newDonorProfileId     String?
+  status                AdultChildTransitionStatus @default(NEEDS_REGISTRATION)
+  turned18At            DateTime
+  notes                 String?
+  resolvedById          String?
+  resolvedAt            DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  familyMember         FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  previousDonorProfile DonorProfile @relation("AdultTransitionPreviousDonor", fields: [previousDonorProfileId], references: [id], onDelete: Cascade)
+  newDonorProfile      DonorProfile? @relation("AdultTransitionNewDonor", fields: [newDonorProfileId], references: [id], onDelete: SetNull)
+  resolvedBy           User?        @relation("AdultTransitionResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([previousDonorProfileId])
+  @@index([newDonorProfileId])
+  @@index([status])
+  @@index([turned18At])
+}
+
+model Membership {
+  id                        String      @id @default(cuid())
+  registrationNumber        String      @unique
+  status                    DonorStatus @default(PENDING)
+  primaryDonorProfileId     String?
+  annualPayerDonorProfileId String?
+  notes                     String?
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+
+  primaryDonorProfile     DonorProfile?             @relation("MembershipPrimary", fields: [primaryDonorProfileId], references: [id], onDelete: SetNull)
+  annualPayerDonorProfile DonorProfile?             @relation("MembershipPayer", fields: [annualPayerDonorProfileId], references: [id], onDelete: SetNull)
+  currentDonorProfiles    DonorProfile[]            @relation("CurrentMembership")
+  members                 MembershipMember[]
+  paymentObligations      PaymentObligation[]
+  changeRequests          MembershipChangeRequest[]
+
+  @@index([status])
+  @@index([primaryDonorProfileId])
+  @@index([annualPayerDonorProfileId])
+}
+
+model MembershipMember {
+  id             String               @id @default(cuid())
+  membershipId   String
+  donorProfileId String?
+  familyMemberId String?
+  role           MembershipMemberRole
+  displayNumber  String?
+  isPrimaryPayer Boolean              @default(false)
+  isActive       Boolean              @default(true)
+  activeFrom     DateTime             @default(now())
+  endedAt        DateTime?
+  endReason      String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  membership   Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  donorProfile DonorProfile? @relation(fields: [donorProfileId], references: [id], onDelete: SetNull)
+  familyMember FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([membershipId, donorProfileId])
+  @@unique([membershipId, familyMemberId])
+  @@index([membershipId])
+  @@index([donorProfileId])
+  @@index([familyMemberId])
+  @@index([role])
+}
+
+model MembershipChangeRequest {
+  id            String                 @id @default(cuid())
+  membershipId  String
+  requestedById String
+  reviewedById  String?
+  changeType    MembershipChangeType
+  status        MembershipChangeStatus @default(PENDING)
+  requestedData Json
+  currentData   Json?
+  memberNote    String?
+  adminNote     String?
+  memberMessage String?
+  submittedAt   DateTime               @default(now())
+  reviewedAt    DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  membership  Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  requestedBy User       @relation("SubmittedMembershipChanges", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?      @relation("ReviewedMembershipChanges", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([membershipId])
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([changeType])
+  @@index([submittedAt])
 }
 
 model RegistrationRequest {
@@ -313,6 +502,7 @@ model PasswordResetToken {
 model PaymentObligation {
   id               String                  @id @default(cuid())
   donorProfileId   String
+  membershipId     String?
   updatedByAdminId String?
   lidnummer        String?
   obligationType   PaymentObligationType
@@ -328,9 +518,11 @@ model PaymentObligation {
   updatedAt        DateTime                @updatedAt
 
   donorProfile   DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  membership     Membership?  @relation(fields: [membershipId], references: [id], onDelete: SetNull)
   updatedByAdmin User?        @relation("PaymentUpdatedBy", fields: [updatedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([donorProfileId])
+  @@index([membershipId])
   @@index([updatedByAdminId])
   @@index([lidnummer])
   @@index([status])

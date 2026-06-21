@@ -33,6 +33,7 @@ Het portaal kan de volgende gegevens verwerken:
 - IBAN en naam rekeninghouder.
 - Lidnummer of registratienummer.
 - Partner- en kindgegevens, zoals naam, geboortedatum, geboorteplaats en relatie.
+- Lidmaatschapsgegevens, zoals het gezamenlijke lidnummer, primary member, partnerprofiel, kinderen onder het lidmaatschap en wijzigingsverzoeken rondom trouwen, scheiden of eigen lidnummer.
 - Contactpersoon in Pakistan en telefoonnummer van die contactpersoon.
 - Uitvaartwensen of andere opgegeven wensen.
 - Status van de inschrijving of donateur.
@@ -136,7 +137,15 @@ Als een omschrijving aangeeft dat iemand betaalt voor een ander, bijvoorbeeld "c
 
 Rijen waarbij de koppeling onvoldoende eenduidig is, worden als "Tweede opinie" getoond en niet automatisch verwerkt. Dit is bedoeld om verkeerde koppelingen te voorkomen.
 
-Bankbetalingen worden administratief als jaarlijkse bijdragen verwerkt. Meerdere termijnen voor hetzelfde jaar kunnen worden opgeteld. Bestaande geimporteerde donateurs krijgen geen eenmalige inschrijfschuld; die eenmalige bijdrage geldt alleen voor nieuwe inschrijvingen via het portaal.
+Bankbetalingen worden administratief als jaarlijkse bijdragen verwerkt. Meerdere termijnen voor hetzelfde jaar kunnen worden opgeteld. Als een bankomschrijving geen lidnummer bevat, wordt de regel als tweede opinie behandeld en niet automatisch verwerkt.
+
+Na de betaalperiode kan het systeem leden zonder volledige jaarbetaling administratief op `INACTIVE` zetten en een open bedrag inclusief maandelijkse boete registreren. Vanaf het volgende jaar kan in het profiel zichtbaar zijn dat het lidmaatschap administratief is geannuleerd wegens niet betalen. Het oude lidnummer en de historie blijven bewaard.
+
+Bestaande geimporteerde donateurs krijgen geen eenmalige inschrijfschuld; die eenmalige bijdrage geldt alleen voor nieuwe inschrijvingen via het portaal.
+
+Het lidnummer wordt administratief behandeld als lidmaatschap of huishouden. Onder één lidnummer kunnen een primary member, partnerprofiel en kinderen vallen. De primary member is financieel verantwoordelijk zolang de partner onder hetzelfde lidmaatschap valt. Een partnerprofiel wordt bewaard zodat gegevens beschikbaar blijven bij scheiding, overlijden of een later eigen lidmaatschap.
+
+Wijzigingen zoals partner toevoegen, scheiding, partner overleden, kind bij een ouder plaatsen of partner eigen lidnummer geven kunnen als lidmaatschapswijziging worden geregistreerd en beoordeeld door bevoegde admins.
 
 Bij export worden donateursgegevens in een bestand gezet. Exportbestanden mogen alleen worden gemaakt wanneer dit nodig is voor bestuur, administratie, controle of betaling. Exportbestanden moeten veilig worden bewaard en verwijderd wanneer ze niet meer nodig zijn.
 

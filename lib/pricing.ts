@@ -3,6 +3,7 @@ import type { PersonCharge } from "@/types/domain";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/lib/pricing-config";
 import { prisma } from "@/lib/prisma";
 import { PRICING_CONFIG_KEY } from "@/lib/pricing-config";
+import { contributesToHousehold } from "@/lib/family-status";
 
 function ageOn(dateOfBirth: Date, today = new Date()) {
   let age = today.getFullYear() - dateOfBirth.getFullYear();
@@ -115,13 +116,13 @@ function oneTimeAmount(age: number, config: PricingConfig) {
 
 export function calculateCurrentAnnualAmount(
   donorProfile: Pick<DonorProfile, "dateOfBirth" | "maritalStatus">,
-  familyMembers: Array<Pick<FamilyMember, "dateOfBirth" | "type" | "isActive">>,
+  familyMembers: Array<Pick<FamilyMember, "dateOfBirth" | "type" | "isActive"> & { status?: string | null }>,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
   today = new Date()
 ) {
   if (ageOn(donorProfile.dateOfBirth, today) < 18) return 0;
 
-  const activeFamily = familyMembers.filter((member) => member.isActive);
+  const activeFamily = familyMembers.filter((member) => member.isActive && contributesToHousehold(member.status));
   const partner = activeFamily.find((member) => member.type === "PARTNER");
   const children = activeFamily.filter((member) => member.type === "CHILD");
   const under18Children = children.filter((child) => ageOn(child.dateOfBirth, today) < 18);
@@ -133,12 +134,12 @@ export function calculateCurrentAnnualAmount(
 
 export function calculateDonorCharges(
   donorProfile: Pick<DonorProfile, "firstName" | "lastName" | "dateOfBirth" | "maritalStatus" | "approvedAt">,
-  familyMembers: Array<Pick<FamilyMember, "firstName" | "lastName" | "dateOfBirth" | "type" | "isActive">>,
+  familyMembers: Array<Pick<FamilyMember, "firstName" | "lastName" | "dateOfBirth" | "type" | "isActive"> & { status?: string | null }>,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
   options: { hasAnnualPayment?: boolean; today?: Date } = {}
 ): PersonCharge[] {
   const today = options.today ?? new Date();
-  const activeFamily = familyMembers.filter((member) => member.isActive);
+  const activeFamily = familyMembers.filter((member) => member.isActive && contributesToHousehold(member.status));
   const partner = activeFamily.find((member) => member.type === "PARTNER");
   const children = activeFamily.filter((member) => member.type === "CHILD");
   const annualForMain = calculateCurrentAnnualAmount(donorProfile, familyMembers, config, today);
@@ -164,7 +165,7 @@ export function calculateDonorCharges(
       name: `${child.firstName} ${child.lastName}`.trim(),
       role: "kind" as const,
       dateOfBirth: child.dateOfBirth,
-      annualContribution: ageOn(child.dateOfBirth, today) >= 18 ? config.annualIndividual18Plus : 0
+      annualContribution: 0
     }))
   ];
 

@@ -7,6 +7,8 @@ import { generateRegistrationNumber } from "@/lib/registration/numbers";
 import { writeAuditLog } from "@/lib/audit";
 import { isAdminRole } from "@/lib/permissions";
 import { prepareEmailLog } from "@/lib/email/templates";
+import { ensurePrimaryMembership } from "@/lib/membership";
+import { calculateCurrentAnnualAmount, getPricingConfig } from "@/lib/pricing";
 
 async function requireAdmin() {
   const session = await auth();
@@ -21,7 +23,7 @@ export async function approveRegistration(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const request = await prisma.registrationRequest.findUnique({
     where: { id },
-    include: { donorProfile: true, requestedBy: true }
+    include: { donorProfile: { include: { familyMembers: true, paymentObligations: true } }, requestedBy: true }
   });
 
   if (!request?.donorProfile) {
@@ -30,6 +32,14 @@ export async function approveRegistration(formData: FormData) {
 
   const registrationNumber = request.donorProfile.registrationNumber ?? (await generateRegistrationNumber());
   const now = new Date();
+  const pricing = await getPricingConfig();
+  const currentYear = now.getFullYear();
+  const annualAmountCents = calculateCurrentAnnualAmount(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
+  const hasCurrentAnnualObligation = request.donorProfile.paymentObligations.some(
+    (item) =>
+      item.obligationType === "ANNUAL" &&
+      ((item.dueDate ?? item.paidAt ?? item.createdAt).getFullYear() === currentYear || item.lidnummer === `${registrationNumber}-${currentYear}`)
+  );
 
   await prisma.$transaction([
     prisma.donorProfile.update({
@@ -56,8 +66,34 @@ export async function approveRegistration(formData: FormData) {
         reviewedAt: now,
         donorMessage: "Uw aanvraag is goedgekeurd."
       }
-    })
+    }),
+    ...(annualAmountCents > 0 && !hasCurrentAnnualObligation
+      ? [
+          prisma.paymentObligation.create({
+            data: {
+              donorProfileId: request.donorProfile.id,
+              lidnummer: `${registrationNumber}-${currentYear}`,
+              obligationType: "ANNUAL",
+              amountCents: annualAmountCents,
+              status: "DUE",
+              dueDate: now,
+              source: "REGISTRATION_APPROVAL_ANNUAL",
+              notes: `Jaarlijkse bijdrage ${currentYear} aangemaakt bij registratiegoedkeuring.`
+            }
+          })
+        ]
+      : [])
   ]);
+
+  await ensurePrimaryMembership({
+    id: request.donorProfile.id,
+    registrationNumber,
+    status: "PAYMENT_REQUIRED",
+    approvedAt: now,
+    activeSince: null,
+    createdAt: request.donorProfile.createdAt,
+    updatedAt: now
+  });
 
   await writeAuditLog({
     actorId: adminId,

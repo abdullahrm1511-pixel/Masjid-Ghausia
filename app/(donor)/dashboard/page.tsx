@@ -19,6 +19,10 @@ function statusText(status: string, message?: string | null) {
   return status;
 }
 
+function paymentYear(item: { dueDate?: Date | null; paidAt?: Date | null; createdAt: Date }) {
+  return (item.dueDate ?? item.paidAt ?? item.createdAt).getFullYear();
+}
+
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user.id) {
@@ -44,23 +48,27 @@ export default async function DashboardPage() {
   const latestChange = profile.changeRequests[0];
   const visibleMessage = latestRegistration?.donorMessage ?? latestChange?.donorMessage;
   const totalPaid = profile.paymentObligations.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountCents, 0);
-  const openRegisteredTotal = profile.paymentObligations.filter((item) => item.status === "DUE").reduce((sum, item) => sum + item.amountCents, 0);
   const latestPaymentDate = profile.paymentObligations.find((item) => item.status === "PAID")?.paidAt;
   const pricing = await getPricingConfig();
   const mainCharge = calculateDonorCharges(profile, profile.familyMembers, pricing, { hasAnnualPayment: false })[0];
   const oneTimePaid = profile.paymentObligations
     .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
+  const currentYear = new Date().getFullYear();
+  const annualPaid = profile.paymentObligations
+    .filter((item) => item.status === "PAID" && item.obligationType === "ANNUAL" && paymentYear(item) === currentYear)
+    .reduce((sum, item) => sum + item.amountCents, 0);
+  const annualOpenRegistered = profile.paymentObligations
+    .filter((item) => item.status === "DUE" && item.obligationType === "ANNUAL" && paymentYear(item) === currentYear)
+    .reduce((sum, item) => sum + item.amountCents, 0);
   const oneTimeRequired = profile.approvedAt ? (mainCharge?.oneTimeContribution ?? 0) * 100 : 0;
   const oneTimeRemaining = Math.max(oneTimeRequired - oneTimePaid, 0);
-  const totalDue = openRegisteredTotal + oneTimeRemaining;
-  const oneTimeDaysRemaining = mainCharge?.oneTimeDaysRemaining;
-  const oneTimeTimerText =
-    oneTimeDaysRemaining === null || oneTimeDaysRemaining === undefined
-      ? "De termijn start vanaf goedkeuring."
-      : oneTimeDaysRemaining >= 0
-        ? `Nog ${oneTimeDaysRemaining} dagen tot de deadline.`
-        : `De deadline is ${Math.abs(oneTimeDaysRemaining)} dagen geleden verlopen.`;
+  const annualRequired = profile.approvedAt ? (mainCharge?.annualContribution ?? 0) * 100 : annualOpenRegistered;
+  const annualRemaining = profile.approvedAt
+    ? Math.max(annualRequired - annualPaid, 0)
+    : Math.max(annualRequired - annualPaid, annualOpenRegistered, 0);
+  const penaltyRequired = profile.approvedAt?.getFullYear() === currentYear ? 0 : (mainCharge?.penaltyContribution ?? 0) * 100;
+  const totalDue = Math.max(annualRequired + oneTimeRequired + penaltyRequired - totalPaid, 0);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -93,10 +101,22 @@ export default async function DashboardPage() {
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div><dt className="text-sm font-semibold text-slate-600">Bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(oneTimeRequired)}</dd></div>
             <div><dt className="text-sm font-semibold text-slate-600">Restant</dt><dd className={`mt-1 font-bold ${oneTimeRemaining > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(oneTimeRemaining)}</dd></div>
-            <div><dt className="text-sm font-semibold text-slate-600">Deadline</dt><dd className="mt-1 font-bold text-slate-900">{formatDate(mainCharge.oneTimeDeadline)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Voorwaarde</dt><dd className="mt-1 font-bold text-slate-900">Volledig betalen</dd></div>
           </dl>
-          <p className={`mt-3 text-sm font-bold ${oneTimeRemaining > 0 && typeof oneTimeDaysRemaining === "number" && oneTimeDaysRemaining < 0 ? "text-red-700" : "text-slate-700"}`}>
-            {oneTimeTimerText}
+          <p className="mt-3 text-sm font-bold text-slate-700">Nieuwe leden worden pas actief nadat het volledige bedrag is betaald.</p>
+        </section>
+      ) : null}
+
+      {annualRequired > 0 ? (
+        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Jaarlijkse bijdrage</h2>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div><dt className="text-sm font-semibold text-slate-600">Bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(annualRequired)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Betaald</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(annualPaid)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Restant</dt><dd className={`mt-1 font-bold ${annualRemaining > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(annualRemaining)}</dd></div>
+          </dl>
+          <p className="mt-3 text-sm font-bold text-slate-700">
+            Na volledige betaling van de jaarlijkse bijdrage kan het account actief worden gezet.
           </p>
         </section>
       ) : null}

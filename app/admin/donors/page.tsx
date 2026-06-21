@@ -44,6 +44,7 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
   const normalizedIban = normalizeIban(q);
   const typedStatus = Object.values(DonorStatus).find((item) => item === q.toUpperCase());
   const statusWhere = getStatusWhere(selectedStatus);
+  const donorListWhere: Prisma.DonorProfileWhereInput = { registrationNumber: { not: null } };
   const searchWhere: Prisma.DonorProfileWhereInput | undefined = q
     ? {
         OR: [
@@ -55,8 +56,14 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
         ]
       }
     : undefined;
-  const where: Prisma.DonorProfileWhereInput | undefined =
-    statusWhere && searchWhere ? { AND: [statusWhere, searchWhere] } : statusWhere ?? searchWhere;
+  const where: Prisma.DonorProfileWhereInput =
+    statusWhere && searchWhere
+      ? { AND: [donorListWhere, statusWhere, searchWhere] }
+      : statusWhere
+        ? { AND: [donorListWhere, statusWhere] }
+        : searchWhere
+          ? { AND: [donorListWhere, searchWhere] }
+          : donorListWhere;
   const donors = await prisma.donorProfile.findMany({
     where,
     include: { user: true, familyMembers: true, paymentObligations: true },

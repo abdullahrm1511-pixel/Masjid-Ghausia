@@ -13,6 +13,7 @@ export function Navbar({ session }: { session: Session | null }) {
     ["Actieve donateurs", "/admin/donors?status=ACTIVE"],
     ["Inactief / betaling afwachtend", "/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED"],
     ["Actie vereist", "/admin/donors?status=ACTION_REQUIRED"],
+    ["Gezinswijzigingen", "/admin/family-transitions"],
     ["Afgewezen", "/admin/donors?status=REJECTED"],
     ["Overleden", "/admin/donors?status=DECEASED"]
   ] as const;
@@ -62,6 +63,11 @@ export function Navbar({ session }: { session: Session | null }) {
               <Link className={navLink} href="/admin">
                 Admin dashboard
               </Link>
+              {donorAdmin ? (
+                <Link className={navLink} href="/admin/control-center">
+                  Controlecentrum
+                </Link>
+              ) : null}
               <Link className={navLink} href="/admin/registrations">
                 Registraties
               </Link>
