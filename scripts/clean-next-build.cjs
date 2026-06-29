@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const projectRoot = path.resolve(__dirname, "..");
-const distDir = process.env.NEXT_DIST_DIR || ".next-build";
+const distDir = process.env.NEXT_DIST_DIR || ".next";
 const target = path.resolve(projectRoot, distDir);
 
 if (!target.startsWith(projectRoot + path.sep)) {
