@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { canManageDonors } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { buildImportPreview, splitName, type ImportPreviewRow } from "@/lib/admin/import";
+import { buildImportPreview, normalizeImportedDonorStatus, splitName, type ImportPreviewRow } from "@/lib/admin/import";
 import { syncRegistrationCounter } from "@/lib/registration/numbers";
 import { writeAuditLog } from "@/lib/audit";
 import { calculateCurrentAnnualAmount, getPricingConfig } from "@/lib/pricing";
 import type { PricingConfig } from "@/lib/pricing-config";
 import { ensurePrimaryMembership, findPrimaryDonorByMembershipNumber, membershipIdForRegistrationNumber } from "@/lib/membership";
+import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
 
 export type ImportPreviewState = {
   rows: ImportPreviewRow[];
@@ -142,6 +143,9 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
         gender: normalizeGender(row.gender),
         phone: row.phone || existingDonor.phone,
         addressLine1: row.addressLine1 || existingDonor.addressLine1,
+        addressLine2: row.addressLine2 ?? existingDonor.addressLine2,
+        postalCode: row.postalCode || existingDonor.postalCode,
+        city: row.city || existingDonor.city,
         dateOfBirth: birthDate,
         birthPlace: row.birthPlace || existingDonor.birthPlace,
         accountHolderName: fullName || existingDonor.accountHolderName,
@@ -193,8 +197,9 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
       gender: normalizeGender(row.gender),
       phone: row.phone || "",
       addressLine1: row.addressLine1 || "",
-      postalCode: "",
-      city: "",
+      addressLine2: row.addressLine2 || null,
+      postalCode: row.postalCode || "",
+      city: row.city || "",
       dateOfBirth: birthDate,
       birthPlace: row.birthPlace || "",
       iban: "",
@@ -308,6 +313,7 @@ async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], admin
     }
 
     const { donor, created } = await upsertImportedPrimary(primary);
+    await syncFamilyActivityForDonorStatus(prisma, donor.id, donor.status);
     const membership = await ensurePrimaryMembership({
       id: donor.id,
       registrationNumber: donor.registrationNumber,
@@ -345,12 +351,171 @@ async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], admin
   return summary;
 }
 
+async function commitDonorStatusImport(rows: ImportPreviewRow[], adminId: string, fileName: string): Promise<ImportResultState> {
+  const summary: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
+  const now = new Date();
+
+  for (const row of rows.filter((item) => item.importMode === "donor-status")) {
+    if (row.detectedAction === "DUPLICATE_IMPORT_ROW") {
+      summary.duplicates = (summary.duplicates ?? 0) + 1;
+      continue;
+    }
+    if (row.errors.length) {
+      summary.invalid += 1;
+      continue;
+    }
+    if (row.reviewReasons.length || row.detectedAction === "STATUS_NOT_FOUND") {
+      summary.review += 1;
+      continue;
+    }
+
+    const nextStatus = normalizeImportedDonorStatus(row.status);
+    if (!nextStatus) {
+      summary.invalid += 1;
+      continue;
+    }
+
+    const donor = await prisma.donorProfile.findUnique({
+      where: { registrationNumber: row.registrationNumber },
+      select: { id: true, status: true, activeSince: true, inactiveSince: true, deceasedAt: true }
+    });
+    if (!donor) {
+      summary.review += 1;
+      continue;
+    }
+
+    const internalNote = `Status geimporteerd uit statusbestand '${fileName}'. Rij ${row.rowNumber}.`;
+    const donorMessage =
+      nextStatus === "INACTIVE"
+        ? "Uw status staat administratief op inactief."
+        : nextStatus === "ACTIVE"
+          ? "Uw status staat administratief op actief."
+          : "Uw status is administratief bijgewerkt.";
+
+    await prisma.$transaction(async (tx) => {
+      await tx.donorProfile.update({
+        where: { id: donor.id },
+        data: {
+          status: nextStatus,
+          statusChangedAt: now,
+          activeSince: nextStatus === "ACTIVE" ? (donor.activeSince ?? now) : donor.activeSince,
+          inactiveSince: nextStatus === "INACTIVE" ? (donor.inactiveSince ?? now) : donor.inactiveSince,
+          deceasedAt: nextStatus === "DECEASED" ? (donor.deceasedAt ?? now) : donor.deceasedAt,
+          statusInternalNote: internalNote,
+          statusDonorMessage: donorMessage
+        }
+      });
+      await tx.donorStatusHistory.create({
+        data: {
+          donorProfileId: donor.id,
+          changedById: adminId,
+          fromStatus: donor.status,
+          toStatus: nextStatus,
+          internalNote,
+          donorMessage
+        }
+      });
+      await syncFamilyActivityForDonorStatus(tx, donor.id, nextStatus);
+    });
+
+    summary.linked += 1;
+    if (nextStatus === "INACTIVE") summary.inactive = (summary.inactive ?? 0) + 1;
+  }
+
+  await writeAuditLog({
+    actorId: adminId,
+    action: "IMPORT",
+    entityType: "DonorProfile",
+    message: "Statusbestand import verwerkt",
+    metadata: {
+      fileName,
+      rows: rows.length,
+      ...summary
+    }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/donors");
+  revalidatePath("/admin/import");
+  return summary;
+}
+
+function normalizeManualRegistrationNumber(value: string) {
+  const cleaned = value.trim().toUpperCase().replace(/\s+/g, "");
+  if (!cleaned) return "";
+
+  const prefixedMatch = cleaned.match(/^11\D*(\d{1,8})$/);
+  if (prefixedMatch) return `11-${prefixedMatch[1]}`;
+
+  const digitsOnlyMatch = cleaned.match(/^(\d{1,8})$/);
+  if (digitsOnlyMatch) return `11-${digitsOnlyMatch[1]}`;
+
+  return cleaned;
+}
+
+function registrationNumberCandidates(value: string) {
+  const normalized = normalizeManualRegistrationNumber(value);
+  if (!normalized) return [];
+
+  const candidates = new Set<string>([normalized]);
+  const match = normalized.match(/^11-(\d{1,8})$/);
+  if (match) {
+    const number = Number(match[1]);
+    if (Number.isFinite(number)) {
+      for (const width of [3, 4, 5, 6]) {
+        candidates.add(`11-${String(number).padStart(width, "0")}`);
+      }
+    }
+  }
+  return [...candidates];
+}
+
+async function findDonorByRegistrationNumber(registrationNumber: string) {
+  const candidates = registrationNumberCandidates(registrationNumber);
+  if (!candidates.length) return null;
+
+  const membershipDonor = await findPrimaryDonorByMembershipNumber(registrationNumber);
+  if (membershipDonor) return membershipDonor;
+
+  const possibleDonors = await prisma.donorProfile.findMany({
+    where: { registrationNumber: { in: candidates } },
+    select: { id: true, registrationNumber: true }
+  });
+  const normalized = normalizeManualRegistrationNumber(registrationNumber);
+  const exactDonor = possibleDonors.find((donor) => donor.registrationNumber === normalized);
+  const selectedDonor = exactDonor ?? (possibleDonors.length === 1 ? possibleDonors[0] : null);
+  return selectedDonor ? prisma.donorProfile.findUnique({ where: { id: selectedDonor.id } }) : null;
+}
+
+function manualRegistrationCanResolve(reason: string) {
+  return /lidnummer|bankbetaling wordt niet automatisch gekoppeld|omschrijving|donateurslijst/i.test(reason);
+}
+
+function applyManualRegistrationOverrides(rows: ImportPreviewRow[], formData: FormData) {
+  return rows.map((row) => {
+    if (row.importMode !== "bank-transactions") return row;
+
+    const override = normalizeManualRegistrationNumber(String(formData.get(`overrideRegistrationNumber:${row.rowNumber}`) ?? ""));
+    if (!override) return row;
+
+    const reviewReasons = row.reviewReasons.filter((reason) => !manualRegistrationCanResolve(reason));
+    const stillNeedsReview = reviewReasons.length > 0 || row.errors.length > 0;
+    return {
+      ...row,
+      registrationNumber: override,
+      detectedAction: stillNeedsReview || row.detectedAction === "DUPLICATE_PAYMENT" ? row.detectedAction : ("LINK_PAYMENT_TO_EXISTING_DONOR" as const),
+      reviewReasons,
+      warnings: row.warnings.includes(`Lidnummer handmatig ingevuld: ${override}.`) ? row.warnings : [...row.warnings, `Lidnummer handmatig ingevuld: ${override}.`]
+    };
+  });
+}
+
 async function findDonor(row: ImportPreviewRow, chosenId?: string) {
   if (chosenId) {
     return prisma.donorProfile.findUnique({ where: { id: chosenId } });
   }
   if (row.registrationNumber) {
-    return (await findPrimaryDonorByMembershipNumber(row.registrationNumber)) ?? prisma.donorProfile.findUnique({ where: { registrationNumber: row.registrationNumber } });
+    return findDonorByRegistrationNumber(row.registrationNumber);
   }
   if (row.importMode === "bank-transactions") return null;
   if (!row.iban) return null;
@@ -363,7 +528,7 @@ async function createLegacyDonor(row: ImportPreviewRow, importWithoutIban: boole
   const { firstName, lastName } = splitName(row.fullName);
   const email = legacyEmail(row.registrationNumber, row.rowNumber);
   const iban = row.iban && !importWithoutIban ? row.iban : "";
-  const importedStatus = row.importMode === "bank-transactions" ? "PAYMENT_REQUIRED" : row.paidAt ? "ACTIVE" : "PAYMENT_REQUIRED";
+  const importedStatus = row.paidAt ? "ACTIVE" : "INACTIVE";
   const birthDate = row.birthDate ? new Date(row.birthDate) : new Date("1900-01-01T00:00:00.000Z");
 
   const user = await prisma.user.upsert({
@@ -385,7 +550,11 @@ async function createLegacyDonor(row: ImportPreviewRow, importWithoutIban: boole
       firstName: firstName || row.fullName,
       lastName,
       iban,
-      accountHolderName: row.fullName
+      accountHolderName: row.fullName,
+      addressLine1: row.addressLine1 || undefined,
+      addressLine2: row.addressLine2 || undefined,
+      postalCode: row.postalCode || undefined,
+      city: row.city || undefined
     },
     create: {
       userId: user.id,
@@ -394,9 +563,10 @@ async function createLegacyDonor(row: ImportPreviewRow, importWithoutIban: boole
       firstName: firstName || row.fullName,
       lastName,
       phone: "",
-      addressLine1: "",
-      postalCode: "",
-      city: "",
+      addressLine1: row.addressLine1 || "",
+      addressLine2: row.addressLine2 || null,
+      postalCode: row.postalCode || "",
+      city: row.city || "",
       dateOfBirth: Number.isNaN(birthDate.getTime()) ? new Date("1900-01-01T00:00:00.000Z") : birthDate,
       birthPlace: "",
       iban,
@@ -425,7 +595,7 @@ function paymentNotes(row: ImportPreviewRow, fileName: string) {
     `Importdatum: ${new Date().toISOString()}`,
     row.paidAt ? `Transactiedatum: ${new Date(row.paidAt).toISOString().slice(0, 10)}` : null,
     row.amountCents ? `Bedrag: ${row.amountCents / 100}` : null,
-    row.iban ? `IBAN betaler: ${row.iban}` : null,
+    row.iban ? `Betaalrekening: ${row.iban}` : null,
     row.contributionYear ? `Contributiejaar: ${row.contributionYear}` : null,
     row.organizationAccountNumber ? `Organisatie rekeningnummer: ${row.organizationAccountNumber}` : null,
     row.rawDescription ? `Omschrijving: ${row.rawDescription}` : null
@@ -507,7 +677,7 @@ async function markUnpaidDonorsInactiveAfterWindow(adminId: string, year: number
 
   const donors = await prisma.donorProfile.findMany({
     where: {
-      status: { in: ["ACTIVE", "PAYMENT_REQUIRED"] },
+      status: { in: ["ACTIVE", "INACTIVE"] },
       id: skippedDonorIds.size ? { notIn: [...skippedDonorIds] } : undefined
     },
     include: { familyMembers: true, paymentObligations: true }
@@ -535,8 +705,8 @@ async function markUnpaidDonorsInactiveAfterWindow(adminId: string, year: number
       ? "Uw lidmaatschap is geannuleerd omdat de jaarlijkse betaling niet is voldaan."
       : "Er staat nog een jaarlijkse betaling open volgens de administratie.";
 
-    await prisma.$transaction([
-      prisma.donorProfile.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.donorProfile.update({
         where: { id: donor.id },
         data: {
           status: "INACTIVE",
@@ -545,8 +715,8 @@ async function markUnpaidDonorsInactiveAfterWindow(adminId: string, year: number
           statusInternalNote: internalNote,
           statusDonorMessage: donorMessage
         }
-      }),
-      prisma.donorStatusHistory.create({
+      });
+      await tx.donorStatusHistory.create({
         data: {
           donorProfileId: donor.id,
           changedById: adminId,
@@ -555,8 +725,9 @@ async function markUnpaidDonorsInactiveAfterWindow(adminId: string, year: number
           internalNote,
           donorMessage
         }
-      })
-    ]);
+      });
+      await syncFamilyActivityForDonorStatus(tx, donor.id, "INACTIVE");
+    });
     inactiveCount += 1;
   }
 
@@ -567,7 +738,10 @@ export async function commitImport(_previous: ImportResultState | null, formData
   const adminId = await requireAdmin();
   const rawRows = String(formData.get("rows") ?? "");
   const fileName = String(formData.get("fileName") ?? "import");
-  const rows = JSON.parse(rawRows) as ImportPreviewRow[];
+  const rows = applyManualRegistrationOverrides(JSON.parse(rawRows) as ImportPreviewRow[], formData);
+  if (rows.some((row) => row.importMode === "donor-status")) {
+    return commitDonorStatusImport(rows, adminId, fileName);
+  }
   if (rows.some((row) => row.importMode === "member-personal-details")) {
     return commitMemberPersonalDetailsImport(rows, adminId, fileName);
   }
@@ -611,13 +785,14 @@ export async function commitImport(_previous: ImportResultState | null, formData
       await prisma.donorProfile.update({
         where: { id: linkedDonor.id },
         data: {
-          status: "PAYMENT_REQUIRED",
+          status: "INACTIVE",
           inactiveSince: linkedDonor.inactiveSince ?? new Date(),
           statusChangedAt: new Date(),
-          statusInternalNote: "Importregel zonder betaal-/transactiedatum verwerkt als betaling afwachtend.",
+          statusInternalNote: "Importregel zonder betaal-/transactiedatum verwerkt als inactief.",
           statusDonorMessage: "Er staat nog een betaling open volgens de administratie."
         }
       });
+      await syncFamilyActivityForDonorStatus(prisma, linkedDonor.id, "INACTIVE");
     }
 
     if (linkedDonor && hasPaidDate && row.importMode !== "bank-transactions" && ["INACTIVE", "PAYMENT_REQUIRED"].includes(linkedDonor.status)) {
@@ -631,6 +806,7 @@ export async function commitImport(_previous: ImportResultState | null, formData
           statusDonorMessage: "Uw betaling is verwerkt volgens de administratie."
         }
       });
+      await syncFamilyActivityForDonorStatus(prisma, linkedDonor.id, "ACTIVE");
     }
 
     const obligationType = row.importMode === "bank-transactions" ? "ANNUAL" : "MANUAL";
@@ -667,13 +843,14 @@ export async function commitImport(_previous: ImportResultState | null, formData
                 statusDonorMessage: "Uw jaarlijkse betaling is verwerkt volgens de administratie."
               }
             : {
-                status: "PAYMENT_REQUIRED",
+                status: "INACTIVE",
                 inactiveSince: donor.inactiveSince ?? new Date(),
                 statusChangedAt: new Date(),
                 statusInternalNote: `Jaarbetaling ${year} gedeeltelijk of niet volledig betaald via bankimport.`,
                 statusDonorMessage: "Er staat nog een jaarlijkse betaling open volgens de administratie."
               }
         });
+        await syncFamilyActivityForDonorStatus(prisma, donor.id, fullyPaid ? "ACTIVE" : "INACTIVE");
       }
     }
 

@@ -15,20 +15,24 @@ type Priority = "danger" | "warning" | "success" | "neutral";
 function priorityClass(priority: Priority) {
   if (priority === "danger") return "border-red-200 bg-red-50 text-red-950";
   if (priority === "warning") return "border-amber-200 bg-amber-50 text-amber-950";
-  if (priority === "success") return "border-emerald-200 bg-emerald-50 text-emerald-950";
+  if (priority === "success") return "border-teal-200 bg-teal-50 text-teal-950";
   return "border-slate-200 bg-white text-slate-950";
 }
 
 function badgeClass(priority: Priority) {
   if (priority === "danger") return "bg-red-700 text-white";
   if (priority === "warning") return "bg-amber-500 text-amber-950";
-  if (priority === "success") return "bg-emerald-700 text-white";
+  if (priority === "success") return "bg-[#0f766e] text-white";
   return "bg-slate-200 text-slate-800";
 }
 
 function noteValue(notes: string | null, label: string) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return notes?.match(new RegExp(`^${escaped}:\\s*(.+)$`, "im"))?.[1]?.trim() ?? "";
+}
+
+function paymentAccount(notes: string | null) {
+  return noteValue(notes, "Betaalrekening") || noteValue(notes, "IBAN betaler");
 }
 
 function paymentYear(item: { paidAt: Date | null; dueDate: Date | null; createdAt: Date; notes: string | null }) {
@@ -51,20 +55,23 @@ function Section({
   href?: string;
 }) {
   return (
-    <section className={`rounded-lg border p-5 shadow-sm ${priorityClass(priority)}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-black">{title}</h2>
-        <div className="flex items-center gap-2">
+    <details className={`group rounded-xl border p-5 shadow-sm ${priorityClass(priority)}`} open={count > 0}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-3">
+          <span className="text-lg font-black transition group-open:rotate-90">›</span>
+          <span className="text-xl font-black">{title}</span>
+        </span>
+        <span className="flex items-center gap-2">
           <span className={`rounded-md px-3 py-1 text-sm font-black ${badgeClass(priority)}`}>{count}</span>
           {href ? (
             <Link className="rounded-md border border-current px-3 py-1 text-sm font-bold hover:bg-white/70" href={href}>
               Openen
             </Link>
           ) : null}
-        </div>
-      </div>
+        </span>
+      </summary>
       <div className="mt-4">{children}</div>
-    </section>
+    </details>
   );
 }
 
@@ -104,7 +111,7 @@ export default async function ControlCenterPage() {
       take: 25
     }),
     prisma.donorProfile.findMany({
-      where: { registrationNumber: { not: null }, status: { in: ["ACTION_REQUIRED", "PAYMENT_REQUIRED", "INACTIVE"] } },
+      where: { registrationNumber: { not: null }, status: { in: ["ACTION_REQUIRED", "INACTIVE"] } },
       orderBy: [{ status: "asc" }, { registrationNumber: "asc" }],
       take: 20
     }),
@@ -171,7 +178,7 @@ export default async function ControlCenterPage() {
   const seenPayments = new Map<string, typeof importedBankPayments[number]>();
   const duplicateBankPayments: typeof importedBankPayments = [];
   for (const item of importedBankPayments) {
-    const payerIban = noteValue(item.notes, "IBAN betaler").replace(/\s/g, "").toUpperCase();
+    const payerIban = paymentAccount(item.notes).replace(/\s/g, "").toUpperCase();
     const key = [item.lidnummer ?? item.donorProfile.registrationNumber ?? "", item.amountCents, item.paidAt?.toISOString().slice(0, 10) ?? "", payerIban].join("|");
     if (seenPayments.has(key)) duplicateBankPayments.push(item);
     else seenPayments.set(key, item);
@@ -189,7 +196,7 @@ export default async function ControlCenterPage() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">Dagelijkse controle</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Dagelijkse controle</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-950">Controlecentrum</h1>
@@ -197,26 +204,26 @@ export default async function ControlCenterPage() {
               Een centrale werklijst voor registraties, betalingen, importsignalen en gezinswijzigingen.
             </p>
           </div>
-          <div className={`rounded-md px-4 py-3 text-sm font-black ${totalCritical > 0 ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
+          <div className={`rounded-md px-4 py-3 text-sm font-black ${totalCritical > 0 ? "bg-red-50 text-red-800" : "bg-teal-50 text-[#0f5f9f]"}`}>
             {totalCritical} aandachtspunt(en)
           </div>
         </div>
       </section>
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-300" href="/admin/registrations">
+        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-[#1483d6]/40" href="/admin/registrations">
           <p className="text-sm font-bold text-slate-600">Registraties</p>
           <p className="mt-2 text-3xl font-black text-slate-950">{pendingRegistrations + actionRegistrations}</p>
         </Link>
-        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-300" href="/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED">
+        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-[#1483d6]/40" href="/admin/donors?status=INACTIVE">
           <p className="text-sm font-bold text-slate-600">Betalingen open</p>
           <p className="mt-2 text-3xl font-black text-red-700">{duePaymentRows.length}</p>
         </Link>
-        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-300" href="/admin/family-transitions">
+        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-[#1483d6]/40" href="/admin/family-transitions">
           <p className="text-sm font-bold text-slate-600">Gezinswijzigingen</p>
           <p className="mt-2 text-3xl font-black text-amber-700">{adultTransitions.length + guardianNeeded.length}</p>
         </Link>
-        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-300" href="/admin/import">
+        <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-[#1483d6]/40" href="/admin/import">
           <p className="text-sm font-bold text-slate-600">Importcontrole</p>
           <p className="mt-2 text-3xl font-black text-slate-950">{duplicateBankPayments.length}</p>
         </Link>
@@ -234,7 +241,7 @@ export default async function ControlCenterPage() {
           </div>
         </Section>
 
-        <Section count={duePaymentRows.length} href="/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED" priority={duePaymentRows.length ? "danger" : "success"} title="Open betalingen">
+        <Section count={duePaymentRows.length} href="/admin/donors?status=INACTIVE" priority={duePaymentRows.length ? "danger" : "success"} title="Open betalingen">
           {duePaymentRows.length ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[780px] text-left text-sm">
@@ -257,7 +264,7 @@ export default async function ControlCenterPage() {
                       <td className="p-3 font-black text-red-800">{formatCurrency(total)}</td>
                       <td className="p-3">{annualDue > 0 ? formatCurrency(annualDue) : "-"}</td>
                       <td className="p-3">
-                        <Link className="font-black text-emerald-800 underline" href={`/admin/donors/${donor.id}/financial`}>Financieel openen</Link>
+                        <Link className="font-black text-[#0f5f9f] underline" href={`/admin/donors/${donor.id}/financial`}>Financieel openen</Link>
                       </td>
                     </tr>
                   ))}
@@ -328,7 +335,7 @@ export default async function ControlCenterPage() {
                     <th className="p-3">Lid</th>
                     <th className="p-3">Datum</th>
                     <th className="p-3">Bedrag</th>
-                    <th className="p-3">IBAN</th>
+                    <th className="p-3">Betaalrekening</th>
                     <th className="p-3">Actie</th>
                   </tr>
                 </thead>
@@ -338,9 +345,9 @@ export default async function ControlCenterPage() {
                       <td className="p-3 font-bold">{item.donorProfile.registrationNumber} - {item.donorProfile.firstName} {item.donorProfile.lastName}</td>
                       <td className="p-3">{formatDate(item.paidAt)}</td>
                       <td className="p-3 font-bold">{formatCurrency(item.amountCents)}</td>
-                      <td className="p-3">{noteValue(item.notes, "IBAN betaler") || "-"}</td>
+                      <td className="p-3">{paymentAccount(item.notes) || "-"}</td>
                       <td className="p-3">
-                        <Link className="font-black text-emerald-800 underline" href={`/admin/donors/${item.donorProfileId}/financial`}>Historie bekijken</Link>
+                        <Link className="font-black text-[#0f5f9f] underline" href={`/admin/donors/${item.donorProfileId}/financial`}>Historie bekijken</Link>
                       </td>
                     </tr>
                   ))}

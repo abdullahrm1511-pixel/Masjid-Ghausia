@@ -2,605 +2,316 @@
 
 Project: St. GBC Donateursportaal  
 Organisatie: St. GBC Masjid Ghausia  
-Versie: 1.1  
-Datum: 12 juni 2026
+Versie: 1.2  
+Datum: 21 juni 2026
 
 ## 1. Doel van het portaal
 
-Het St. GBC Donateursportaal is gemaakt om inschrijvingen, donateurs, gezinsgegevens, wijzigingsverzoeken, betalingen, import, export en prijsinstellingen centraal te beheren.
+Het St. GBC Donateursportaal is gemaakt om inschrijvingen, donateurs, gezinsgegevens, wijzigingsverzoeken, betalingen, import, export, controlepunten en prijsinstellingen centraal te beheren.
 
-Het portaal heeft twee hoofdrollen:
+Het portaal heeft drie beheerlagen:
 
 - Donateur: kan inschrijven, inloggen, eigen gegevens bekijken en wijzigingen aanvragen.
-- Admin: kan registraties beoordelen, donateurs beheren, wijzigingsverzoeken verwerken, importeren, exporteren en instellingen aanpassen.
+- Registratie-admin: kan registraties lezen, goedkeuren, afwijzen en om correctie vragen.
+- Admin/super-admin: kan donateurs beheren, wijzigingsverzoeken verwerken, betalingen controleren, importeren, exporteren, instellingen beheren en het controlecentrum gebruiken.
 
-Het portaal bevat daarnaast voorbereidende productiefuncties: handmatige bevestiging van externe betalingen, bewerkbare e-mailtemplates, een e-maillog met voorbereide berichten, een PDF-kopie van de ingevulde inschrijving, bankimport met previewcontrole en herkenning van betalingsdoelen uit omschrijvingen.
+Het portaal bevat handmatige bevestiging van bankbetalingen, bewerkbare e-mailtemplates, een e-maillog met voorbereide berichten, PDF-kopieen van inschrijvingen, bankimport met previewcontrole, een controlecentrum en gezinsbeheer voor 18+ kinderen, overleden leden en voogd/contactregistratie.
 
 ## 2. Belangrijkste termen
 
 Donateur betekent een persoon die in het systeem staat als lid of donateur van St. GBC.
 
-Hoofddonateur betekent de persoon op wie het account en het lidnummer staan.
+Hoofddonateur of primary member betekent de persoon op wie het account en het lidnummer staan.
 
-Partner betekent de opgegeven partner van de hoofddonateur.
+Lidnummer betekent het registratienummer van de donateur. De opbouw begint met `11-001` tot en met `11-999`. Als die reeks vol is, start de volgende reeks met een extra cijfer: `11-0001` tot en met `11-9999`. Daarna gaat het verder met `11-00001`. `11-054` en `11-0054` zijn dus twee verschillende lidnummers.
+
+Lidmaatschap betekent de huishoudlaag onder een lidnummer. Onder een lidmaatschap kunnen een primary member, partner en kinderen vallen.
+
+Partnerprofiel betekent een partner onder hetzelfde lidnummer. De partner is niet automatisch een aparte betalende donateur zolang er geen eigen lidnummer is.
 
 Kind betekent een opgegeven kind binnen het gezin van de hoofddonateur.
 
-Lidnummer betekent het registratienummer van de donateur. De opbouw begint met `11-001` tot en met `11-999`. Als die reeks vol is, start een nieuwe reeks met een extra cijfer: `11-0001` tot en met `11-9999`. Daarna gaat het verder met `11-00001` enzovoort. `11-054` en `11-0054` zijn dus twee verschillende lidnummers.
+IBAN betekent het bankrekeningnummer. Bij bankimport wordt de betaler-IBAN uit de omschrijving opgeslagen als betaalbewijs, maar het lidnummer blijft leidend voor de koppeling.
 
-Lidmaatschap betekent de huishoudlaag onder een lidnummer. Onder een lidmaatschap kunnen een primary member, partner en kinderen vallen. Bankbetalingen en jaarbijdragen horen bij het lidmaatschap/lidnummer.
+Bankexport betekent een Excel- of CSV-bestand met banktransacties. De kolom `Rekeningnummer` is de rekening van de organisatie. De betaler-IBAN staat in de omschrijving.
 
-Primary member betekent de persoon die financieel verantwoordelijk is voor het lidmaatschap. Bij een getrouwd stel betaalt de primary member voor het gezin zolang de partner onder hetzelfde lidmaatschap valt.
+Controlecentrum betekent de centrale adminpagina waar registraties, open betalingen, importsignalen, gezinswijzigingen, verlopen eenmalige bijdragen en statuscontroles samen zichtbaar zijn.
 
-Partnerprofiel betekent een volledig profiel van de partner onder hetzelfde lidmaatschap. De partner is dan niet automatisch een aparte betalende donateur. Het profiel bestaat zodat gegevens bewaard blijven en de partner bij scheiding of eigen lidmaatschap niet opnieuw vanaf nul hoeft te beginnen.
-
-IBAN betekent het bankrekeningnummer van de donateur.
-
-Rekeninghouder betekent de naam die hoort bij de opgegeven bankrekening.
-
-Bankexport betekent een Excel- of CSV-bestand met banktransacties. In bankexports is de kolom `Rekeningnummer` de rekening van de organisatie. De donor-IBAN wordt bij bankexports uit de kolom `Omschrijving` gelezen.
-
-Bij bankexports worden alleen regels meegenomen waarvan de omschrijving `SEPA Overboeking` of `SEPA Periodieke Overboeking` bevat. Incasso's en andere transactiesoorten worden overgeslagen en verschijnen niet in de importpreview.
-
-Omschrijving betekent de bankomschrijving waarin gegevens kunnen staan zoals IBAN, naam, lidnummer, contributiejaar, geboortedatum of "contributie voor".
-
-Betaler betekent de persoon of rekeninghouder die de bankoverschrijving heeft gedaan.
-
-Betalingsdoel betekent de persoon van wie de contributie wordt afgelost. Dit kan dezelfde persoon zijn als de betaler, maar bij teksten zoals "contributie voor ..." kan dit iemand anders zijn.
-
-Tweede opinie betekent dat het systeem onvoldoende zekerheid heeft om een importregel automatisch te verwerken. Een beheerder moet de rij handmatig controleren.
-
-Contact Pakistan betekent een contactpersoon in Pakistan die de donateur vrijwillig kan opgeven.
-
-Uitvaartwensen betekent informatie die de donateur zelf kan invullen over wensen rondom overlijden en uitvaart.
+Controle nodig betekent dat het systeem een regel niet automatisch verwerkt en dat een beheerder handmatig moet controleren.
 
 Auditlog betekent een interne registratie van belangrijke acties, zoals goedkeuren, afwijzen, importeren, exporteren en statuswijzigingen.
 
-## 3. Statussen van donateurs
+## 3. Donateurstatussen
 
-`PENDING` betekent dat een aanvraag is ontvangen en nog wacht op beoordeling door het bestuur.
+`PENDING` betekent dat een aanvraag is ontvangen en nog wacht op beoordeling.
 
-`ACTION_REQUIRED` betekent dat het bestuur extra informatie nodig heeft of een correctie vraagt. De donateur ziet op het dashboard een bericht met wat nodig is.
+`ACTION_REQUIRED` betekent dat het bestuur extra informatie nodig heeft of een correctie vraagt.
 
 `PAYMENT_REQUIRED` betekent dat de aanvraag is goedgekeurd, maar dat de eerste betaling nog openstaat. Deze groep telt mee bij "Inactief / betaling afwachtend".
 
 `ACTIVE` betekent dat de donateur actief is.
 
-`INACTIVE` betekent dat de donateur administratief niet actief is. Dit kan worden gebruikt wanneer iemand niet meer als actieve donateur moet meetellen.
+`INACTIVE` betekent dat de donateur administratief niet actief is.
 
 `REJECTED` betekent dat de aanvraag of donateur is afgewezen.
 
-`DECEASED` betekent dat de donateur als overleden is geregistreerd. Dit mag alleen worden gebruikt wanneer het bestuur hiervoor betrouwbare informatie heeft.
+`DECEASED` betekent dat de donateur als overleden is geregistreerd. Dit mag alleen na betrouwbare informatie.
 
-## 4. Wanneer iemand actief is
+## 4. Actief, inactief en overleden
 
-Iemand is actief wanneer het bestuur de persoon als goedgekeurde en actieve donateur behandelt. In de huidige werking krijgt een nieuwe goedgekeurde registratie eerst de status `PAYMENT_REQUIRED`. Zodra de betaling administratief is verwerkt en het bestuur dit als afgerond ziet, kan de persoon als actieve donateur worden behandeld.
+Een nieuwe goedgekeurde registratie komt eerst op `PAYMENT_REQUIRED`. Zodra de eerste betaling administratief is verwerkt en het bestuur dit akkoord vindt, kan de donateur actief worden gezet.
 
-## 5. Wanneer iemand inactief is
+Inactief betekent dat de donateur niet als actief meetelt. Het dashboardblok "Inactief / betaling afwachtend" telt ook donateurs mee die nog op eerste betaling wachten.
 
-Iemand is inactief wanneer de status `INACTIVE` is ingesteld. Op het dashboard staat daarnaast het blok "Inactief / betaling afwachtend". Dat blok telt ook mensen mee met status `PAYMENT_REQUIRED`, omdat zij nog niet volledig actief zijn zolang de eerste betaling openstaat.
+Overleden betekent dat het bestuur betrouwbare informatie heeft ontvangen dat iemand is overleden. Bij overlijden moet zorgvuldig worden gekeken naar gezinsleden, contactpersonen en uitvaartwensen.
 
-## 6. Wanneer iemand overleden is
+## 5. Donateur: inschrijven
 
-Iemand wordt als overleden gezien wanneer het bestuur betrouwbare informatie heeft ontvangen dat de persoon is overleden. De status `DECEASED` zorgt ervoor dat deze persoon apart zichtbaar is in het adminportaal en niet wordt verward met actieve donateurs.
+Een nieuwe donateur vult de registratie in stappen in:
 
-Bij overleden donateurs moet zorgvuldig worden omgegaan met gezinsgegevens, contactgegevens en uitvaartwensen.
+- Hoofddonateur: naam, geboortedatum, geboorteplaats, telefoon, adres, e-mail, wachtwoord, IBAN en rekeninghouder.
+- Partner: gegevens van de partner als die aanwezig is.
+- Kinderen: gegevens van kinderen.
+- Contact: contactpersoon Pakistan en eventuele uitvaartwensen.
+- Bevestiging: verklaringen en akkoord met voorwaarden/privacy.
 
-## 7. Donateur: inschrijven
+Na verzenden komt de aanvraag binnen bij het bestuur met status `PENDING`.
 
-Een nieuwe donateur gaat naar "Inschrijven" en vult de registratie in stappen in.
+## 6. Donateur: dashboard en account
 
-Hoofddonateur bevat de persoonlijke basisgegevens van de aanvrager, zoals naam, geboortedatum, geboorteplaats, telefoon, adres, e-mail, wachtwoord, IBAN en rekeninghouder.
+Het donateurdashboard toont de huidige status, het lidnummer, betaaloverzicht, eenmalige bijdrage, jaarlijkse bijdrage, accountgegevens, gezin en laatste wijzigingsverzoek.
 
-Partner bevat gegevens van de partner, als die aanwezig is.
+Het betaaloverzicht toont:
 
-Kinderen bevat gegevens van kinderen. Er kunnen meerdere kinderen worden toegevoegd.
-
-Contact bevat onder andere contactgegevens voor Pakistan en eventuele uitvaartwensen.
-
-Bevestiging bevat verklaringen die de donateur moet bevestigen voordat de aanvraag wordt verstuurd.
-
-Na verzenden komt de aanvraag binnen bij het bestuur. De status is dan `PENDING`.
-
-## 8. Donateur: dashboard
-
-Het donateurdashboard is de eerste pagina na inloggen.
-
-Status toont de huidige stand van de aanvraag of donateur. Voorbeelden:
-
-- "Uw aanvraag is in afwachting van beoordeling" betekent dat het bestuur nog moet kijken.
-- "Actie vereist" betekent dat het bestuur een correctie of extra informatie vraagt.
-- "Uw aanvraag is goedgekeurd. Eerste betaling is vereist" betekent dat betaling nog openstaat.
-- "Uw account is actief" betekent dat de donateur actief staat.
-- "Uw account is niet actief" betekent dat de status inactief is.
-- "Uw aanvraag is afgewezen" betekent dat het bestuur de aanvraag heeft afgewezen.
-- "Status: overleden" betekent dat de persoon als overleden is geregistreerd.
-
-Lidnummer verschijnt wanneer er een lidnummer is toegewezen.
-
-Het lidnummer is leidend. Bij een gezin vallen primary member, partner en kinderen administratief onder hetzelfde lidnummer/lidmaatschap zolang zij samen geregistreerd zijn.
-
-Betaling verschijnt wanneer de status `PAYMENT_REQUIRED` is. Op dit moment staat daar dat betaling later volgt en dat online betalen nog niet beschikbaar is.
-
-Account toont naam, e-mail, telefoon en IBAN.
-
-Gezin toont partner en kinderen die bij de donateur horen. Bankimport maakt geen gezinsrelaties aan en toont geen gezinsverwijzingen.
-
-Laatste wijzigingsverzoek toont de laatste aanvraag die de donateur heeft gedaan om gegevens te wijzigen.
-
-## 9. Donateur: mijn account
-
-Op "Mijn account" ziet de donateur zijn of haar gegevens.
-
-Getoonde gegevens zijn onder andere:
-
-- Lidnummer.
-- Naam.
-- E-mail.
-- Telefoon.
-- Adres.
-- Geboortedatum.
-- Geboorteplaats.
-- Geslacht.
+- Totaal betaald.
+- Openstaand bedrag.
+- Laatste betaling.
 - IBAN.
-- Rekeninghouder.
-- Contact Pakistan.
-- Telefoon Pakistan.
-- Uitvaartwensen.
-- Partner en kinderen.
 
-Onder "Wijziging aanvragen" kan de donateur wijzigingen indienen. Dit past de gegevens niet direct aan. Het wordt eerst een wijzigingsverzoek voor het bestuur.
+De donateur kan op "Mijn account" gegevens bekijken en wijzigingen aanvragen. Een wijziging wordt niet direct toegepast, maar wordt eerst een wijzigingsverzoek voor het bestuur.
 
-## 10. Admin: admin dashboard
+## 7. Admin dashboard
 
-Het admin dashboard geeft een snelle samenvatting.
+Het admin dashboard geeft een snelle samenvatting van:
 
-Registraties in afwachting toont hoeveel nieuwe registraties nog beoordeeld moeten worden. Klikken opent de registratiepagina.
-
-Actie vereist toont hoeveel donateurs wachten op correctie of extra informatie.
-
-Actieve donateurs toont hoeveel donateurs actief zijn. Klikken opent de donateurslijst met actieve donateurs.
-
-Inactief / betaling afwachtend toont hoeveel donateurs inactief zijn of nog wachten op betaling. Dit bevat status `INACTIVE` en `PAYMENT_REQUIRED`.
-
-Afgewezen toont hoeveel donateurs of aanvragen zijn afgewezen.
-
-Overleden toont hoeveel donateurs als overleden geregistreerd staan.
-
-Onder de blokken staan snelle knoppen:
-
-- Registraties beoordelen.
-- Donateurs beheren.
-- Wijzigingsverzoeken.
-- Import.
-- Export.
-- Prijsinstellingen.
-
-## 11. Admin: navigatie
-
-Admin dashboard brengt de beheerder terug naar het overzicht.
-
-Registraties opent de lijst met nieuwe inschrijvingen.
-
-Donateurs opent de donateurslijst. Als de cursor boven "Donateurs" staat, verschijnt een menu met groepen: alle donateurs, actieve donateurs, inactief/betaling afwachtend, actie vereist, afgewezen en overleden.
-
-Wijzigingsverzoeken opent aanvragen van donateurs om hun gegevens aan te passen.
-
-Import opent het importscherm voor bestanden.
-
-Export opent het exportscherm.
-
-Instellingen opent de prijsinstellingen.
-
-Uitloggen sluit de sessie af.
-
-## 12. Admin: registraties beoordelen
-
-De registratiepagina toont nieuwe aanvragen.
-
-In het detailscherm ziet de admin:
-
-- Naam.
-- Status.
-- Eventueel lidnummer.
-- E-mail.
-- Telefoon.
-- Adres.
-- Geboortedatum.
-- Geboorteplaats.
-- Geslacht.
-- IBAN.
-- Rekeninghouder.
-- Burgerlijke staat.
-- Contact Pakistan.
-- Uitvaartwensen.
-- Partner en kinderen.
-- Verklaringen.
-
-Goedkeuren betekent dat de registratie wordt goedgekeurd, er een lidnummer wordt toegekend als dat nog niet bestaat en de donateur op `PAYMENT_REQUIRED` komt.
-
-Correctie vragen betekent dat de donateur op `ACTION_REQUIRED` komt. De admin schrijft een bericht voor de donateur en eventueel een interne notitie.
-
-Afwijzen betekent dat de registratie op `REJECTED` komt. De admin vult een interne reden en een bericht voor de donateur in.
-
-## 13. Admin: donateurs beheren
-
-De donateurspagina toont alle donateurs of een gekozen groep.
-
-Zoeken kan op:
-
-- Lidnummer.
-- Naam.
-- E-mail.
-- Telefoon.
-- IBAN.
-- Status.
-
-De filters boven de tabel tonen:
-
-- Alle donateurs.
+- Registraties in afwachting.
 - Actieve donateurs.
 - Inactief / betaling afwachtend.
 - Actie vereist.
 - Afgewezen.
 - Overleden.
+- Kinderen bijna 18.
+- 18+ inschrijving nodig.
+- Voogd/contact nodig.
 
-De tabel toont:
+De knop "Controlecentrum openen" brengt de admin naar de centrale werklijst.
 
+## 8. Admin navigatie
+
+Admin dashboard brengt de beheerder terug naar het overzicht.
+
+Controlecentrum opent de dagelijkse werklijst.
+
+Registraties opent nieuwe inschrijvingen.
+
+Donateurs opent de donateurslijst. De dropdown bevat alle donateurs, actieve donateurs, inactief/betaling afwachtend, actie vereist, gezinswijzigingen, afgewezen en overleden.
+
+Wijzigingsverzoeken opent aanvragen van donateurs om gegevens aan te passen.
+
+E-mail opent e-mailtemplates en e-maillog.
+
+Instellingen bevat prijsinstellingen, import, export en betaalcorrecties.
+
+## 9. Controlecentrum
+
+Het controlecentrum bundelt de belangrijkste aandachtspunten:
+
+- Registraties en correcties.
+- Open betalingen.
+- Eenmalige bijdrage-termijnen binnen 90 dagen of verlopen.
+- 18+ kinderen die zichzelf moeten inschrijven.
+- Huishoudens waar voogd/contact nodig is.
+- Mogelijke dubbele bankbetalingen.
+- Statuscontrole, zoals inactief, betaling vereist, actie vereist en overleden zonder verwerkingsnotitie.
+
+Het controlecentrum voert geen aparte nieuwe berekening uit. Het maakt bestaande signalen zichtbaar op een centrale plek.
+
+## 10. Registraties beoordelen
+
+De registratiepagina toont nieuwe aanvragen. De admin ziet onder andere naam, status, e-mail, telefoon, adres, geboortedatum, geboorteplaats, geslacht, IBAN, rekeninghouder, partner, kinderen en verklaringen.
+
+Goedkeuren betekent dat er een lidnummer wordt toegekend en de donateur op `PAYMENT_REQUIRED` komt.
+
+Correctie vragen zet de aanvraag op `ACTION_REQUIRED` met een bericht voor de donateur en eventueel een interne notitie.
+
+Afwijzen zet de aanvraag op `REJECTED`.
+
+## 11. Donateurs beheren
+
+De donateurspagina toont alle donateurs of een gekozen groep. Zoeken kan op lidnummer, naam, IBAN en status.
+
+De tabel toont lidnummer, naam, IBAN, status, betaalstatus en acties. Profiel opent het volledige donateursprofiel. Financieel opent het financieel overzicht.
+
+## 12. Financieel overzicht
+
+Het financieel overzicht toont per donateur de financiele stand.
+
+Bovenaan staan naam, lidnummer, donateurstatus en jaarbetalingstatus.
+
+Het belangrijkste hoofdgetal is "Nog te betalen". Dit staat rood wanneer er open posten zijn.
+
+Daaronder staan:
+
+- Jaarlijks: jaarbijdrage, betaald bedrag en eventueel restant.
+- Eenmalig: eenmalige bijdrage, betaald bedrag en restant.
+- Boete: openstaande boete als die is geregistreerd.
+
+Betaling registreren is een uitklapbaar onderdeel voor uitzonderingen en handmatige bankcontrole. Daarin staan ontvangen bedragen, aftrek/correcties, netto verwerkt, administratief saldo en extra ontvangen bedragen.
+
+Positieve bedragen tellen als ontvangen geld. Negatieve bedragen worden gebruikt voor aftrek of correctie.
+
+Betalingen worden administratief bijgehouden als bankbetalingen of importbetalingen. Contante betaling is niet de normale werkwijze.
+
+Betaalhistorie toont datum, bedrag, betaler-IBAN, importbestand en omschrijving. IBAN is alleen bewijs/historie en bepaalt niet automatisch voor welk lid is betaald.
+
+Bij een positieve betalingsregistratie wordt een betalingsbevestiging voorbereid in de e-maillog. Er wordt nog niets automatisch verzonden.
+
+Betalingsregistraties resetten wist ontvangen betalingen, aftrekken, correcties en extra ontvangen bedragen van die donateur. De berekende jaarlijkse, eenmalige en boetebedragen blijven staan.
+
+## 13. Betalingsregels
+
+De standaard betaalperiode voor de jaarlijkse bijdrage is 1 januari tot en met 31 maart.
+
+Jaarbetalingen mogen in termijnen binnen hetzelfde jaar worden betaald. Het systeem telt termijnen op. Bij gedeeltelijke betaling blijft het restant zichtbaar.
+
+Na 31 maart kan een boete ontstaan. De standaardboete is 5 euro per maand vanaf april tot en met december zolang de jaarbetaling niet volledig is betaald.
+
+Voor nieuwe leden geldt: de eenmalige bijdrage moet binnen 365 dagen na goedkeuring/lidnummer betaald worden. De timer wordt berekend vanaf de goedkeurdatum.
+
+Als iemand in het inschrijfjaar nog geen jaarbetaling heeft gedaan, wordt bij de jaarwisseling het inschrijfjaar plus het nieuwe jaar meegenomen. De boete voor deze situatie start pas vanaf februari na de jaarwisseling.
+
+## 14. Import
+
+Import is bedoeld voor bestaande ledenbestanden en bankexports.
+
+Ondersteunde bestanden zijn `.xlsx`, `.xls`, `.xlsm` en `.csv`.
+
+Bij bankimport is het lidnummer leidend. De betaler-IBAN wordt alleen opgeslagen als betaalbewijs. Het systeem maakt vanuit bankimport geen nieuwe donateurs aan.
+
+De preview toont onder andere:
+
+- Rij.
+- Datum.
+- Bedrag.
+- Organisatie-rekeningnummer.
 - Lidnummer.
-- Naam.
-- E-mail.
-- Telefoon.
-- IBAN.
-- Status.
-- Betaalstatus.
-- Acties.
+- IBAN betaler.
+- Contributiejaar.
+- Actie.
+- Controle / fouten.
 
-Bekijken opent het volledige donateursprofiel.
+Mogelijke acties zijn:
 
-Financieel opent het financieel overzicht van die donateur.
+- Bedrag verwerkt.
+- Lidnummer niet gevonden.
+- Dubbele betaling mogelijk.
+- Ongeldig.
+- Controle nodig.
 
-## 14. Admin: financieel overzicht
+Dubbele betaling mogelijk wordt herkend op basis van hetzelfde lidnummer, bedrag, transactiedatum en betaler-IBAN.
 
-Het financieel overzicht toont de financiele gegevens van een donateur.
+Als dezelfde IBAN bij meerdere lidnummers voorkomt, is dat toegestaan. Een ouder kan bijvoorbeeld voor zichzelf en voor een kind betalen. Het lidnummer in de omschrijving bepaalt voor welk lid de betaling wordt verwerkt.
 
-Bovenaan staan:
+Als het lidnummer ontbreekt of niet bestaat, wordt de regel niet automatisch verwerkt.
 
-- Lidnummer.
-- Naam.
-- IBAN.
-- Betaald totaal.
-- Openstaand totaal.
+Relaties zoals dochter, echtgenoot, partner of zoon worden niet gebruikt om automatisch een ander lid te kiezen. Het lidnummer blijft leidend.
 
-Berekende bijdragen toont per persoon in het gezin welk bedrag berekend wordt op basis van leeftijd, partner en kinderen.
+Alleen SEPA-overboekingen die relevant zijn voor betalingsimport worden meegenomen.
 
-Betalingen en verplichtingen toont de daadwerkelijke administratie van betalingen en openstaande posten.
+## 15. Geen externe AI in bankimport
 
-Statussen bij betalingen:
+De bankimport gebruikt lokale herkenningsregels in de applicatie. Er wordt geen bankomschrijving naar een externe AI-dienst gestuurd.
 
-`DUE` betekent openstaand.
+Als het bestuur later AI-verwerking wil toevoegen, moet dit opnieuw bestuurlijk en privacytechnisch worden beoordeeld en in het privacybeleid worden aangepast.
 
-`PAID` betekent betaald.
+## 16. Gezinswijzigingen
 
-`WAIVED` betekent kwijtgescholden.
+Gezinswijzigingen is de beheerpagina voor huishoudsituaties die extra aandacht nodig hebben.
 
-`MANUAL_CORRECTION` betekent handmatige correctie.
+Kinderen vanaf 17 jaar en 6 maanden worden als "bijna 18" zichtbaar op het dashboard. Zodra een kind 18 wordt, komt deze persoon in "18+ inschrijving nodig".
 
-De knoppen "Betaald", "Open", "Kwijt" en "Correctie" veranderen de betaalstatus.
+Een 18+ kind telt niet automatisch meer mee onder het oude lidnummer voor nieuwe administratieve verwerking. De persoon moet zichzelf inschrijven voor een eigen lidnummer.
 
-Wanneer een admin een betaling als betaald markeert, moeten betaaldatum, bedrag, betaalmethode en eventueel een adminnotitie worden ingevuld. Mogelijke betaalmethodes zijn bankoverschrijving, contant, externe iDEAL, externe SEPA en anders. Dit blijft handmatige administratie: het portaal koppelt nog niet met Mollie, iDEAL, SEPA of een andere betaalprovider.
+De admin kan een 18+ kandidaat:
 
-Als alle betalingsverplichtingen van een donateur op betaald staan en de donateur nog op betaling vereist staat, kan de admin de donateur handmatig actief zetten. Dit gebeurt niet automatisch.
+- Markeren als uitgenodigd.
+- Koppelen aan een zelfstandig lidnummer zodra de persoon zichzelf heeft ingeschreven.
+- Markeren als geen lid.
 
-Bij het bevestigen van een betaling wordt een betalingsbevestiging als voorbereide e-mail in de e-maillog gezet. Er wordt nog niets automatisch verzonden.
+Bij overlijden van de primary member kan een actieve partner als primaire contactpersoon worden vastgelegd.
 
-## 15. Admin: wijzigingsverzoeken
+Als er geen actieve partner is en er kinderen onder 18 zijn, toont het systeem "Voogd/contact nodig". De admin kan dan een voogd of contactpersoon registreren in de interne administratie.
+
+## 17. Wijzigingsverzoeken
 
 Een wijzigingsverzoek ontstaat wanneer een donateur op "Mijn account" gegevens aanpast en indient.
 
-De admin ziet het verzoek en kan het goedkeuren of afwijzen.
+De admin kan het verzoek goedkeuren of afwijzen. Adminnotities zijn intern. Donateurberichten zijn bedoeld voor de donateur.
 
-Goedkeuren past de gegevens definitief aan.
+## 18. Export
 
-Afwijzen laat de bestaande gegevens staan en toont een bericht aan de donateur.
+Export maakt bestanden voor administratie of controle. Exportbestanden bevatten persoonsgegevens en moeten veilig worden behandeld.
 
-Adminnotities zijn voor intern gebruik. Donateurberichten zijn bedoeld voor de donateur.
+Mogelijke exports zijn onder andere alle donateurs, actieve donateurs, inactief/betaling afwachtend, afgewezen en overleden.
 
-## 16. Admin: import
+## 19. E-mailtemplates en e-maillog
 
-Import is bedoeld om bestaande lijsten met donateurs en banktransacties in het systeem te zetten.
+E-mailtemplates zijn standaardteksten die het systeem gebruikt om e-mails voor te bereiden. Ze zijn bewerkbaar via E-mailtemplates.
 
-Ondersteunde bestanden zijn Excel en CSV.
-
-Het systeem maakt eerst een preview. In die preview wordt gekeken naar:
-
-- Nieuwe donateurs.
-- Mogelijke matches.
-- Dubbelen.
-- Ongeldige rijen.
-- Banktransacties waarvan de donor-IBAN in de omschrijving staat.
-- Betaler en betalingsdoel.
-- Lidnummer en naam uit de omschrijving.
-- Contributiejaar.
-- Teksten zoals "contributie voor ...".
-- Rijen die tweede opinie nodig hebben.
-
-Een beheerder moet de preview controleren voordat de import definitief wordt verwerkt.
-
-Bij bankexports wordt de kolom `Rekeningnummer` niet gebruikt als donor-IBAN. Die kolom is de rekening van de organisatie. De donor-IBAN wordt uit de omschrijving gelezen. Het systeem controleert de IBAN niet inhoudelijk; wat in de omschrijving staat wordt als uitgangspunt gebruikt.
-
-Alleen bankregels met `SEPA Overboeking` of `SEPA Periodieke Overboeking` in de omschrijving worden meegenomen. Incasso's en andere bankregels worden genegeerd, omdat die niet nodig zijn voor deze betalingsimport.
-
-Bij import kunnen ook betalingsverplichtingen worden aangemaakt, zodat oude betalingen of bedragen zichtbaar zijn in het financieel overzicht.
-
-Bankbetalingen uit een bankexport worden als jaarlijkse bijdrage verwerkt. Een donateur kan de jaarbijdrage in meerdere termijnen betalen, bijvoorbeeld in januari, februari en maart. Het systeem telt deze betalingen bij elkaar op. Als het totaal lager is dan de jaarbijdrage, blijft alleen het restant openstaan. Als het totaal voldoende is, wordt de jaarbetaling als betaald behandeld.
-
-Na de betaalperiode, dus na 31 maart volgens de standaardinstellingen, zet het systeem leden zonder volledige jaarbetaling bij het verwerken van een bankimport automatisch op `INACTIVE`. Het open bedrag bestaat dan uit de jaarbijdrage min ontvangen betalingen plus de maandelijkse boete.
-
-De boete is standaard 5 euro per maand vanaf april. Op 1 april telt het systeem dus 5 euro boete mee. Daarna komt er iedere maand 5 euro bij zolang de jaarbetaling niet volledig is betaald.
-
-Als een bankomschrijving geen lidnummer bevat, gaat de regel altijd naar tweede opinie. Het systeem mag wel een suggestie tonen op basis van naam of IBAN, maar verwerkt de betaling dan niet automatisch.
-
-Als hetzelfde bankbestand per ongeluk opnieuw wordt geimporteerd, probeert het systeem dubbele betalingen te herkennen op basis van dezelfde donateur, betaaldatum, bedrag en importsbron. Zulke regels worden als dubbele betaling getoond en niet opnieuw verwerkt.
-
-Bestaande donateurs die via oude Excelbestanden of bankimports worden geimporteerd krijgen geen eenmalige inschrijfschuld. De eenmalige bijdrage geldt alleen voor mensen die zich nu via het portaal inschrijven en daarna door het bestuur worden goedgekeurd.
-
-### 16.1 Bankimport en betalingsdoel
-
-Bij bankimport wordt niet alleen gekeken naar de rekeninghouder. Het systeem probeert te bepalen voor wie de betaling bedoeld is.
-
-Voorbeelden:
-
-- Als de omschrijving een lidnummer bevat, wordt de betaling gekoppeld aan dat lidnummer.
-- Als de omschrijving zegt "contributie voor persoon 2", dan wordt de betaling gekoppeld aan persoon 2 en niet automatisch aan de betaler.
-- Als dezelfde IBAN bij meerdere lidnummers voorkomt, gebruikt het systeem het lidnummer of betalingsdoel uit de omschrijving. Als dit niet duidelijk genoeg is, gaat de rij naar tweede opinie.
-- Relaties zoals echtgenoot, partner, dochter of zoon worden niet verwerkt vanuit bankimport.
-
-### 16.2 Kolommen in de importpreview
-
-De importpreview toont onder andere:
-
-- Rij: het rijnummer uit het bestand.
-- Datum: de transactiedatum of rentedatum.
-- Bedrag: het bedrag van de transactie.
-- Org. rekeningnummer: het rekeningnummer van de organisatie uit de bankexport.
-- Lidnummer: het lidnummer waaraan het systeem wil koppelen.
-- Betalingsdoel: de persoon van wie de contributie wordt afgelost.
-- Betaler: de naam van de rekeninghouder of betaler uit de omschrijving.
-- Donor IBAN: de IBAN die uit de omschrijving is gelezen.
-- Jaar: het contributiejaar als dat is gevonden.
-- Actie: wat het systeem met de rij wil doen.
-- Uitleg: korte menselijke uitleg over wat het systeem heeft herkend.
-- Tweede opinie / fouten: waarschuwingen, foutmeldingen en redenen voor controle.
-
-### 16.3 Mogelijke acties in de preview
-
-Nieuwe donateur aanmaken betekent dat er geen bestaande donateur is gevonden en de rij gebruikt kan worden om een nieuwe donateur aan te maken.
-
-Koppelen aan bestaande donateur betekent dat het systeem een bestaande donateur heeft gevonden, meestal via lidnummer, IBAN of naam.
-
-Dubbele betaling betekent dat een betaling met hetzelfde bedrag en dezelfde datum al eerder is verwerkt.
-
-Controle nodig betekent dat het systeem onvoldoende zekerheid heeft. Deze rij wordt niet automatisch verwerkt.
-
-Ongeldig betekent dat de rij blokkerende fouten bevat.
-
-Gedeeltelijk betaald betekent dat er al een deel van de jaarbijdrage is ontvangen, maar dat er nog een restant openstaat.
-
-Inactief gezet betekent dat een lid na de betaalperiode geen volledige jaarbetaling heeft. Dit gebeurt niet voor rijen die nog in tweede opinie staan, zodat mogelijke betalingen zonder lidnummer eerst handmatig beoordeeld kunnen worden.
-
-### 16.4 Mogelijke meldingen bij import
-
-IBAN komt bij meerdere lidnummers voor; kies handmatig op lidnummer of zorg dat de omschrijving een lidnummer bevat betekent dat dezelfde IBAN bij meerdere donateurs voorkomt en het systeem niet zelfstandig mag kiezen.
-
-Betalingsdoel komt overeen met meerdere donateurs betekent dat meerdere personen op de gevonden naam lijken.
-
-Geen lidnummer in de omschrijving; controleer de voorgestelde koppeling handmatig betekent dat het systeem wel een mogelijke persoon kan herkennen, maar de betaling niet automatisch verwerkt omdat het lidnummer ontbreekt.
-
-Omschrijving ontbreekt betekent dat een bankexportregel geen omschrijving bevat.
-
-AI kon deze omschrijving niet betrouwbaar uitlezen; handmatige controle nodig betekent dat de optionele AI-hulplezer is ingeschakeld, maar geen betrouwbare verbetering kon geven.
-
-Het systeem controleert contributiejaar, bedrag, naam, lidnummer en IBAN niet inhoudelijk. Deze velden worden aangenomen zoals ze in het bestand of de omschrijving staan. De preview is vooral bedoeld om te zien of de betaling aan de juiste donateur wordt gekoppeld.
-
-### 16.5 Verwerken van tweede-opinie rijen
-
-Rijen met "Controle nodig", "Ongeldig" of tweede-opinie redenen worden niet automatisch verwerkt wanneer op "Import verwerken" wordt geklikt. Ze blijven buiten de verwerking totdat een beheerder de gegevens corrigeert of handmatig op een andere manier verwerkt.
-
-### 16.6 Optionele AI-hulplezer
-
-Het portaal bevat een optionele AI-hulplezer voor bankomschrijvingen. Deze werkt alleen als er bewust een `OPENAI_API_KEY` en `OPENAI_IMPORT_MODEL` zijn ingesteld. Zonder deze instellingen gebruikt het portaal alleen de lokale parser en wordt er geen bankdata naar OpenAI gestuurd.
-
-Vanwege gevoelige bank- en donateurgegevens is het aanbevolen om standaard de lokale parser te gebruiken en AI alleen te gebruiken na een bewuste privacy-afweging door het bestuur.
-
-## 17. Admin: export
-
-Export maakt bestanden voor administratie of controle.
-
-Mogelijke exports zijn onder andere:
-
-- Alle donateurs.
-- Actieve donateurs.
-- Inactief / betaling afwachtend.
-- Afgewezen.
-- Overleden.
-
-Exportbestanden bevatten persoonsgegevens en moeten veilig worden behandeld.
-
-## 18. Admin: e-mailtemplates
-
-E-mailtemplates zijn standaardteksten die het systeem gebruikt om e-mails voor te bereiden.
-
-De templates zijn bewerkbaar via "E-mailtemplates" in de adminnavigatie. Een admin kan:
-
-- Templates bekijken.
-- Onderwerp aanpassen.
-- Tekst aanpassen.
-- Preview bekijken met voorbeeldgegevens.
-- Template terugzetten naar standaard.
-
-Beschikbare placeholders zijn onder andere naam, voornaam, achternaam, lidnummer, status, bedrag, betaaldatum, reden, correctiebericht, loginlink, contact e-mail, organisatie, verificatielink en resetlink.
-
-Er is nog geen echte e-mailprovider gekoppeld. Templates worden gebruikt om e-mails klaar te zetten in de e-maillog.
-
-## 19. Admin: e-maillog
-
-De e-maillog toont voorbereide e-mails. Dit zijn berichten die het systeem heeft klaargezet, bijvoorbeeld na een registratie, wijzigingsverzoek of handmatige betalingsbevestiging.
-
-De status is `PREPARED`. Dit betekent dat het bericht is voorbereid, maar niet verzonden.
-
-De e-maillog toont:
-
-- Datum.
-- Ontvanger.
-- Template.
-- Onderwerp.
-- Status.
-- Preview van de tekst.
+De e-maillog toont voorbereide e-mails met status `PREPARED`. Dit betekent dat het bericht is voorbereid, maar niet verzonden.
 
 ## 20. Registratie PDF
 
-Bij een inschrijving kan een PDF-overzicht worden gegenereerd. Deze PDF bevat een kopie van de ingevulde inschrijving.
+Bij een inschrijving kan een PDF-overzicht worden gegenereerd. Deze PDF bevat een kopie van de ingevulde inschrijving. De donateur kan de eigen PDF downloaden vanaf het dashboard. De admin kan de PDF downloaden vanaf de registratiedetailpagina.
 
-De PDF bevat:
+## 21. Prijsinstellingen
 
-- Titel.
-- Inzenddatum.
-- Hoofddonateurgegevens.
-- Partnergegevens als die zijn ingevuld.
-- Kinderen.
-- Contactpersoon Pakistan.
-- Uitvaartwensen.
-- Verklaringen.
-- Geformatteerde IBAN.
-- Een melding dat het document een kopie is van de ingevulde inschrijving.
+Prijsinstellingen bepalen jaarlijkse bijdragen, eenmalige bijdragen, betaalperiode en boete.
 
-De donateur kan de eigen PDF downloaden vanaf het dashboard. De admin kan de PDF downloaden vanaf de registratiedetailpagina.
-
-## 21. Admin: prijsinstellingen
-
-Prijsinstellingen bepalen hoe bijdragen worden berekend.
-
-Er zijn jaarlijkse bijdragen en eenmalige bijdragen.
-
-Jaarlijkse bijdragen kunnen verschillen voor:
-
-- Individuele volwassenen.
-- Gezinssituaties.
-- Alleenstaande ouder met kinderen.
+Jaarlijkse bijdragen kunnen verschillen voor individuele volwassenen, gezinssituaties en alleenstaande ouder met kinderen.
 
 Eenmalige bijdragen kunnen verschillen per leeftijdsgroep.
 
-Als instellingen worden aangepast, worden berekende bedragen anders weergegeven. Bestaande handmatig geimporteerde of geregistreerde betalingen veranderen niet automatisch tenzij de administratie dit verwerkt.
+Als instellingen worden aangepast, veranderen bestaande handmatig geimporteerde of geregistreerde betalingen niet automatisch.
 
-Gezinsverwijzingen die alleen uit bankimport komen, tellen niet automatisch mee als officiele gezinsleden voor prijsberekening. Alleen geregistreerde gezinsleden in het profiel tellen mee.
-
-De eenmalige bijdrage wordt alleen gebruikt bij nieuwe inschrijvingen via het portaal. Voor bestaande geimporteerde donateurs telt standaard alleen de jaarlijkse bijdrage.
-
-Bij huwelijk of partnerregistratie onder hetzelfde lidmaatschap betaalt de primary member het gezinstarief. Als de partner als partnerprofiel onder hetzelfde lidnummer staat, krijgt de partner geen aparte jaarlijkse betaalplicht. Als de partner voor zichzelf betaalt of apart lid wil zijn, krijgt de partner een eigen lidnummer en wordt die persoon primary member van een eigen lidmaatschap.
-
-Als een partner wordt toegevoegd in een lopend jaar, geldt voor dat jaar het gezinstarief voor het lidmaatschap. De partner krijgt geen aparte jaarlijkse bijdrage voor datzelfde jaar. De eenmalige bijdrage van de partner kan wel openstaan en heeft dezelfde betalingsruimte als een nieuwe inschrijving.
-
-## 22. Rollen en rechten
-
-Donateur heeft toegang tot eigen dashboard en eigen account.
-
-Admin heeft toegang tot beheerfuncties, zoals registraties, donateurs, wijzigingsverzoeken, import, export en instellingen.
-
-Super admin is bedoeld voor de hoogste beheerlaag en kan als aparte bestuursrol worden gebruikt.
-
-Adminrechten moeten beperkt blijven tot personen die deze toegang echt nodig hebben.
-
-## 23. Proces: nieuwe donateur
-
-1. Donateur schrijft zich in.
-2. Status wordt `PENDING`.
-3. Admin beoordeelt de aanvraag.
-4. Admin keurt goed, wijst af of vraagt correctie.
-5. Bij goedkeuring krijgt de donateur een lidnummer en status `PAYMENT_REQUIRED`.
-6. Na betaling en administratieve verwerking kan de donateur actief worden behandeld.
-
-## 24. Proces: wijziging van gegevens
-
-1. Donateur gaat naar "Mijn account".
-2. Donateur vult nieuwe gegevens in.
-3. Het systeem maakt een wijzigingsverzoek.
-4. Admin beoordeelt het verzoek.
-5. Bij goedkeuring worden de gegevens aangepast.
-6. Bij afwijzing blijven de bestaande gegevens staan.
-
-## 25. Proces: betaling
-
-1. Admin bekijkt het financieel overzicht.
-2. Het systeem toont berekende bijdragen.
-3. Openstaande posten staan op `DUE`.
-4. Admin kan een post op `PAID`, `DUE`, `WAIVED` of `MANUAL_CORRECTION` zetten.
-5. De donateurslijst toont of er openstaande posten zijn.
-
-Bij bankimport wordt een betaling gekoppeld aan het betalingsdoel. Als persoon 1 betaalt voor persoon 2, wordt alleen de bijdrage van persoon 2 als betaald geregistreerd. Persoon 1 wordt dan alleen als betaler of rekeninghouder in de notitie genoemd.
-
-Voor een gezin onder één lidnummer wordt de bankbetaling gekoppeld aan het lidmaatschap/huishouden. De primary member is de betaler. Partnerprofielen onder hetzelfde lidnummer krijgen geen aparte jaarlijkse betaalstatus zolang zij geen eigen lidnummer hebben.
-
-Jaarbetalingen mogen in termijnen binnen januari tot en met maart binnenkomen. Het systeem telt termijnen op. Bij een gedeeltelijke betaling blijft het restant zichtbaar als open jaarbetaling. Na 31 maart komt daar standaard 5 euro boete per maand bij. Uitzonderingen kunnen handmatig via het financieel overzicht worden toegevoegd of gecorrigeerd.
-
-Als bij een volgende jaarimport blijkt dat iemand geen betaling voor dat jaar heeft, wordt deze persoon na de betaalperiode administratief op `INACTIVE` gezet. In het profiel blijft het lidnummer gekoppeld aan de naam. Als de persoon later opnieuw wil deelnemen, moet het bestuur het normale proces opnieuw volgen, inclusief screening, eenmalige betaling op basis van leeftijd en de nieuwe jaarlijkse bijdrage.
-
-Wanneer iemand tot 31 december niet volledig heeft betaald, kan het profiel vanaf 1 januari als geannuleerd wegens niet-betalen zichtbaar zijn. De technische status blijft `INACTIVE`, zodat het oude lidnummer en de historie bewaard blijven.
-
-## 25.1 Proces: trouwen, scheiden en partnerprofielen
-
-Wanneer een primary member trouwt en de partner onder hetzelfde lidmaatschap wordt toegevoegd, blijft het lidnummer leidend. De partner krijgt een partnerprofiel onder dat lidnummer. De primary member betaalt dan de gezamenlijke jaarbijdrage voor het gezin.
-
-Als de partner apart wil betalen of niet onder het lidmaatschap van de primary member valt, krijgt de partner een eigen lidnummer en wordt die persoon primary member van een eigen lidmaatschap.
-
-Bij scheiding behoudt de oorspronkelijke primary member het bestaande lidnummer. De partner krijgt een nieuw lidnummer en wordt primary member van een eigen lidmaatschap. Vanaf het volgende kalenderjaar betaalt ieder lidmaatschap volgens de eigen gezinssituatie.
-
-Bij scheiding met kinderen wordt via een wijzigingsverzoek vastgelegd bij welk lidmaatschap de kinderen administratief horen. Vanaf het volgende kalenderjaar betaalt de ouder met kinderen bijvoorbeeld het alleenstaande-oudertarief en de ouder zonder kinderen het individuele tarief.
-
-Als een partner overlijdt, wordt die partner administratief inactief. Het lidmaatschap rekent daarna niet meer als getrouwd gezin voor de jaarlijkse bijdrage, tenzij er nog kinderen of andere prijsregels gelden.
-
-Wijzigingen zoals partner toevoegen, scheiding doorgeven, partner overleden, kind bij een ouder plaatsen of partner eigen lidnummer geven worden voorbereid via lidmaatschapswijzigingsverzoeken. De admin controleert en keurt deze wijzigingen goed.
-
-## 26. Proces: overlijden
+## 22. Proces: overlijden
 
 1. Bestuur ontvangt een betrouwbare melding.
 2. Bestuur controleert intern of de melding voldoende is.
 3. De donateur wordt administratief op `DECEASED` gezet.
 4. De donateur verschijnt in de groep "Overleden".
-5. Gegevens en uitvaartwensen worden zorgvuldig behandeld.
+5. Het systeem toont indien nodig gezinswijzigingen, zoals partner als primaire contactpersoon of voogd/contact nodig.
+6. Gegevens en uitvaartwensen worden zorgvuldig behandeld.
 
-## 27. Rapportage-overzicht
+## 23. Proces: kind wordt 18
 
-Het portaal ondersteunt rapportage via dashboardblokken en exports.
+1. Het systeem signaleert kinderen vanaf 17 jaar en 6 maanden.
+2. Zodra het kind 18 is, wordt deze persoon gemarkeerd als 18+ inschrijving nodig.
+3. De persoon moet zichzelf inschrijven voor een eigen lidnummer.
+4. De admin kan de persoon uitnodigen, koppelen aan een nieuw lidnummer of markeren als geen lid.
+5. Als de persoon zich nooit inschrijft, blijft dit administratief zichtbaar als geen lid of als open aandachtspunt.
 
-Dashboardrapportage:
+## 24. Rapportage-overzicht
 
-- Aantal registraties in afwachting.
-- Aantal actie vereist.
-- Aantal actieve donateurs.
-- Aantal inactief of betaling afwachtend.
-- Aantal afgewezen.
-- Aantal overleden.
+Het portaal ondersteunt rapportage via dashboardblokken, controlecentrum, donateurslijsten en exports.
 
-Donateursrapportage:
+Dashboardrapportage bevat registraties, actie vereist, actieve donateurs, inactief/betaling afwachtend, afgewezen, overleden, kinderen bijna 18, 18+ inschrijving nodig en voogd/contact nodig.
 
-- Lijst per statusgroep.
-- Zoekresultaten per naam, lidnummer, telefoon, e-mail of IBAN.
-- Betaalstatus per donateur.
+Controlecentrumrapportage bevat open betalingen, eenmalige bijdrage-termijnen, mogelijke dubbele bankbetalingen, statuscontrole en gezinswijzigingen.
 
-Financiele rapportage:
+Financiele rapportage bevat betaald totaal, openstaand totaal, jaarlijkse bijdrage, eenmalige bijdrage, boete en betaalhistorie.
 
-- Betaald totaal per donateur.
-- Openstaand totaal per donateur.
-- Berekende bijdragen per gezinslid.
-- Betaalverplichtingen per bron en status.
-
-Export:
-
-- Bestanden voor administratie, controle of bestuur.
-- Filters op actieve, inactieve, afgewezen en overleden donateurs.
-
-## 28. Aanbevolen werkwijze voor bestuur
+## 25. Aanbevolen werkwijze voor bestuur
 
 Controleer nieuwe registraties regelmatig.
 
@@ -608,11 +319,13 @@ Gebruik duidelijke donorberichten bij correctie of afwijzing.
 
 Gebruik interne notities alleen voor bestuursinformatie.
 
+Controleer het controlecentrum dagelijks of wekelijks.
+
 Controleer imports altijd voordat ze definitief worden verwerkt.
 
-Controleer bij bankimport altijd de kolommen Betalingsdoel, Betaler, Donor IBAN, Uitleg en Tweede opinie / fouten.
+Controleer bij bankimport altijd lidnummer, datum, bedrag, betaler-IBAN, contributiejaar en controle/fouten.
 
-Verwerk tweede-opinie rijen niet zonder handmatige controle.
+Verwerk controle-nodig rijen niet zonder handmatige controle.
 
 Bewaar exports veilig en verwijder oude exportbestanden.
 
@@ -622,19 +335,19 @@ Registreer iemand alleen als overleden na betrouwbare bevestiging.
 
 Controleer prijsinstellingen voordat betaaloverzichten worden gebruikt.
 
-## 29. Beperkingen en aandachtspunten
+## 26. Beperkingen en aandachtspunten
 
-Online betalen staat nog niet actief in het portaal. Bij betaling vereist ziet de donateur dat betaling later volgt.
+Online betalen staat niet actief in het portaal.
 
-E-mails worden nog niet automatisch verzonden. Ze worden voorbereid in de e-maillog.
+E-mails worden niet automatisch verzonden. Ze worden voorbereid in de e-maillog.
 
 De overgang van `PAYMENT_REQUIRED` naar `ACTIVE` moet bestuurlijk en administratief goed worden afgesproken.
 
-De lokale bankomschrijving-parser kan veel varianten en spelfouten herkennen, maar is geen garantie dat elke omschrijving correct wordt begrepen. Daarom bestaat de preview en tweede-opinie werkwijze.
+De lokale bankomschrijving-parser kan varianten herkennen, maar is geen garantie dat elke omschrijving correct wordt begrepen. Daarom bestaat de preview en controle-nodig werkwijze.
 
-Gezinsverwijzingen uit bankimport zijn informatief. Ze vervangen geen officiele registratie van partner of kinderen.
+Gezinsverwijzingen uit bankimport zijn informatief en vervangen geen officiele registratie van partner of kinderen.
 
-De optionele AI-hulplezer staat alleen aan als daarvoor expliciet OpenAI-instellingen zijn ingevuld. Bij gevoelige bankdata moet het bestuur eerst bepalen of externe verwerking is toegestaan.
+Er is op dit moment geen externe AI-verwerking voor bankimport actief.
 
 Privacy- en beleidsteksten moeten voor officieel gebruik door het bestuur worden gecontroleerd.
 

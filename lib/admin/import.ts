@@ -1,10 +1,11 @@
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
+import { DonorStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeIban } from "@/lib/iban";
 import { parseBankDescription } from "@/lib/import/bank-description-parser";
 
-export type ImportMode = "donor-list" | "bank-transactions" | "member-personal-details";
+export type ImportMode = "donor-list" | "bank-transactions" | "member-personal-details" | "donor-status";
 export type ImportAction =
   | "NEW"
   | "POSSIBLE_MATCH"
@@ -14,13 +15,16 @@ export type ImportAction =
   | "PAYMENT_ONLY_REQUIRES_REVIEW"
   | "DUPLICATE_PAYMENT"
   | "DUPLICATE_IMPORT_ROW"
-  | "INVALID_REQUIRES_REVIEW";
+  | "INVALID_REQUIRES_REVIEW"
+  | "UPDATE_STATUS"
+  | "STATUS_NOT_FOUND";
 
 export type ImportPreviewRow = {
   rowNumber: number;
   importMode: ImportMode;
   registrationNumber: string;
   fullName: string;
+  status?: string;
   firstName?: string;
   middleName?: string;
   lastName?: string;
@@ -28,6 +32,9 @@ export type ImportPreviewRow = {
   legacyMemberDetailKey?: string;
   legacyAddressKey?: string;
   addressLine1?: string;
+  addressLine2?: string;
+  postalCode?: string;
+  city?: string;
   gender?: string;
   maritalStatus?: string;
   birthPlace?: string;
@@ -54,6 +61,9 @@ type RawImportRow = {
   legacyMemberDetailKey: string;
   legacyAddressKey: string;
   addressLine1: string;
+  addressLine2: string;
+  postalCode: string;
+  city: string;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -63,6 +73,7 @@ type RawImportRow = {
   birthPlace: string;
   iban: string;
   fullName: string;
+  status: string;
   amount: unknown;
   date: unknown;
   organizationAccountNumber: string;
@@ -77,9 +88,13 @@ const aliases = {
   registrationNumber: ["lid nr", "lidnummer", "registratienummer", "registration number", "registration nr key"],
   legacyMemberDetailKey: ["mem detail nr key", "member detail nr key"],
   legacyAddressKey: ["addr nr key", "address nr key"],
-  addressLine1: ["address line 1", "adres", "address"],
+  addressLine1: ["address line 1", "address line 1 display only", "adres", "address", "straat", "straatnaam"],
+  addressLine2: ["address line 2", "adresregel 2", "toevoeging"],
+  postalCode: ["postcode", "postal code", "zip", "zip code"],
+  city: ["woonplaats", "plaats", "city", "town"],
   iban: ["rek nr", "iban", "bankrekening", "rekeningnummer"],
   fullName: ["naam", "name"],
+  status: ["status", "lid status", "donateurstatus", "member status"],
   firstName: ["first name", "voornaam"],
   middleName: ["middle name", "middle nam", "tussenvoegsel"],
   lastName: ["surname", "achternaam", "last name"],
@@ -138,6 +153,9 @@ function buildIndexes(headers: string[]) {
     legacyMemberDetailKey: headerIndex(headers, aliases.legacyMemberDetailKey),
     legacyAddressKey: headerIndex(headers, aliases.legacyAddressKey),
     addressLine1: headerIndex(headers, aliases.addressLine1),
+    addressLine2: headerIndex(headers, aliases.addressLine2),
+    postalCode: headerIndex(headers, aliases.postalCode),
+    city: headerIndex(headers, aliases.city),
     firstName: headerIndex(headers, aliases.firstName),
     middleName: headerIndex(headers, aliases.middleName),
     lastName: headerIndex(headers, aliases.lastName),
@@ -147,6 +165,7 @@ function buildIndexes(headers: string[]) {
     birthPlace: headerIndex(headers, aliases.birthPlace),
     iban: headerIndex(headers, aliases.iban),
     fullName: headerIndex(headers, aliases.fullName),
+    status: headerIndex(headers, aliases.status),
     amount: headerIndex(headers, aliases.amount),
     date: headerIndex(headers, aliases.date),
     email: headerIndex(headers, aliases.email),
@@ -171,6 +190,9 @@ function detectImportMode(indexes: Record<string, number>): ImportMode {
   if (indexes.organizationAccountNumber >= 0 && indexes.description >= 0 && indexes.amount >= 0) {
     return "bank-transactions";
   }
+  if (indexes.registrationNumber >= 0 && indexes.status >= 0) {
+    return "donor-status";
+  }
   return "donor-list";
 }
 
@@ -186,7 +208,8 @@ function headerScore(indexes: Record<string, number>) {
     indexes.birthDate
   ].filter((value) => value >= 0).length;
   const bankScore = [indexes.organizationAccountNumber, indexes.description, indexes.amount, indexes.date].filter((value) => value >= 0).length;
-  return Math.max(generalScore, memberScore * 2, bankScore * 2);
+  const statusScore = [indexes.registrationNumber, indexes.status, indexes.fullName].filter((value) => value >= 0).length;
+  return Math.max(generalScore, memberScore * 2, bankScore * 2, statusScore * 2);
 }
 
 function findHeaderRow(rows: unknown[][]) {
@@ -215,6 +238,9 @@ function rawRowToImportRow(rowNumber: number, values: unknown[], indexes: Record
     legacyMemberDetailKey: indexes.legacyMemberDetailKey >= 0 ? cellText(values[indexes.legacyMemberDetailKey]) : "",
     legacyAddressKey: indexes.legacyAddressKey >= 0 ? cellText(values[indexes.legacyAddressKey]) : "",
     addressLine1: indexes.addressLine1 >= 0 ? cellText(values[indexes.addressLine1]) : "",
+    addressLine2: indexes.addressLine2 >= 0 ? cellText(values[indexes.addressLine2]) : "",
+    postalCode: indexes.postalCode >= 0 ? cellText(values[indexes.postalCode]) : "",
+    city: indexes.city >= 0 ? cellText(values[indexes.city]) : "",
     firstName: indexes.firstName >= 0 ? cellText(values[indexes.firstName]) : "",
     middleName: indexes.middleName >= 0 ? cellText(values[indexes.middleName]) : "",
     lastName: indexes.lastName >= 0 ? cellText(values[indexes.lastName]) : "",
@@ -224,6 +250,7 @@ function rawRowToImportRow(rowNumber: number, values: unknown[], indexes: Record
     birthPlace: indexes.birthPlace >= 0 ? cellText(values[indexes.birthPlace]) : "",
     iban: indexes.iban >= 0 ? cellText(values[indexes.iban]) : "",
     fullName: indexes.fullName >= 0 ? cellText(values[indexes.fullName]) : "",
+    status: indexes.status >= 0 ? cellText(values[indexes.status]) : "",
     amount: indexes.amount >= 0 ? values[indexes.amount] : "",
     date: indexes.date >= 0 ? values[indexes.date] : "",
     organizationAccountNumber: indexes.organizationAccountNumber >= 0 ? cellText(values[indexes.organizationAccountNumber]) : "",
@@ -289,6 +316,35 @@ function normalizeRegistrationNumberForImport(value: string, importMode: ImportM
   return cleaned;
 }
 
+export function normalizeImportedDonorStatus(value?: string) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (normalized === "ACTIVE" || normalized === "ACTIEF") return DonorStatus.ACTIVE;
+  if (normalized === "INACTIVE" || normalized === "INACTIEF") return DonorStatus.INACTIVE;
+  if (normalized === "DECEASED" || normalized === "OVERLEDEN") return DonorStatus.DECEASED;
+  if (normalized === "REJECTED" || normalized === "AFGEWEZEN") return DonorStatus.REJECTED;
+  if (normalized === "PAYMENT_REQUIRED" || normalized === "BETALING_AFwACHTEND".toUpperCase()) return DonorStatus.INACTIVE;
+  if (normalized === "ACTION_REQUIRED" || normalized === "CORRECTIE_NODIG") return DonorStatus.ACTION_REQUIRED;
+  if (normalized === "PENDING" || normalized === "IN_AFwACHTING".toUpperCase()) return DonorStatus.PENDING;
+  return undefined;
+}
+
+function registrationNumberVariants(value: string) {
+  const cleaned = value.trim();
+  const match = cleaned.match(/^11\D+(\d{1,6})$/i);
+  if (!match) return cleaned ? [cleaned] : [];
+
+  const digits = match[1];
+  const numeric = digits.replace(/^0+/, "") || "0";
+  const variants = new Set<string>([`11-${digits}`]);
+  for (let width = 3; width <= 6; width += 1) {
+    if (numeric.length <= width) variants.add(`11-${numeric.padStart(width, "0")}`);
+  }
+  return [...variants];
+}
+
 export function splitName(fullName: string) {
   const normalized = fullName.trim().replace(/\s+/g, " ");
   const parts = normalized.split(" ").filter(Boolean);
@@ -308,6 +364,10 @@ async function detectAction(row: Omit<ImportPreviewRow, "detectedAction" | "exis
 
   if (row.importMode === "bank-transactions") {
     return detectBankAction(row);
+  }
+
+  if (row.importMode === "donor-status") {
+    return detectDonorStatusAction(row);
   }
 
   if (row.importMode === "member-personal-details") {
@@ -374,20 +434,51 @@ async function detectAction(row: Omit<ImportPreviewRow, "detectedAction" | "exis
   return { detectedAction: "POSSIBLE_MATCH" as const, existingDonorId: existing.id };
 }
 
+async function detectDonorStatusAction(row: Omit<ImportPreviewRow, "detectedAction" | "existingDonorId">) {
+  if (!row.registrationNumber) {
+    row.reviewReasons.push("Lidnummer ontbreekt; status kan niet automatisch worden gekoppeld.");
+    return { detectedAction: "STATUS_NOT_FOUND" as const };
+  }
+
+  const existing = await prisma.donorProfile.findUnique({
+    where: { registrationNumber: row.registrationNumber },
+    select: { id: true }
+  });
+  if (!existing) {
+    row.reviewReasons.push(`Lidnummer ${row.registrationNumber} staat niet in de donateurslijst; importeer eerst de volledige ledenlijst.`);
+    return { detectedAction: "STATUS_NOT_FOUND" as const };
+  }
+
+  return { detectedAction: "UPDATE_STATUS" as const, existingDonorId: existing.id };
+}
+
 async function detectBankAction(row: Omit<ImportPreviewRow, "detectedAction" | "existingDonorId">) {
   if (!row.registrationNumber) {
     row.reviewReasons.push("Geen lidnummer in de omschrijving; bankbetaling wordt niet automatisch gekoppeld op naam of IBAN.");
     return { detectedAction: "PAYMENT_ONLY_REQUIRES_REVIEW" as const };
   }
 
-  const existing = await prisma.donorProfile.findUnique({
-    where: { registrationNumber: row.registrationNumber },
-    select: { id: true, iban: true, firstName: true, lastName: true }
+  const possibleRegistrationNumbers = registrationNumberVariants(row.registrationNumber);
+  const possibleDonors = await prisma.donorProfile.findMany({
+    where: { registrationNumber: { in: possibleRegistrationNumbers } },
+    select: { id: true, iban: true, firstName: true, lastName: true, registrationNumber: true }
   });
+  const exactDonor = possibleDonors.find((donor) => donor.registrationNumber === row.registrationNumber);
+  const existing = exactDonor ?? (possibleDonors.length === 1 ? possibleDonors[0] : null);
 
   if (!existing) {
+    if (possibleDonors.length > 1) {
+      row.reviewReasons.push(
+        `Lidnummer ${row.registrationNumber} heeft meerdere mogelijke matches (${possibleDonors.map((donor) => donor.registrationNumber).join(", ")}); handmatige controle nodig.`
+      );
+      return { detectedAction: "PAYMENT_ONLY_REQUIRES_REVIEW" as const };
+    }
     row.reviewReasons.push(`Lidnummer ${row.registrationNumber} staat niet in de donateurslijst; handmatige controle nodig.`);
     return { detectedAction: "PAYMENT_ONLY_REQUIRES_REVIEW" as const };
+  }
+  if (existing.registrationNumber && existing.registrationNumber !== row.registrationNumber) {
+    row.warnings.push(`Lidnummer ${row.registrationNumber} gekoppeld aan bestaand lidnummer ${existing.registrationNumber}.`);
+    row.registrationNumber = existing.registrationNumber;
   }
 
   if (existing) {
@@ -397,7 +488,7 @@ async function detectBankAction(row: Omit<ImportPreviewRow, "detectedAction" | "
         amountCents: row.amountCents,
         paidAt: row.paidAt ? new Date(row.paidAt) : null,
         source: { in: ["IMPORT_BANK_EXCEL", "IMPORT_BANK_EXCEL_OPEN"] },
-        ...(row.iban ? { notes: { contains: `IBAN betaler: ${row.iban}` } } : {})
+        ...(row.iban ? { OR: [{ notes: { contains: `Betaalrekening: ${row.iban}` } }, { notes: { contains: `IBAN betaler: ${row.iban}` } }] } : {})
       },
       select: { id: true }
     });
@@ -432,7 +523,7 @@ async function rowsFromXlsxWorkbook(buffer: ArrayBuffer): Promise<RawImportRow[]
     .filter((_, index) => index > bestSheet.headerIndex)
     .map(({ rowNumber, values }) => rawRowToImportRow(rowNumber, values, bestSheet.indexes, bestSheet.importMode))
     .filter(rowHasUsefulData)
-    .filter((row) => row.importMode !== "bank-transactions" || isAllowedSepaTransfer(row.description));
+    .filter((row) => row.importMode !== "bank-transactions" || (isAllowedSepaTransfer(row.description) && parseAmountCents(row.amount) > 0));
 }
 
 async function rowsFromLegacyWorkbook(buffer: ArrayBuffer): Promise<RawImportRow[]> {
@@ -455,7 +546,7 @@ async function rowsFromLegacyWorkbook(buffer: ArrayBuffer): Promise<RawImportRow
     .slice(bestSheet.headerIndex + 1)
     .map((values, index) => rawRowToImportRow(bestSheet.headerIndex + index + 2, values, bestSheet.indexes, bestSheet.importMode))
     .filter(rowHasUsefulData)
-    .filter((row) => row.importMode !== "bank-transactions" || isAllowedSepaTransfer(row.description));
+    .filter((row) => row.importMode !== "bank-transactions" || (isAllowedSepaTransfer(row.description) && parseAmountCents(row.amount) > 0));
 }
 
 async function rowsFromCsv(text: string) {
@@ -467,7 +558,7 @@ async function rowsFromCsv(text: string) {
     .slice(headerIndex + 1)
     .map((values, index) => rawRowToImportRow(headerIndex + index + 2, values, indexes, importMode))
     .filter(rowHasUsefulData)
-    .filter((row) => row.importMode !== "bank-transactions" || isAllowedSepaTransfer(row.description));
+    .filter((row) => row.importMode !== "bank-transactions" || (isAllowedSepaTransfer(row.description) && parseAmountCents(row.amount) > 0));
 }
 
 function rowHasUsefulData(row: RawImportRow) {
@@ -507,6 +598,12 @@ function duplicateKeyForRow(row: ImportPreviewRow) {
     const iban = duplicateKeyPart(row.iban);
     if (!target || !amount || !paidAt || !iban) return null;
     return `bank:${target}:${amount}:${paidAt}:${iban}`;
+  }
+
+  if (row.importMode === "donor-status") {
+    const target = duplicateKeyPart(row.registrationNumber);
+    if (!target) return null;
+    return `donor-status:${target}`;
   }
 
   if (row.importMode === "member-personal-details") {
@@ -592,6 +689,7 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
     const email = raw.email.trim().toLowerCase();
     const phone = raw.phone.trim();
     const memberFullName = [raw.firstName, raw.middleName, raw.lastName].filter(Boolean).join(" ").trim().replace(/\s+/g, " ");
+    const normalizedStatus = normalizeImportedDonorStatus(raw.status);
 
     if (parsedBank) warnings.push(...parsedBank.warnings.filter((message) => message !== "Geen lidnummer gevonden"));
     const reviewReasons: string[] = [];
@@ -608,12 +706,17 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       if (!raw.relationshipToMember) errors.push("Relatie tot lid ontbreekt");
       if (!birthDate) warnings.push("Geboortedatum ontbreekt of is niet leesbaar");
     }
+    if (raw.importMode === "donor-status") {
+      if (!registrationNumber) errors.push("Lidnummer ontbreekt");
+      if (!normalizedStatus) errors.push(`Status '${raw.status || "-"}' wordt niet herkend`);
+    }
 
     const base = {
       rowNumber: raw.rowNumber,
       importMode: raw.importMode,
       registrationNumber,
       fullName: raw.importMode === "member-personal-details" ? memberFullName : fullName,
+      status: normalizedStatus ?? raw.status,
       firstName: raw.firstName,
       middleName: raw.middleName,
       lastName: raw.lastName,
@@ -621,6 +724,9 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       legacyMemberDetailKey: raw.legacyMemberDetailKey,
       legacyAddressKey: raw.legacyAddressKey,
       addressLine1: raw.addressLine1,
+      addressLine2: raw.addressLine2,
+      postalCode: raw.postalCode,
+      city: raw.city,
       gender: raw.gender,
       maritalStatus: raw.maritalStatus,
       birthPlace: raw.birthPlace,

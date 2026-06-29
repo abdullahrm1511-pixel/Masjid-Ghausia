@@ -12,6 +12,8 @@ type PreviewFilter = "all" | "new" | "linked" | "duplicates" | "warnings" | "rev
 function actionLabel(action: string, isMemberImport = false) {
   if (isMemberImport && action === "DUPLICATE") return "Bestaand lid bijwerken";
   if (isMemberImport && action === "NEW") return "Nieuw lid aanmaken";
+  if (action === "UPDATE_STATUS") return "Status bijwerken";
+  if (action === "STATUS_NOT_FOUND") return "Lidnummer niet gevonden";
   if (action === "DUPLICATE_IMPORT_ROW") return "Dubbele rij in bestand";
   if (action === "LINK_PAYMENT_TO_EXISTING_DONOR") return "Bedrag verwerkt";
   if (action === "DUPLICATE" || action === "POSSIBLE_MATCH") return "Gekoppeld";
@@ -28,6 +30,7 @@ export function ImportForm() {
   const [filter, setFilter] = useState<PreviewFilter>("all");
   const isBankImport = preview.rows.some((row) => row.importMode === "bank-transactions");
   const isMemberImport = preview.rows.some((row) => row.importMode === "member-personal-details");
+  const isStatusImport = preview.rows.some((row) => row.importMode === "donor-status");
   const invalidRows = preview.rows.filter((row) => row.errors.length > 0).length;
   const reviewRows = preview.rows.filter((row) => row.detectedAction === "PAYMENT_ONLY_REQUIRES_REVIEW" || row.reviewReasons.length > 0).length;
   const warningRows = preview.rows.filter((row) => row.errors.length === 0 && row.warnings.length > 0).length;
@@ -45,35 +48,35 @@ export function ImportForm() {
   }, [filter, preview.rows]);
 
   const filterButtonClass = (name: PreviewFilter, baseClass: string) =>
-    `rounded-md p-4 text-left transition hover:ring-2 hover:ring-slate-300 ${baseClass} ${filter === name ? "ring-2 ring-slate-900" : ""}`;
+    `rounded-xl p-4 text-left transition hover:ring-2 hover:ring-[#1483d6]/30 ${baseClass} ${filter === name ? "ring-2 ring-[#1483d6]" : ""}`;
 
   return (
     <div className="mt-6 grid gap-6">
       <section className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold text-emerald-700">Stap 1</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-bold text-[#1483d6]">Stap 1</p>
           <h2 className="mt-1 text-lg font-black text-slate-950">Bestand kiezen</h2>
           <p className="mt-2 text-sm text-slate-600">Ondersteund: .xlsx, .xls en .csv.</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold text-emerald-700">Stap 2</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-bold text-[#1483d6]">Stap 2</p>
           <h2 className="mt-1 text-lg font-black text-slate-950">Preview controleren</h2>
           <p className="mt-2 text-sm text-slate-600">Controleer alleen of de koppeling logisch is.</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold text-emerald-700">Stap 3</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-bold text-[#1483d6]">Stap 3</p>
           <h2 className="mt-1 text-lg font-black text-slate-950">Alles verwerken</h2>
           <p className="mt-2 text-sm text-slate-600">Geldige rijen worden automatisch aangemaakt of gekoppeld.</p>
         </div>
       </section>
 
-      <form action={previewAction} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <form action={previewAction} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <label>
             Excel- of CSV-bestand
             <input name="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" required />
           </label>
-          <button className="rounded-md bg-emerald-700 px-5 py-3 font-bold text-white hover:bg-emerald-800" disabled={previewPending} type="submit">
+          <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f]" disabled={previewPending} type="submit">
             {previewPending ? "Preview maken..." : "Preview maken"}
           </button>
         </div>
@@ -81,7 +84,7 @@ export function ImportForm() {
       </form>
 
       {preview.rows.length ? (
-        <form action={commitAction} className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <form action={commitAction} className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <input name="fileName" type="hidden" value={preview.fileName} />
           <textarea className="hidden" name="rows" readOnly value={JSON.stringify(preview.rows)} />
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -89,7 +92,7 @@ export function ImportForm() {
               <h2 className="text-xl font-black text-slate-950">Import preview</h2>
               <p className="mt-1 text-sm text-slate-600">{preview.fileName}</p>
             </div>
-            <button className="rounded-md bg-emerald-700 px-5 py-3 font-bold text-white hover:bg-emerald-800 disabled:opacity-60" disabled={commitPending} type="submit">
+            <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f] disabled:opacity-60" disabled={commitPending} type="submit">
               {commitPending ? "Verwerken..." : "Import verwerken"}
             </button>
           </div>
@@ -99,9 +102,9 @@ export function ImportForm() {
               <p className="text-xs font-bold uppercase text-slate-500">Rijen</p>
               <p className="mt-1 text-2xl font-black text-slate-950">{preview.rows.length}</p>
             </button>
-            <button className={filterButtonClass("new", "bg-emerald-50")} onClick={() => setFilter("new")} type="button">
-              <p className="text-xs font-bold uppercase text-emerald-700">Nieuw</p>
-              <p className="mt-1 text-2xl font-black text-emerald-900">{newRows}</p>
+            <button className={filterButtonClass("new", "bg-teal-50")} onClick={() => setFilter("new")} type="button">
+              <p className="text-xs font-bold uppercase text-[#1483d6]">Nieuw</p>
+              <p className="mt-1 text-2xl font-black text-teal-900">{newRows}</p>
             </button>
             <button className={filterButtonClass("linked", "bg-sky-50")} onClick={() => setFilter("linked")} type="button">
               <p className="text-xs font-bold uppercase text-sky-700">Koppelen</p>
@@ -135,12 +138,13 @@ export function ImportForm() {
           ) : null}
 
           <div className="grid gap-2">
-            <p className="rounded-md bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
+            <p className="rounded-md bg-teal-50 p-3 text-sm font-semibold text-teal-900">
               Bij verwerken worden alle geldige rijen geimporteerd. Bij bankimport is het lidnummer leidend; IBAN wordt alleen als betaalhistorie opgeslagen.
             </p>
             {isBankImport ? (
               <p className="rounded-md bg-amber-50 p-3 text-sm font-semibold text-amber-900">
                 Bankexport herkend. Alleen SEPA Overboeking en SEPA Periodieke Overboeking worden meegenomen. Kolom Rekeningnummer is de rekening van de organisatie. De IBAN uit Omschrijving bepaalt niet wie betaald heeft.
+                Ontbreekt het lidnummer of is controle nodig? Vul bij die regel zelf het lidnummer in, bijvoorbeeld 11-141 of 11-00141.
               </p>
             ) : null}
             {isMemberImport ? (
@@ -148,11 +152,41 @@ export function ImportForm() {
                 Ledenbestand herkend. Dit maakt of werkt bestaande leden bij en koppelt partner/kinderen alleen als lidnummer en adresnummer allebei hetzelfde zijn. Betalingen, schulden en record status worden hierbij niet verwerkt.
               </p>
             ) : null}
+            {isStatusImport ? (
+              <p className="rounded-md bg-sky-50 p-3 text-sm font-semibold text-sky-900">
+                Statusbestand herkend. Alleen bestaande donateurs worden bijgewerkt op lidnummer. Er worden geen nieuwe donateurs, betalingen of verplichtingen aangemaakt.
+              </p>
+            ) : null}
           </div>
           <div className="overflow-x-auto">
-            {isMemberImport ? (
+            {isStatusImport ? (
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="p-3">Rij</th>
+                    <th className="p-3">Lidnummer</th>
+                    <th className="p-3">Naam</th>
+                    <th className="p-3">Nieuwe status</th>
+                    <th className="p-3">Actie</th>
+                    <th className="p-3">Controle / fouten</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRows.map((row) => (
+                    <tr className={`border-t border-slate-200 align-top ${row.errors.length ? "border-l-4 border-l-red-700 bg-red-100/80" : row.reviewReasons.length ? "border-l-4 border-l-red-600 bg-red-50/80" : row.warnings.length ? "bg-amber-50/50" : "bg-white"}`} key={row.rowNumber}>
+                      <td className="p-3">{row.rowNumber}</td>
+                      <td className="p-3 font-semibold">{row.registrationNumber || "-"}</td>
+                      <td className="p-3">{row.fullName || "-"}</td>
+                      <td className="p-3 font-semibold">{row.status || "-"}</td>
+                      <td className="p-3 font-semibold">{actionLabel(row.detectedAction)}</td>
+                      <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : isMemberImport ? (
               <table className="w-full min-w-[1300px] text-left text-sm">
-                <thead className="bg-slate-100 text-slate-700">
+                <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="p-3">Rij</th>
                     <th className="p-3">Lidnummer</th>
@@ -189,33 +223,50 @@ export function ImportForm() {
               </table>
             ) : (
               <table className="w-full min-w-[1250px] text-left text-sm">
-                <thead className="bg-slate-100 text-slate-700">
+                <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="p-3">Rij</th>
                     <th className="p-3">Datum</th>
                     <th className="p-3">Bedrag</th>
                     <th className="p-3">Org. rekeningnummer</th>
                     <th className="p-3">Lidnummer</th>
-                    <th className="p-3">IBAN betaler</th>
+                    <th className="p-3">Betaalrekening</th>
                     <th className="p-3">Jaar</th>
                     <th className="p-3">Actie</th>
                     <th className="p-3">Controle / fouten</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRows.map((row) => (
+                  {filteredRows.map((row) => {
+                    const canOverrideRegistration =
+                      row.importMode === "bank-transactions" &&
+                      (row.detectedAction === "PAYMENT_ONLY_REQUIRES_REVIEW" || row.reviewReasons.length > 0 || !row.registrationNumber);
+                    return (
                       <tr className={`border-t border-slate-200 align-top ${row.errors.length ? "border-l-4 border-l-red-700 bg-red-100/80" : row.reviewReasons.length || row.detectedAction === "PAYMENT_ONLY_REQUIRES_REVIEW" ? "border-l-4 border-l-red-600 bg-red-50/80" : row.warnings.length ? "bg-amber-50/50" : "bg-white"}`} key={row.rowNumber}>
                         <td className="p-3">{row.rowNumber}</td>
                         <td className="p-3">{formatDate(row.paidAt)}</td>
                         <td className="p-3">{formatCurrency(row.amountCents)}</td>
                         <td className="p-3">{row.organizationAccountNumber || "-"}</td>
-                        <td className="p-3 font-semibold">{row.registrationNumber || "-"}</td>
+                        <td className="p-3">
+                          <div className="grid gap-2">
+                            <span className="font-semibold">{row.registrationNumber || "-"}</span>
+                            {canOverrideRegistration ? (
+                              <input
+                                className="w-36 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-[#1483d6] focus:ring-2 focus:ring-[#1483d6]/20"
+                                defaultValue={row.registrationNumber ?? ""}
+                                name={`overrideRegistrationNumber:${row.rowNumber}`}
+                                placeholder="11-00141"
+                              />
+                            ) : null}
+                          </div>
+                        </td>
                         <td className="p-3">{row.iban ? formatIban(row.iban) : "-"}</td>
                         <td className="p-3">{row.contributionYear ?? "-"}</td>
                         <td className="p-3 font-semibold">{actionLabel(row.detectedAction)}</td>
                         <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
                       </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -224,7 +275,7 @@ export function ImportForm() {
       ) : null}
 
       {result.created || result.linked || result.invalid || result.review || result.duplicates || result.inactive ? (
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold text-emerald-950">
+        <section className="rounded-lg border border-teal-200 bg-teal-50 p-5 text-sm font-bold text-teal-950">
           Verwerkt: {result.created} aangemaakt - {result.linked} gekoppeld - {result.duplicates ?? 0} duplicaten - {result.review} controle nodig - {result.invalid} ongeldig - {result.inactive ?? 0} inactief gezet
         </section>
       ) : null}

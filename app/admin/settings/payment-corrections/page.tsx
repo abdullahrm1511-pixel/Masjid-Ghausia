@@ -29,7 +29,7 @@ export default async function PaymentCorrectionsPage({
         </p>
       ) : null}
       {query.error ? <p className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 font-semibold text-red-800">{query.error}</p> : null}
-      {query.success ? <p className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4 font-semibold text-emerald-900">{query.success}</p> : null}
+      {query.success ? <p className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4 font-semibold text-teal-900">{query.success}</p> : null}
 
       <form action={createPaymentCorrection} className="mt-8 grid gap-5 rounded-lg border border-red-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-2">

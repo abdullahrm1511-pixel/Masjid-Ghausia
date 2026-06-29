@@ -48,11 +48,11 @@ export default async function EmailTemplateDetailPage({
       <BackButton fallbackHref="/admin/email-templates" />
       <h1 className="mt-5 text-3xl font-bold text-slate-900">{template.name}</h1>
       <p className="mt-2 font-mono text-xs text-slate-600">{template.key}</p>
-      {state.saved ? <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800">Template opgeslagen.</p> : null}
-      {state.reset ? <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-semibold text-emerald-800">Template teruggezet naar standaard.</p> : null}
+      {state.saved ? <p className="mt-4 rounded-md border border-teal-200 bg-teal-50 p-3 font-semibold text-[#0f5f9f]">Template opgeslagen.</p> : null}
+      {state.reset ? <p className="mt-4 rounded-md border border-teal-200 bg-teal-50 p-3 font-semibold text-[#0f5f9f]">Template teruggezet naar standaard.</p> : null}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
-        <form action={updateEmailTemplate} className="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <form action={updateEmailTemplate} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <input name="key" type="hidden" value={template.key} />
           <label>
             Onderwerp
@@ -67,21 +67,21 @@ export default async function EmailTemplateDetailPage({
             <p className="mt-2 text-sm text-slate-600">{EMAIL_PLACEHOLDERS.map((item) => `{{${item}}}`).join(", ")}</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button className="rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" type="submit">
+            <button className="rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" type="submit">
               Opslaan
             </button>
           </div>
         </form>
 
         <aside className="grid gap-4">
-          <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-bold text-slate-900">Preview</h2>
             <p className="mt-4 text-sm font-semibold text-slate-700">Onderwerp</p>
-            <p className="mt-1 rounded-md bg-stone-100 p-3">{preview.subject}</p>
+            <p className="mt-1 rounded-md bg-slate-50 p-3">{preview.subject}</p>
             <p className="mt-4 text-sm font-semibold text-slate-700">Body</p>
-            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-stone-100 p-3 text-sm">{preview.bodyText}</pre>
+            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm">{preview.bodyText}</pre>
           </section>
-          <form action={resetTemplateToDefault} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+          <form action={resetTemplateToDefault} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <input name="key" type="hidden" value={template.key} />
             <button className="rounded-md border border-red-300 px-4 py-3 font-semibold text-red-700" type="submit">
               Terug naar standaard

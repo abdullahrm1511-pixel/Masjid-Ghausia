@@ -72,11 +72,11 @@ export default function SettingsPage() {
       <p className="mt-2 text-slate-700">Alle beheeronderdelen die niet dagelijks in de hoofdnavigatie hoeven te staan.</p>
       <div className="mt-8 grid gap-6">
         {groups.map((group) => (
-          <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm" key={group.title}>
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={group.title}>
             <h2 className="text-xl font-bold text-slate-900">{group.title}</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.items.map((item) => (
-                <Link className="rounded-md border border-stone-200 p-4 hover:border-emerald-300 hover:bg-emerald-50" href={item.href} key={item.href}>
+                <Link className="rounded-md border border-slate-200 p-4 hover:border-[#1483d6]/40 hover:bg-sky-50" href={item.href} key={item.href}>
                   <h3 className="font-bold text-slate-900">{item.title}</h3>
                   <p className="mt-2 text-sm text-slate-600">{item.description}</p>
                 </Link>

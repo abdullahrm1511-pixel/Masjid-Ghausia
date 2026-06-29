@@ -8,6 +8,7 @@
     "start": "next start -p 3001",
     "lint": "next lint",
     "db": "node prisma/seed.cjs",
+    "db:reset-data": "node scripts/reset-database.cjs",
     "prisma:generate": "prisma generate",
     "prisma:format": "prisma format"
   },

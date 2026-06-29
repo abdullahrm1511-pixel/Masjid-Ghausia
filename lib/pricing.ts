@@ -122,12 +122,12 @@ export function calculateCurrentAnnualAmount(
 ) {
   if (ageOn(donorProfile.dateOfBirth, today) < 18) return 0;
 
-  const activeFamily = familyMembers.filter((member) => member.isActive && contributesToHousehold(member.status));
+  const activeFamily = familyMembers.filter((member) => contributesToHousehold(member.status));
   const partner = activeFamily.find((member) => member.type === "PARTNER");
   const children = activeFamily.filter((member) => member.type === "CHILD");
   const under18Children = children.filter((child) => ageOn(child.dateOfBirth, today) < 18);
 
-  if (partner && under18Children.length > 0) return config.annualFamily;
+  if (partner) return config.annualFamily;
   if (!partner && under18Children.length > 0) return config.annualSingleParent;
   return config.annualIndividual18Plus;
 }
@@ -139,7 +139,7 @@ export function calculateDonorCharges(
   options: { hasAnnualPayment?: boolean; today?: Date } = {}
 ): PersonCharge[] {
   const today = options.today ?? new Date();
-  const activeFamily = familyMembers.filter((member) => member.isActive && contributesToHousehold(member.status));
+  const activeFamily = familyMembers.filter((member) => contributesToHousehold(member.status));
   const partner = activeFamily.find((member) => member.type === "PARTNER");
   const children = activeFamily.filter((member) => member.type === "CHILD");
   const annualForMain = calculateCurrentAnnualAmount(donorProfile, familyMembers, config, today);
@@ -197,19 +197,41 @@ export function calculateDonorCharges(
   });
 }
 
+export function calculateTotalOneTimeContribution(
+  donorProfile: Pick<DonorProfile, "firstName" | "lastName" | "dateOfBirth" | "maritalStatus" | "approvedAt">,
+  familyMembers: Array<Pick<FamilyMember, "firstName" | "lastName" | "dateOfBirth" | "type" | "isActive"> & { status?: string | null }>,
+  config: PricingConfig = DEFAULT_PRICING_CONFIG,
+  today = new Date()
+) {
+  return calculateDonorCharges(donorProfile, familyMembers, config, { today }).reduce((sum, charge) => sum + charge.oneTimeContribution, 0);
+}
+
+function normalizePricingConfig(config: PricingConfig): PricingConfig {
+  const oneTimeBrackets = config.oneTimeBrackets.map((bracket) => ({ ...bracket }));
+  if (oneTimeBrackets[0]?.minAge === 0 && oneTimeBrackets[0]?.maxAge === 17 && oneTimeBrackets[1]?.minAge === 18) {
+    oneTimeBrackets[0] = { ...oneTimeBrackets[0], maxAge: 18 };
+    oneTimeBrackets[1] = { ...oneTimeBrackets[1], minAge: 19 };
+  }
+
+  return {
+    ...config,
+    oneTimeBrackets
+  };
+}
+
 export async function getPricingConfig(): Promise<PricingConfig> {
   const config = await prisma.appConfig.findUnique({
     where: { key: PRICING_CONFIG_KEY }
   });
 
   if (!config?.value || typeof config.value !== "object") {
-    return DEFAULT_PRICING_CONFIG;
+    return normalizePricingConfig(DEFAULT_PRICING_CONFIG);
   }
 
-  return {
+  return normalizePricingConfig({
     ...DEFAULT_PRICING_CONFIG,
     ...(config.value as Partial<PricingConfig>)
-  };
+  });
 }
 
 export async function savePricingConfig(value: PricingConfig) {

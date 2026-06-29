@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { syncAdultChildTransitions } from "@/lib/adult-child-transitions";
+import { formatDateWithAge } from "@/lib/display";
 import { canManageDonors } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { isNearlyEighteen } from "@/lib/pricing";
@@ -23,7 +24,7 @@ export default async function AdminDashboardPage() {
       where: {
         AND: [
           registeredDonorWhere,
-          { OR: [{ status: { in: ["INACTIVE", "PAYMENT_REQUIRED"] } }, { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }] }
+          { OR: [{ status: "INACTIVE" }, { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }] }
         ]
       }
     }),
@@ -72,7 +73,7 @@ export default async function AdminDashboardPage() {
     actionItems.push(
       ["Registratiecorrecties nodig", registrationCorrections, "/admin/registrations"],
       ["Donateuractie nodig", donorActionRequired, "/admin/donors?status=ACTION_REQUIRED"],
-      ["Betaling afwachtend", inactiveDonors, "/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED"],
+      ["Inactief", inactiveDonors, "/admin/donors?status=INACTIVE"],
       ["Kinderen bijna 18", nearlyAdults.length, "#bijna-18"],
       ["18+ inschrijving nodig", adultTransitions.length, "/admin/family-transitions"],
       ["Voogd/contact nodig", householdsNeedingGuardian.length, "/admin/family-transitions"]
@@ -83,7 +84,7 @@ export default async function AdminDashboardPage() {
   if (fullAdmin) {
     cards.push(
       ["Actieve donateurs", activeDonors, "/admin/donors?status=ACTIVE"],
-      ["Inactief / betaling afwachtend", inactiveDonors, "/admin/donors?status=INACTIVE_OR_PAYMENT_REQUIRED"],
+      ["Inactief", inactiveDonors, "/admin/donors?status=INACTIVE"],
       ["Registratiecorrecties", registrationCorrections, "/admin/registrations"],
       ["Donateuractie vereist", donorActionRequired, "/admin/donors?status=ACTION_REQUIRED"],
       ["Afgewezen", rejected, "/admin/donors?status=REJECTED"],
@@ -93,26 +94,35 @@ export default async function AdminDashboardPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">Beheercentrum</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-950">Admin dashboard</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">Begin hier met het hoofdoverzicht. Alle blokken zijn klikbaar.</p>
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Beheercentrum</p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-slate-950">Admin dashboard</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">Begin hier met het hoofdoverzicht. Alle blokken zijn klikbaar.</p>
+          </div>
+          {fullAdmin ? (
+            <Link className="rounded-lg bg-[#1483d6] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#0f5f9f]" href="/admin/control-center">
+              Controlecentrum openen
+            </Link>
+          ) : null}
+        </div>
       </section>
 
       <section className="mt-6 grid gap-4 xl:grid-cols-[1.5fr_0.85fr]">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map(([label, value, href]) => (
-            <Link className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-300 hover:shadow-md" href={href} key={label}>
+            <Link className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[#1483d6]/40 hover:shadow-md" href={href} key={label}>
               <p className="text-sm font-bold text-slate-600">{label}</p>
-              <p className="mt-3 text-4xl font-black text-emerald-800">{value}</p>
+              <p className="mt-3 text-4xl font-black text-[#0f5f9f]">{value}</p>
             </Link>
           ))}
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black text-slate-950">Vandaag aandacht nodig</h2>
           <div className="mt-4 grid gap-3">
             {actionItems.map(([label, value, href]) => (
-              <Link className="rounded-md border border-slate-200 p-4 hover:border-emerald-300 hover:bg-emerald-50" href={href} key={label}>
+              <Link className="rounded-lg border border-slate-200 p-4 hover:border-[#1483d6]/40 hover:bg-sky-50" href={href} key={label}>
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-bold text-slate-700">{label}</p>
                   <p className={`text-2xl font-black ${value > 0 ? "text-red-700" : "text-slate-900"}`}>{value}</p>
@@ -125,14 +135,14 @@ export default async function AdminDashboardPage() {
 
       {fullAdmin ? (
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" id="bijna-18">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" id="bijna-18">
             <h2 className="text-xl font-black text-slate-950">Kinderen die binnenkort 18 worden</h2>
             <p className="mt-2 text-sm text-slate-600">Vanaf 17 jaar en 6 maanden. Ze blijven zichtbaar als kind bij het gezin.</p>
             <div className="mt-4 grid gap-2 text-sm">
               {nearlyAdults.length ? (
                 nearlyAdults.map((child) => (
                   <p className="rounded-md bg-slate-50 p-3" key={child.id}>
-                    <strong>{child.firstName} {child.lastName}</strong> - geboren {child.dateOfBirth.toLocaleDateString("nl-NL")} - hoofddonateur: {child.donorProfile.firstName} {child.donorProfile.lastName}
+                    <strong>{child.firstName} {child.lastName}</strong> - geboren {formatDateWithAge(child.dateOfBirth)} - hoofddonateur: {child.donorProfile.firstName} {child.donorProfile.lastName}
                   </p>
                 ))
               ) : (
@@ -140,7 +150,7 @@ export default async function AdminDashboardPage() {
               )}
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" id="kinderen-18">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" id="kinderen-18">
             <h2 className="text-xl font-black text-slate-950">18+ inschrijving nodig</h2>
             <p className="mt-2 text-sm text-slate-600">Deze personen zijn 18+ geworden, tellen niet meer mee onder het gezin en moeten zichzelf inschrijven.</p>
             <div className="mt-4 grid gap-2 text-sm">
@@ -155,7 +165,7 @@ export default async function AdminDashboardPage() {
               )}
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2" id="voogd-nodig">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2" id="voogd-nodig">
             <h2 className="text-xl font-black text-slate-950">Huishoudens zonder actieve ouder</h2>
             <p className="mt-2 text-sm text-slate-600">Primaire persoon is overleden, er is geen actieve partner geregistreerd en er zijn nog kinderen onder 18.</p>
             <div className="mt-4 grid gap-2 text-sm">

@@ -8,9 +8,10 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { formatCurrency, formatDate } from "@/lib/display";
 import { prepareEmailLog } from "@/lib/email/templates";
-import { calculateCurrentAnnualAmount, calculateDonorCharges, getPricingConfig } from "@/lib/pricing";
+import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig, oneTimePaymentDeadline } from "@/lib/pricing";
 import type { PricingConfig } from "@/lib/pricing-config";
 import { membershipIdForRegistrationNumber } from "@/lib/membership";
+import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
 
 async function requireAdmin() {
   const session = await auth();
@@ -40,6 +41,17 @@ function penaltyCentsForYear(year: number, config: PricingConfig, today = new Da
   return penaltyMonths * config.monthlyPenaltyAfterWindow * 100;
 }
 
+function automaticDueSource(source?: string | null) {
+  return (
+    source === "REGISTRATION_APPROVAL_ANNUAL" ||
+    source === "REGISTRATION_APPROVAL_ONE_TIME" ||
+    source === "IMPORT_ANNUAL_REMAINDER" ||
+    source === "IMPORT_BANK_EXCEL_OPEN" ||
+    source === "ADMIN_PAYMENT_CORRECTION" ||
+    !source
+  );
+}
+
 async function reconcileAnnualRemainder(donorId: string, year: number) {
   const donor = await prisma.donorProfile.findUnique({
     where: { id: donorId },
@@ -56,15 +68,15 @@ async function reconcileAnnualRemainder(donorId: string, year: number) {
     .reduce((sum, item) => sum + item.amountCents, 0);
   const remainingCents = Math.max(expectedCents + penaltyCents - paidCents, 0);
 
-  await prisma.paymentObligation.deleteMany({
-    where: {
-      donorProfileId: donor.id,
-      obligationType: "ANNUAL",
-      status: "DUE",
-      source: "IMPORT_ANNUAL_REMAINDER",
-      notes: { contains: `Contributiejaar: ${year}` }
-    }
-  });
+  const dueIds = donor.paymentObligations
+    .filter((item) => item.status === "DUE" && item.obligationType === "ANNUAL" && paymentYear(item) === year && automaticDueSource(item.source))
+    .map((item) => item.id);
+
+  if (dueIds.length) {
+    await prisma.paymentObligation.deleteMany({
+      where: { id: { in: dueIds } }
+    });
+  }
 
   if (remainingCents > 0) {
     const membershipId = await membershipIdForRegistrationNumber(donor.registrationNumber);
@@ -94,25 +106,78 @@ async function reconcileAnnualRemainder(donorId: string, year: number) {
   return { expectedCents, penaltyCents, paidCents, remainingCents };
 }
 
-async function isInitialFullAmountPaid(donorId: string, year: number) {
+async function reconcileOneTimeRemainder(donorId: string) {
   const donor = await prisma.donorProfile.findUnique({
     where: { id: donorId },
     include: { familyMembers: true, paymentObligations: true }
   });
-  if (!donor) return false;
+  if (!donor) return null;
 
   const pricing = await getPricingConfig();
-  const annualRequired = calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, new Date(`${year}-01-01T00:00:00.000Z`)) * 100;
-  const mainCharge = calculateDonorCharges(donor, donor.familyMembers, pricing, { hasAnnualPayment: false })[0];
-  const oneTimeRequired = donor.approvedAt && mainCharge ? mainCharge.oneTimeContribution * 100 : 0;
+  const expectedCents = donor.approvedAt ? calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, donor.approvedAt) * 100 : 0;
+  const paidCents = donor.paymentObligations
+    .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME")
+    .reduce((sum, item) => sum + item.amountCents, 0);
+  const remainingCents = Math.max(expectedCents - paidCents, 0);
+  const dueIds = donor.paymentObligations
+    .filter((item) => item.status === "DUE" && item.obligationType === "ONE_TIME" && automaticDueSource(item.source))
+    .map((item) => item.id);
+
+  if (dueIds.length) {
+    await prisma.paymentObligation.deleteMany({
+      where: { id: { in: dueIds } }
+    });
+  }
+
+  if (remainingCents > 0) {
+    const membershipId = await membershipIdForRegistrationNumber(donor.registrationNumber);
+    await (prisma.paymentObligation.create as any)({
+      data: {
+        donorProfileId: donor.id,
+        ...(membershipId ? { membershipId } : {}),
+        lidnummer: donor.registrationNumber,
+        obligationType: "ONE_TIME",
+        status: "DUE",
+        amountCents: remainingCents,
+        dueDate: oneTimePaymentDeadline(donor.approvedAt),
+        source: "REGISTRATION_APPROVAL_ONE_TIME",
+        notes: [
+          "Open restant eenmalige bijdrage",
+          `Eenmalig bedrag: ${expectedCents / 100}`,
+          `Betaald tot nu toe: ${paidCents / 100}`
+        ].join("\n")
+      }
+    });
+  }
+
+  return { expectedCents, paidCents, remainingCents };
+}
+
+async function registrationBalance(donorId: string) {
+  const donor = await prisma.donorProfile.findUnique({
+    where: { id: donorId },
+    include: { familyMembers: true, paymentObligations: true }
+  });
+  if (!donor?.approvedAt) return null;
+
+  const pricing = await getPricingConfig();
+  const approvalYear = donor.approvedAt.getFullYear();
+  const annualRequired = calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, donor.approvedAt) * 100;
+  const oneTimeRequired = calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, donor.approvedAt) * 100;
   const annualPaid = donor.paymentObligations
-    .filter((item) => item.status === "PAID" && item.obligationType === "ANNUAL" && paymentYear(item) === year)
+    .filter((item) => item.status === "PAID" && item.obligationType === "ANNUAL" && paymentYear(item) === approvalYear)
     .reduce((sum, item) => sum + item.amountCents, 0);
   const oneTimePaid = donor.paymentObligations
     .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
+  const remainingCents = Math.max(annualRequired - annualPaid, 0) + Math.max(oneTimeRequired - oneTimePaid, 0);
 
-  return annualRequired > 0 && annualPaid >= annualRequired && oneTimePaid >= oneTimeRequired;
+  return { approvalYear, annualRequired, oneTimeRequired, annualPaid, oneTimePaid, remainingCents };
+}
+
+async function isRegistrationBalancePaid(donorId: string) {
+  const balance = await registrationBalance(donorId);
+  return Boolean(balance && balance.annualRequired > 0 && balance.remainingCents === 0);
 }
 
 export async function updatePaymentStatus(formData: FormData) {
@@ -181,12 +246,13 @@ export async function updatePaymentStatus(formData: FormData) {
     data
   });
   const year = updated.obligationType === "ANNUAL" ? paymentYear(updated) : null;
-  const annualState = year ? await reconcileAnnualRemainder(existing.donorProfile.id, year) : null;
+  if (year) await reconcileAnnualRemainder(existing.donorProfile.id, year);
+  if (updated.obligationType === "ONE_TIME") await reconcileOneTimeRemainder(existing.donorProfile.id);
   const shouldActivateAfterAnnualPayment =
     status === "PAID" &&
     ["ANNUAL", "ONE_TIME"].includes(updated.obligationType) &&
-    (await isInitialFullAmountPaid(existing.donorProfile.id, year ?? new Date().getFullYear())) &&
-    existing.donorProfile.status === "PAYMENT_REQUIRED";
+    (await isRegistrationBalancePaid(existing.donorProfile.id)) &&
+    existing.donorProfile.status === "INACTIVE";
 
   await writeAuditLog({
     actorId: adminId,
@@ -208,8 +274,8 @@ export async function updatePaymentStatus(formData: FormData) {
     const donor = existing.donorProfile;
     if (shouldActivateAfterAnnualPayment) {
       const now = new Date();
-      const internalNote = "Automatisch actief gezet na bevestiging van de eerste jaarlijkse betaling.";
-      const donorMessage = "Uw jaarlijkse betaling is bevestigd en uw status is bijgewerkt naar actief.";
+      const internalNote = "Automatisch actief gezet nadat de volledige inschrijfschuld is voldaan.";
+      const donorMessage = "Uw betaling is bevestigd en uw status is bijgewerkt naar actief.";
       await prisma.$transaction([
         prisma.donorProfile.update({
           where: { id: donor.id },
@@ -232,6 +298,7 @@ export async function updatePaymentStatus(formData: FormData) {
           }
         })
       ]);
+      await syncFamilyActivityForDonorStatus(prisma, donor.id, "ACTIVE");
       await writeAuditLog({
         actorId: adminId,
         action: "STATUS_CHANGE",
@@ -309,17 +376,18 @@ export async function registerBankPayment(formData: FormData) {
     metadata: { donorId, obligationType, amountCents }
   });
 
-  const annualState = obligationType === "ANNUAL" ? await reconcileAnnualRemainder(donor.id, paidAt.getFullYear()) : null;
+  if (obligationType === "ANNUAL") await reconcileAnnualRemainder(donor.id, paidAt.getFullYear());
+  if (obligationType === "ONE_TIME") await reconcileOneTimeRemainder(donor.id);
 
   if (
     amountCents > 0 &&
     ["ANNUAL", "ONE_TIME"].includes(obligationType) &&
-    donor.status === "PAYMENT_REQUIRED" &&
-    (await isInitialFullAmountPaid(donor.id, paidAt.getFullYear()))
+    donor.status === "INACTIVE" &&
+    (await isRegistrationBalancePaid(donor.id))
   ) {
     const now = new Date();
-    const internalNote = "Automatisch actief gezet na registratie van de eerste jaarlijkse bankbetaling.";
-    const donorMessage = "Uw jaarlijkse betaling is ontvangen en uw status is bijgewerkt naar actief.";
+    const internalNote = "Automatisch actief gezet nadat de volledige inschrijfschuld is voldaan.";
+    const donorMessage = "Uw betaling is ontvangen en uw status is bijgewerkt naar actief.";
     await prisma.$transaction([
       prisma.donorProfile.update({
         where: { id: donor.id },
@@ -342,6 +410,7 @@ export async function registerBankPayment(formData: FormData) {
         }
       })
     ]);
+    await syncFamilyActivityForDonorStatus(prisma, donor.id, "ACTIVE");
     await writeAuditLog({
       actorId: adminId,
       action: "STATUS_CHANGE",
@@ -432,7 +501,7 @@ export async function markAnnualPaymentDue(formData: FormData) {
       prisma.donorProfile.update({
         where: { id: donor.id },
         data: {
-          status: "PAYMENT_REQUIRED",
+          status: "INACTIVE",
           inactiveSince: donor.inactiveSince ?? now,
           statusChangedAt: now,
           statusInternalNote: `Jaarbetaling ${year} handmatig open gezet.`,
@@ -444,12 +513,13 @@ export async function markAnnualPaymentDue(formData: FormData) {
           donorProfileId: donor.id,
           changedById: adminId,
           fromStatus: donor.status,
-          toStatus: "PAYMENT_REQUIRED",
+          toStatus: "INACTIVE",
           internalNote: `Jaarbetaling ${year} handmatig open gezet.`,
           donorMessage: "Er staat nog een jaarlijkse betaling open volgens de administratie."
         }
       })
     ]);
+    await syncFamilyActivityForDonorStatus(prisma, donor.id, "INACTIVE");
   }
 
   await writeAuditLog({
@@ -478,8 +548,8 @@ export async function activateDonorManually(formData: FormData) {
   });
 
   if (!donor) redirect(`${path}?error=Donateur+niet+gevonden`);
-  const canActivate = await isInitialFullAmountPaid(donor.id, new Date().getFullYear());
-  if (!canActivate) redirect(`${path}?error=De+jaarbijdrage+en+eenmalige+bijdrage+moeten+eerst+volledig+betaald+zijn`);
+  const canActivate = await isRegistrationBalancePaid(donor.id);
+  if (!canActivate) redirect(`${path}?error=Het+restant+van+de+inschrijving+moet+eerst+0+euro+zijn`);
 
   const now = new Date();
   const internalNote = "Handmatig actief gezet na betaalcontrole.";
@@ -506,6 +576,7 @@ export async function activateDonorManually(formData: FormData) {
       }
     })
   ]);
+  await syncFamilyActivityForDonorStatus(prisma, donorId, "ACTIVE");
 
   await writeAuditLog({
     actorId: adminId,

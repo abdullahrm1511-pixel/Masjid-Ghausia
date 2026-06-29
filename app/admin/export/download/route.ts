@@ -17,14 +17,14 @@ function donorWhere(filter: string): Prisma.DonorProfileWhereInput | undefined {
   if (filter === "inactive") {
     return {
       OR: [
-        { status: { in: [DonorStatus.INACTIVE, DonorStatus.PAYMENT_REQUIRED] } },
+        { status: DonorStatus.INACTIVE },
         { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }
       ]
     };
   }
   if (filter === "rejected") return { status: DonorStatus.REJECTED };
   if (filter === "deceased") return { status: DonorStatus.DECEASED };
-  if (filter === "payment_required") return { status: DonorStatus.PAYMENT_REQUIRED };
+  if (filter === "payment_required") return { status: DonorStatus.INACTIVE };
   if (filter === "open_change_requests") return { changeRequests: { some: { status: "PENDING" } } };
   return undefined;
 }

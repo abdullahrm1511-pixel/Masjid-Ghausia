@@ -2,13 +2,13 @@
 
 Organisatie: St. GBC Masjid Ghausia  
 Portaal: St. GBC Donateursportaal  
-Versie: 1.1  
-Datum: 12 juni 2026  
+Versie: 1.2  
+Datum: 21 juni 2026  
 Contact privacy: [vul e-mailadres of contactpersoon in]
 
 ## 1. Doel van dit beleid
 
-Dit beleid legt uit hoe St. GBC Masjid Ghausia omgaat met persoonsgegevens binnen het donateursportaal. Het portaal wordt gebruikt voor inschrijvingen, donateursadministratie, gezinsgegevens, wijzigingsverzoeken, betalingen, import, export en interne controle door bevoegde beheerders.
+Dit beleid legt uit hoe St. GBC Masjid Ghausia omgaat met persoonsgegevens binnen het donateursportaal. Het portaal wordt gebruikt voor inschrijvingen, donateursadministratie, gezinsgegevens, wijzigingsverzoeken, betalingen, import, export, controlecentrum en interne controle door bevoegde beheerders.
 
 Het doel is dat donateurs weten welke gegevens worden gevraagd, waarom die gegevens nodig zijn, wie ze mag bekijken en hoe verzoeken rondom privacy worden behandeld.
 
@@ -19,6 +19,7 @@ Dit beleid geldt voor:
 - Nieuwe personen die zich inschrijven als donateur.
 - Bestaande donateurs met een account in het portaal.
 - Gezinsleden die door een hoofddonateur worden opgegeven.
+- Kinderen die 18 worden en administratief uit het gezin moeten worden opgevolgd.
 - Bestuursleden of beheerders die toegang hebben tot het adminportaal.
 - Personen waarvan gegevens via een oude donateurslijst of bankexport worden geimporteerd.
 
@@ -33,13 +34,14 @@ Het portaal kan de volgende gegevens verwerken:
 - IBAN en naam rekeninghouder.
 - Lidnummer of registratienummer.
 - Partner- en kindgegevens, zoals naam, geboortedatum, geboorteplaats en relatie.
-- Lidmaatschapsgegevens, zoals het gezamenlijke lidnummer, primary member, partnerprofiel, kinderen onder het lidmaatschap en wijzigingsverzoeken rondom trouwen, scheiden of eigen lidnummer.
+- Lidmaatschapsgegevens, zoals gezamenlijke lidnummers, primary member, partnerprofiel, kinderen onder het lidmaatschap en gezinsstatussen.
 - Contactpersoon in Pakistan en telefoonnummer van die contactpersoon.
-- Uitvaartwensen of andere opgegeven wensen.
-- Status van de inschrijving of donateur.
-- Betaalstatus, openstaande bedragen, betaalde bedragen en betaaldatum.
-- Banktransactiegegevens uit importbestanden, zoals bedrag, datum, omschrijving, organisatie-rekeningnummer, donor-IBAN uit omschrijving, betaler en betalingsdoel.
-- Interne bestuursnotities bij beoordeling, correctie, afwijzing of wijzigingsverzoeken.
+- Voogd/contactpersoon bij huishoudens waar geen actieve ouder meer geregistreerd staat.
+- Uitvaartwensen of andere vrijwillig opgegeven wensen.
+- Status van inschrijving of donateur.
+- Betaalstatus, openstaande bedragen, betaalde bedragen, correcties, betaaldatum en betaalhistorie.
+- Banktransactiegegevens uit importbestanden, zoals bedrag, datum, omschrijving, organisatie-rekeningnummer, betaler-IBAN uit omschrijving en importbestand.
+- Interne bestuursnotities bij beoordeling, correctie, afwijzing, statuswijzigingen, betalingen en gezinswijzigingen.
 - Loggegevens over belangrijke acties in het systeem, zoals import, export, goedkeuringen en statuswijzigingen.
 - Voorbereide e-mails in de e-maillog, zoals onderwerp, ontvanger en tekst.
 - PDF-overzichten van ingediende inschrijvingen die op aanvraag worden gegenereerd.
@@ -48,7 +50,7 @@ Wachtwoorden worden niet leesbaar opgeslagen. Het systeem bewaart alleen een bev
 
 ## 4. Waarom deze gegevens nodig zijn
 
-De gegevens worden verwerkt voor de volgende doelen:
+De gegevens worden verwerkt voor:
 
 - Het beoordelen van nieuwe inschrijvingen.
 - Het beheren van het donateursbestand.
@@ -58,11 +60,12 @@ De gegevens worden verwerkt voor de volgende doelen:
 - Het berekenen en administreren van bijdragen.
 - Het importeren van oude of bestaande donateurslijsten.
 - Het importeren en controleren van banktransacties.
-- Het herkennen of een betaling door iemand anders is gedaan voor een specifieke donateur.
-- Het tonen van tweede-opinie rijen wanneer een koppeling niet eenduidig is.
+- Het herkennen of een betaling bij een specifiek lidnummer hoort.
+- Het tonen van controle-nodig rijen wanneer een koppeling niet eenduidig is.
+- Het beheren van 18+ kinderen die zichzelf moeten inschrijven.
+- Het vastleggen van partner als primaire contactpersoon of voogd/contactpersoon bij overlijden.
 - Het exporteren van lijsten voor bestuur, administratie of betaalcontrole.
 - Het onderhouden van contact met donateurs.
-- Het registreren van gezinsleden voor administratieve en organisatorische doeleinden.
 - Het bijhouden van uitvaartwensen wanneer een donateur deze vrijwillig invult.
 - Het vastleggen van bestuursbesluiten en controles in auditlogs.
 - Het voorbereiden van e-mailberichten voor communicatie met donateurs.
@@ -70,52 +73,77 @@ De gegevens worden verwerkt voor de volgende doelen:
 
 ## 5. Grondslag voor verwerking
 
-St. GBC Masjid Ghausia verwerkt gegevens omdat dit noodzakelijk is voor het beheren van donateurs, inschrijvingen, betalingen en organisatorische administratie. Sommige gegevens worden gevraagd omdat de donateur deze zelf invult bij inschrijving of bij een wijzigingsverzoek.
+St. GBC Masjid Ghausia verwerkt gegevens omdat dit noodzakelijk is voor het beheren van donateurs, inschrijvingen, betalingen, gezinsadministratie en organisatorische administratie. Sommige gegevens worden gevraagd omdat de donateur deze zelf invult bij inschrijving of bij een wijzigingsverzoek.
 
-Voor gevoelige of bijzondere informatie, zoals uitvaartwensen, geldt dat deze alleen wordt gebruikt voor het doel waarvoor de donateur deze informatie zelf heeft opgegeven. Het bestuur moet voorzichtig omgaan met deze informatie en toegang beperken tot personen die deze gegevens nodig hebben voor hun taak.
+Voor gevoelige of bijzondere informatie, zoals uitvaartwensen, geldt dat deze alleen wordt gebruikt voor het doel waarvoor de donateur deze informatie zelf heeft opgegeven. Toegang moet worden beperkt tot personen die deze gegevens nodig hebben voor hun taak.
 
-## 6. Donateurstatussen en betekenis
-
-De status van een donateur bepaalt hoe het account administratief wordt behandeld.
+## 6. Donateurstatussen
 
 `PENDING` betekent dat de inschrijving is ontvangen, maar nog niet door het bestuur is beoordeeld.
 
-`ACTION_REQUIRED` betekent dat het bestuur extra informatie of een correctie nodig heeft. De donateur ziet op het dashboard welk bericht het bestuur heeft achtergelaten.
+`ACTION_REQUIRED` betekent dat het bestuur extra informatie of een correctie nodig heeft.
 
-`PAYMENT_REQUIRED` betekent dat de inschrijving is goedgekeurd, maar dat de eerste betaling nog nodig is. Deze persoon wordt in overzichten meegenomen bij inactief of betaling afwachtend.
+`PAYMENT_REQUIRED` betekent dat de inschrijving is goedgekeurd, maar dat de eerste betaling nog nodig is.
 
 `ACTIVE` betekent dat de donateur actief is.
 
-`INACTIVE` betekent dat de donateur niet actief is. Dit kan bijvoorbeeld worden gebruikt wanneer iemand tijdelijk of administratief niet actief staat.
+`INACTIVE` betekent dat de donateur niet actief is of administratief niet meetelt.
 
 `REJECTED` betekent dat een inschrijving of donateur is afgewezen.
 
-`DECEASED` betekent dat de persoon als overleden is geregistreerd. Dit mag alleen gebeuren wanneer het bestuur hiervoor voldoende betrouwbare informatie heeft ontvangen en dit administratief moet vastleggen.
+`DECEASED` betekent dat de persoon als overleden is geregistreerd. Dit mag alleen wanneer het bestuur hiervoor voldoende betrouwbare informatie heeft ontvangen.
 
-## 7. Wanneer iemand actief is
+## 7. Betalingen en bankimport
 
-Een donateur wordt actief wanneer het bestuur de persoon als goedgekeurd en administratief actief beschouwt. In de huidige werking wordt een inschrijving na goedkeuring eerst op betaling vereist gezet. Daarna kan de administratie de betaalstatus volgen en de donateur als actief behandelen volgens de afgesproken werkwijze van het bestuur.
+Betalingen worden buiten het portaal gedaan via bankoverschrijving. Het portaal registreert administratief wat op de bank is ontvangen.
 
-## 8. Wanneer iemand inactief is
+Bij bankimport is het lidnummer leidend. De betaler-IBAN wordt uit de omschrijving gelezen en opgeslagen als betaalbewijs, maar bepaalt niet zelfstandig voor welk lid is betaald.
 
-Een donateur is inactief wanneer het bestuur de persoon niet als actief wil meetellen. In het dashboard worden ook personen meegenomen die nog betaling afwachten. Daardoor bestaat de groep "Inactief / betaling afwachtend" uit:
+Het kan voorkomen dat dezelfde IBAN bij meerdere lidnummers voorkomt, bijvoorbeeld wanneer een ouder voor zichzelf en voor een kind betaalt. Dit is toegestaan. De koppeling moet gebeuren op basis van het lidnummer.
 
-- Donateurs met status `INACTIVE`.
-- Donateurs met status `PAYMENT_REQUIRED`.
+Als een bankomschrijving geen lidnummer bevat of het lidnummer niet bestaat, wordt de regel niet automatisch verwerkt. De regel komt in controle nodig of moet handmatig worden opgevolgd.
 
-Dit helpt het bestuur om snel te zien wie niet volledig actief is of nog geen eerste betaling heeft afgerond.
+Bankbetalingen kunnen in termijnen worden verwerkt. Meerdere betalingen voor hetzelfde jaar kunnen worden opgeteld. Als niet volledig is betaald, blijft het restant zichtbaar.
 
-## 9. Wanneer iemand als overleden wordt gezien
+Na de betaalperiode kan het systeem leden zonder volledige jaarbetaling administratief op `INACTIVE` zetten en een open bedrag inclusief boete registreren. Het oude lidnummer en de historie blijven bewaard.
 
-Een donateur wordt alleen als overleden geregistreerd wanneer het bestuur hiervoor een betrouwbare melding of bevestiging heeft ontvangen. De status `DECEASED` is bedoeld om administratief vast te leggen dat de persoon niet meer als gewone actieve donateur wordt behandeld.
+Bestaande geimporteerde donateurs krijgen geen eenmalige inschrijfschuld. De eenmalige bijdrage geldt alleen voor nieuwe inschrijvingen via het portaal.
 
-Bij deze status moet zorgvuldig worden omgegaan met nabestaanden, gezinsgegevens en eventuele uitvaartwensen.
+## 8. Controlecentrum
+
+Het controlecentrum bundelt aandachtspunten voor bevoegde admins. Het kan persoonsgegevens tonen omdat het bedoeld is voor intern beheer en controle.
+
+Het controlecentrum toont onder andere:
+
+- Registraties en correcties.
+- Open betalingen.
+- Eenmalige bijdrage-termijnen.
+- 18+ kinderen die zichzelf moeten inschrijven.
+- Huishoudens waar voogd/contact nodig is.
+- Mogelijke dubbele bankbetalingen.
+- Statuscontrole.
+
+Beheerders mogen deze informatie alleen gebruiken voor hun taak.
+
+## 9. Gezinsgegevens, 18+ kinderen en overlijden
+
+Gezinsleden worden geregistreerd voor administratieve en organisatorische doeleinden.
+
+Kinderen die 18 worden, moeten zichzelf inschrijven als zij zelfstandig lid willen worden. Het portaal kan deze personen zichtbaar maken als "18+ inschrijving nodig". De admin kan vastleggen of iemand is uitgenodigd, gekoppeld aan een nieuw lidnummer of geen lid is.
+
+Bij overlijden van een primary member kan een partner als primaire contactpersoon worden vastgelegd. Als er geen actieve partner is en er kinderen onder 18 zijn, kan een voogd/contactpersoon worden vastgelegd.
+
+Deze gegevens moeten zorgvuldig worden behandeld, omdat zij gezinsrelaties en soms gevoelige omstandigheden bevatten.
 
 ## 10. Wie toegang heeft tot gegevens
 
-Donateurs kunnen hun eigen gegevens bekijken via het donateurdashboard en de accountpagina. Zij kunnen wijzigingen aanvragen, maar wijzigingen worden niet direct definitief aangepast zonder beoordeling.
+Donateurs kunnen hun eigen gegevens bekijken via het dashboard en de accountpagina. Zij kunnen wijzigingen aanvragen, maar wijzigingen worden niet direct definitief aangepast zonder beoordeling.
 
-Beheerders en bevoegde bestuursleden kunnen via het adminportaal gegevens bekijken en verwerken voor hun taak. Niet iedere gebruiker hoort adminrechten te krijgen. Adminrechten zijn bedoeld voor personen die verantwoordelijk zijn voor inschrijvingen, donateursadministratie, betalingen, import, export of instellingen.
+Registratie-admins mogen registraties lezen, goedkeuren, afwijzen en om correctie vragen.
+
+Admins en super-admins kunnen via het adminportaal gegevens bekijken en verwerken voor hun taak. Adminrechten zijn bedoeld voor personen die verantwoordelijk zijn voor inschrijvingen, donateursadministratie, betalingen, import, export, controlecentrum of instellingen.
+
+Niet iedere gebruiker hoort adminrechten te krijgen.
 
 ## 11. Wijzigingsverzoeken
 
@@ -127,49 +155,31 @@ Bij goedkeuring worden de gegevens aangepast. Bij afwijzing kan het bestuur een 
 
 Het adminportaal bevat functies om bestaande donateurslijsten te importeren en gegevens te exporteren.
 
-Bij import controleert het systeem vooral of een betaling aan de juiste donateur kan worden gekoppeld. Een beheerder moet de preview controleren voordat de import definitief wordt verwerkt.
+Een beheerder moet de importpreview controleren voordat de import definitief wordt verwerkt.
 
-Bij bankexports wordt de kolom `Rekeningnummer` behandeld als de rekening van de organisatie. De donor-IBAN wordt uit de bankomschrijving gelezen. IBAN, naam, lidnummer, bedrag en contributiejaar worden niet inhoudelijk gevalideerd; het systeem neemt deze gegevens over als administratief uitgangspunt.
-
-Bij bankexports worden alleen transacties verwerkt waarvan de omschrijving `SEPA Overboeking` of `SEPA Periodieke Overboeking` bevat. Incasso's en andere transactiesoorten worden overgeslagen en niet in de preview getoond.
-
-Als een omschrijving aangeeft dat iemand betaalt voor een ander, bijvoorbeeld "contributie voor ...", wordt de betaling gekoppeld aan de persoon voor wie betaald is. De betaler kan wel in de betalingsnotitie zichtbaar blijven.
-
-Rijen waarbij de koppeling onvoldoende eenduidig is, worden als "Tweede opinie" getoond en niet automatisch verwerkt. Dit is bedoeld om verkeerde koppelingen te voorkomen.
-
-Bankbetalingen worden administratief als jaarlijkse bijdragen verwerkt. Meerdere termijnen voor hetzelfde jaar kunnen worden opgeteld. Als een bankomschrijving geen lidnummer bevat, wordt de regel als tweede opinie behandeld en niet automatisch verwerkt.
-
-Na de betaalperiode kan het systeem leden zonder volledige jaarbetaling administratief op `INACTIVE` zetten en een open bedrag inclusief maandelijkse boete registreren. Vanaf het volgende jaar kan in het profiel zichtbaar zijn dat het lidmaatschap administratief is geannuleerd wegens niet betalen. Het oude lidnummer en de historie blijven bewaard.
-
-Bestaande geimporteerde donateurs krijgen geen eenmalige inschrijfschuld; die eenmalige bijdrage geldt alleen voor nieuwe inschrijvingen via het portaal.
-
-Het lidnummer wordt administratief behandeld als lidmaatschap of huishouden. Onder één lidnummer kunnen een primary member, partnerprofiel en kinderen vallen. De primary member is financieel verantwoordelijk zolang de partner onder hetzelfde lidmaatschap valt. Een partnerprofiel wordt bewaard zodat gegevens beschikbaar blijven bij scheiding, overlijden of een later eigen lidmaatschap.
-
-Wijzigingen zoals partner toevoegen, scheiding, partner overleden, kind bij een ouder plaatsen of partner eigen lidnummer geven kunnen als lidmaatschapswijziging worden geregistreerd en beoordeeld door bevoegde admins.
+Bij bankexports wordt de kolom `Rekeningnummer` behandeld als de rekening van de organisatie. De betaler-IBAN wordt uit de bankomschrijving gelezen.
 
 Bij export worden donateursgegevens in een bestand gezet. Exportbestanden mogen alleen worden gemaakt wanneer dit nodig is voor bestuur, administratie, controle of betaling. Exportbestanden moeten veilig worden bewaard en verwijderd wanneer ze niet meer nodig zijn.
 
-## 13. Optionele AI-hulplezer bij import
+## 13. Geen externe AI-verwerking bij bankimport
 
-Het portaal bevat technisch een optionele AI-hulplezer voor bankomschrijvingen. Deze functie werkt alleen als er bewust een OpenAI API-sleutel en modelnaam in de serverinstellingen zijn ingevuld.
+De huidige bankimport gebruikt lokale herkenningsregels in de applicatie. Bankomschrijvingen worden niet naar een externe AI-dienst gestuurd.
 
-Standaard kan de import zonder externe AI werken met lokale herkenningsregels. Zonder ingevulde OpenAI-instellingen worden bankomschrijvingen niet naar OpenAI gestuurd.
+Als het bestuur later externe AI-verwerking wil toevoegen, moet vooraf worden beoordeeld:
 
-Omdat bankgegevens en donateurgegevens gevoelig zijn, moet het bestuur vooraf bepalen of het gebruik van een externe AI-dienst is toegestaan. Als AI wordt ingeschakeld, kunnen bankomschrijvingen en parserresultaten worden verzonden naar de gekozen AI-aanbieder om de omschrijving beter te laten uitlezen.
+- Welke gegevens worden verzonden.
+- Welke aanbieder wordt gebruikt.
+- Welke afspraken nodig zijn.
+- Of donateurs hierover geinformeerd moeten worden.
+- Wie toestemming heeft om deze functie in te schakelen.
 
-Aanbevolen beleid:
-
-- Gebruik standaard de lokale parser.
-- Schakel externe AI alleen bewust in na privacy-afweging.
-- Gebruik AI alleen voor twijfelgevallen, niet onnodig voor alle rijen.
-- Verwerk AI-resultaten nooit blind; gebruik de preview en tweede-opinie controle.
-- Leg vast wie toestemming heeft om AI-instellingen te beheren.
+Tot die tijd geldt: geen externe AI-verwerking van bankimportgegevens.
 
 ## 14. E-mailtemplates, e-maillog en PDF's
 
 Het portaal kan e-mails voorbereiden op basis van bewerkbare templates. Deze e-mails worden voorlopig niet automatisch verzonden. Ze worden opgeslagen als voorbereide e-maillog, zodat het bestuur de tekst kan controleren.
 
-Het portaal kan ook een PDF-kopie van een ingevulde inschrijving genereren. Deze PDF is bedoeld voor de donateur zelf en voor bevoegde admins die de registratie beoordelen. De PDF bevat persoonsgegevens en moet daarom zorgvuldig worden behandeld.
+Het portaal kan ook een PDF-kopie van een ingevulde inschrijving genereren. Deze PDF is bedoeld voor de donateur zelf en voor bevoegde admins die de registratie beoordelen. De PDF bevat persoonsgegevens en moet zorgvuldig worden behandeld.
 
 ## 15. Bewaartermijnen
 
@@ -179,9 +189,9 @@ Aanbevolen werkwijze:
 
 - Actieve donateurs: bewaren zolang de persoon donateur is.
 - Inactieve, afgewezen of overleden donateurs: bewaren zolang dit administratief of juridisch nodig is.
-- Betaalgegevens: bewaren volgens de geldende administratieve bewaartermijnen.
+- Betaalgegevens: bewaren volgens geldende administratieve bewaartermijnen.
 - Bankimportgegevens en betalingsnotities: bewaren zolang nodig is voor financiele administratie en controle.
-- Tweede-opinie meldingen: bewaren zolang nodig is om importkeuzes te controleren.
+- Controle-nodig meldingen: bewaren zolang nodig is om importkeuzes te controleren.
 - Auditlogs: bewaren zolang nodig is voor controle en verantwoording.
 - E-maillogs: bewaren zolang nodig is voor communicatiecontrole en administratie.
 - Exportbestanden: zo kort mogelijk bewaren en verwijderen zodra ze niet meer nodig zijn.
@@ -198,13 +208,11 @@ De volgende maatregelen horen bij zorgvuldig gebruik:
 - Belangrijke adminacties worden vastgelegd in auditlogs.
 - Exportbestanden worden alleen gemaakt wanneer nodig.
 - Importpreviews moeten door beheerders worden gecontroleerd voordat verwerking plaatsvindt.
-- Rijen met tweede-opinie meldingen worden niet automatisch verwerkt.
+- Rijen met controle-nodig meldingen worden niet automatisch verwerkt.
 - PDF-downloads en e-maillogs zijn alleen toegankelijk voor ingelogde bevoegde gebruikers.
 - Beheerders loggen uit wanneer zij klaar zijn.
 - Toegang tot Supabase, database en hosting wordt beperkt tot bevoegde technische beheerders.
 - Databasewachtwoorden en geheime sleutels worden niet gedeeld via chat, e-mail of screenshots.
-- API-sleutels voor externe diensten, zoals een eventuele OpenAI-sleutel, worden alleen ingesteld door bevoegde technische beheerders.
-- Bij gebruik van gevoelige bankdata wordt bij voorkeur geen externe AI gebruikt, tenzij het bestuur dit bewust heeft goedgekeurd.
 
 ## 17. Delen met derden
 
@@ -212,7 +220,7 @@ Persoonsgegevens worden niet verkocht. Gegevens kunnen technisch worden verwerkt
 
 Als gegevens met externe partijen worden gedeeld, moet dat een duidelijk doel hebben en moeten passende afspraken worden gemaakt.
 
-Als de optionele AI-hulplezer wordt ingeschakeld, is de gekozen AI-aanbieder een externe partij voor de omschrijvingen die worden verzonden. Dit moet vooraf worden beoordeeld en vastgelegd door het bestuur.
+Er is op dit moment geen externe AI-verwerking voor bankimport actief.
 
 ## 18. Rechten van betrokkenen
 
@@ -237,13 +245,13 @@ Als later analytische cookies, tracking of externe scripts worden toegevoegd, mo
 
 ## 20. Datalekken
 
-Wanneer er sprake is van verlies, onbevoegde toegang of mogelijke misbruik van persoonsgegevens, moet het bestuur dit direct onderzoeken. Als er risico bestaat voor betrokkenen, moet het bestuur passende maatregelen nemen en beoordelen of melding nodig is bij de Autoriteit Persoonsgegevens en/of betrokken personen.
+Wanneer er sprake is van verlies, onbevoegde toegang of mogelijk misbruik van persoonsgegevens, moet het bestuur dit direct onderzoeken. Als er risico bestaat voor betrokkenen, moet het bestuur passende maatregelen nemen en beoordelen of melding nodig is bij de Autoriteit Persoonsgegevens en/of betrokken personen.
 
 ## 21. Gedragsregels voor beheerders
 
 Beheerders mogen gegevens alleen gebruiken voor hun taak. Het is niet toegestaan om gegevens op te zoeken uit nieuwsgierigheid, gegevens buiten het bestuur te delen of exportbestanden onbeveiligd rond te sturen.
 
-Beheerders moeten bij import extra zorgvuldig omgaan met bankomschrijvingen, IBANs, gezinsrelaties en tweede-opinie rijen. Een automatische suggestie is geen bestuursbesluit; bij twijfel moet handmatig worden gecontroleerd.
+Beheerders moeten bij import extra zorgvuldig omgaan met bankomschrijvingen, IBANs, gezinsrelaties en controle-nodig rijen. Een automatische suggestie is geen bestuursbesluit; bij twijfel moet handmatig worden gecontroleerd.
 
 Bij twijfel geldt: niet delen, eerst intern navragen.
 

@@ -13,7 +13,7 @@ export default async function PricingSettingsPage() {
       <p className="mt-2 text-slate-700">Pas hier alleen bedragen en betaalregels aan. Import en export staan in het algemene instellingenoverzicht.</p>
 
       <form action={savePricing} className="mt-8 grid gap-5 lg:grid-cols-2">
-        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Jaarlijkse bijdragen</h2>
           <div className="mt-4 grid gap-4">
             <label>18+ individueel<input name="annualIndividual18Plus" type="number" defaultValue={config.annualIndividual18Plus} min="0" step="1" /></label>
@@ -22,7 +22,7 @@ export default async function PricingSettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Betaalperiode en boete</h2>
           <div className="mt-4 grid gap-4">
             <label>Betaalperiode start<input name="paymentWindowStart" type="text" defaultValue={`${config.paymentWindowStartDay}-${config.paymentWindowStartMonth}`} /></label>
@@ -32,7 +32,7 @@ export default async function PricingSettingsPage() {
           <p className="mt-2 text-sm text-slate-600">Standaard: betalen van 1 januari t/m 31 maart. Daarna komt 5 euro per maand boete bij openstaande jaarbetalingen.</p>
         </section>
 
-        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
           <h2 className="text-xl font-bold text-slate-900">Eenmalige leeftijdsbijdragen</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {DEFAULT_PRICING_CONFIG.oneTimeBrackets.map((bracket, index) => {
@@ -49,8 +49,8 @@ export default async function PricingSettingsPage() {
         </section>
 
         <div className="flex flex-wrap gap-3 lg:col-span-2">
-          <button className="rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" type="submit">Opslaan</button>
-          <button className="rounded-md border border-stone-300 px-4 py-3 font-semibold text-slate-800" formAction={resetPricing}>Reset standaardwaarden</button>
+          <button className="rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" type="submit">Opslaan</button>
+          <button className="rounded-md border border-slate-300 px-4 py-3 font-semibold text-slate-800" formAction={resetPricing}>Reset standaardwaarden</button>
         </div>
       </form>
     </main>

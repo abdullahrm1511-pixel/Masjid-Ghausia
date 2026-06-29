@@ -5,6 +5,7 @@ import { renderEmailTemplate } from "@/lib/email/templates";
 import { formatIban } from "@/lib/iban";
 import { donorStatusBadgeClass, donorStatusLabel } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
+import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 import { activateDonorManually, markAnnualPaymentDue, registerBankPayment, resetRegisteredPayments } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,10 @@ function paymentYear(item: { paidAt: Date | null; dueDate: Date | null; createdA
 function noteValue(notes: string | null, label: string) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return notes?.match(new RegExp(`^${escaped}:\\s*(.+)$`, "im"))?.[1]?.trim() ?? "";
+}
+
+function paymentAccount(notes: string | null) {
+  return noteValue(notes, "Betaalrekening") || noteValue(notes, "IBAN betaler");
 }
 
 export default async function FinancialPage({
@@ -45,10 +50,22 @@ export default async function FinancialPage({
   const deductionTotal = Math.abs(paidItems.filter((item) => item.amountCents < 0).reduce((sum, item) => sum + item.amountCents, 0));
   const paidTotal = receivedTotal - deductionTotal;
   const currentYear = new Date().getFullYear();
+  const pricing = await getPricingConfig();
+  const approvalYear = donor.approvedAt?.getFullYear() ?? currentYear;
+  const expectedAnnualTotal = calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, new Date(`${currentYear}-01-01T00:00:00.000Z`)) * 100;
+  const expectedRegistrationAnnualTotal = donor.approvedAt ? calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, donor.approvedAt) * 100 : 0;
+  const oneTimeChargeDate = donor.approvedAt ?? donor.createdAt;
+  const expectedOneTimeTotal = donor.approvedAt
+    ? calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, oneTimeChargeDate) * 100
+    : 0;
   const annualDueItems = dueItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
-  const annualDueTotal = annualDueItems.reduce((sum, item) => sum + item.amountCents, 0);
+  const registeredAnnualDueTotal = annualDueItems.reduce((sum, item) => sum + item.amountCents, 0);
   const annualPaidItems = paidItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
-  const annualPaidTotal = Math.max(annualPaidItems.reduce((sum, item) => sum + item.amountCents, 0), 0);
+  const annualPaidTotal = annualPaidItems.reduce((sum, item) => sum + item.amountCents, 0);
+  const registrationAnnualPaidTotal = paidItems
+    .filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === approvalYear)
+    .reduce((sum, item) => sum + item.amountCents, 0);
+  const annualDueTotal = expectedAnnualTotal > 0 ? Math.max(expectedAnnualTotal - annualPaidTotal, 0) : registeredAnnualDueTotal;
   const latestAnnualPaid = annualPaidItems.find((item) => item.amountCents > 0);
   const latestPaid = paidItems.find((item) => item.amountCents > 0);
   const paymentHistory = donor.paymentObligations
@@ -57,22 +74,25 @@ export default async function FinancialPage({
   const paidOneTimeTotal = paidItems
     .filter((item) => item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
-  const oneTimeDueTotal = dueItems
+  const registrationRemainingTotal =
+    Math.max(expectedRegistrationAnnualTotal - registrationAnnualPaidTotal, 0) + Math.max(expectedOneTimeTotal - paidOneTimeTotal, 0);
+  const registeredOneTimeDueTotal = dueItems
     .filter((item) => item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
   const extraReceivedTotal = Math.max(paidItems.filter((item) => item.obligationType === "MANUAL" && item.amountCents > 0).reduce((sum, item) => sum + item.amountCents, 0), 0);
 
-  const oneTimeTotal = paidOneTimeTotal + oneTimeDueTotal;
-  const annualTotal = annualPaidTotal + annualDueTotal;
+  const oneTimeDueTotal = expectedOneTimeTotal > 0 ? Math.max(expectedOneTimeTotal - paidOneTimeTotal, 0) : registeredOneTimeDueTotal;
+  const oneTimeTotal = expectedOneTimeTotal > 0 ? expectedOneTimeTotal : Math.max(paidOneTimeTotal + oneTimeDueTotal, 0);
+  const annualTotal = expectedAnnualTotal > 0 ? expectedAnnualTotal : Math.max(annualPaidTotal + annualDueTotal, 0);
   const annualRemaining = annualDueTotal;
   const annualIsPaid = annualTotal > 0 && annualDueTotal === 0;
   const annualIsPartial = annualPaidTotal > 0 && annualRemaining > 0;
   const penaltyTotal = 0;
   const remainingOneTime = oneTimeDueTotal;
   const displayedOneTimePaid = Math.max(0, Math.min(paidOneTimeTotal, oneTimeTotal));
-  const remainingTotal = dueItems.reduce((sum, item) => sum + item.amountCents, 0);
+  const remainingTotal = annualDueTotal + oneTimeDueTotal;
   const creditTotal = remainingTotal === 0 ? Math.max(paidTotal - oneTimeTotal - annualTotal, 0) : 0;
-  const canActivate = donor.status === "PAYMENT_REQUIRED" && remainingTotal === 0 && annualIsPaid;
+  const canActivate = donor.status === "INACTIVE" && donor.approvedAt && expectedRegistrationAnnualTotal > 0 && registrationRemainingTotal === 0;
   const paymentPreview = latestPaid
     ? await renderEmailTemplate("PAYMENT_CONFIRMED", {
         naam: `${donor.firstName} ${donor.lastName}`.trim(),
@@ -87,26 +107,28 @@ export default async function FinancialPage({
   const todayInput = new Date().toISOString().slice(0, 10);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
+    <main className="mx-auto max-w-7xl px-4 py-8">
       <BackButton fallbackHref={`/admin/donors/${donor.id}`} />
-      <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
+      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Financieel beheer</h1>
-          <p className="mt-3 text-2xl font-bold text-slate-900">{donor.firstName} {donor.lastName} - {donor.registrationNumber ?? "geen lidnummer"}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Financieel beheer</p>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">{donor.firstName} {donor.lastName} - {donor.registrationNumber ?? "geen lidnummer"}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className={`rounded-md px-3 py-2 text-sm font-bold ${donorStatusBadgeClass(donor.status)}`}>
             {donorStatusLabel(donor.status)}
           </span>
-          <span className={`rounded-md px-3 py-2 text-sm font-bold ${annualIsPaid ? "bg-emerald-50 text-emerald-800" : annualIsPartial ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-800"}`}>
+          <span className={`rounded-md px-3 py-2 text-sm font-bold ${annualIsPaid ? "bg-teal-50 text-[#0f5f9f]" : annualIsPartial ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-800"}`}>
             {annualIsPaid ? "Jaarbetaling betaald" : annualIsPartial ? "Jaarbetaling gedeeltelijk betaald" : "Jaarbetaling open"}
           </span>
         </div>
       </div>
+      </div>
 
       {query.error ? <p className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 font-semibold text-red-800">{query.error}</p> : null}
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
           <div>
             <div>
@@ -114,18 +136,18 @@ export default async function FinancialPage({
               <p className="mt-1 text-sm text-slate-600">De berekende bijdrage voor deze donateur.</p>
             </div>
             <div className="mt-5">
-              <div className="rounded-md border border-red-200 bg-red-50 p-5">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-5">
                 <p className="text-sm font-bold text-slate-600">Nog te betalen</p>
-                <p className="mt-1 text-4xl font-black text-red-800">
+                <p className="mt-1 text-5xl font-black text-red-800">
                   {formatCurrency(remainingTotal)}
                 </p>
                   <p className="mt-2 text-sm font-bold text-red-800">
-                  Alleen geregistreerde open posten worden als schuld getoond
+                  Verwerkte betalingen worden direct van de open schuld afgetrokken
                 </p>
               </div>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-md bg-slate-100 p-3">
+                <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
                   <dt className="text-sm font-bold text-slate-600">Jaarlijks</dt>
                   <dd className={`mt-1 text-lg font-black ${annualIsPaid ? "text-slate-900" : annualTotal > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(annualTotal)}</dd>
                   <p className="mt-1 text-xs text-slate-600">
@@ -138,7 +160,7 @@ export default async function FinancialPage({
                           : "Geen open jaarbetaling geregistreerd"}
                   </p>
                 </div>
-                <div className="rounded-md bg-slate-100 p-3">
+                <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
                   <dt className="text-sm font-bold text-slate-600">Eenmalig</dt>
                   <dd className={`mt-1 text-lg font-black ${remainingOneTime > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(oneTimeTotal)}</dd>
                   {donor.approvedAt ? (
@@ -150,13 +172,13 @@ export default async function FinancialPage({
                     <p className="mt-1 text-xs text-slate-600">Niet van toepassing voor geimporteerde bestaande donateurs.</p>
                   )}
                 </div>
-                <div className="rounded-md bg-slate-100 p-3">
+                <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
                   <dt className="text-sm font-bold text-slate-600">Boete</dt>
                   <dd className={`mt-1 text-lg font-black ${penaltyTotal > 0 && !annualIsPaid ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(penaltyTotal)}</dd>
                 </div>
             </div>
           </div>
-          <div className="rounded-md bg-slate-100 p-4 text-sm">
+          <div className="rounded-xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
             <p><strong>IBAN:</strong> {formatIban(donor.iban)}</p>
             <p className="mt-2"><strong>Rekeninghouder:</strong> {donor.accountHolderName}</p>
             <p className="mt-2"><strong>Status:</strong> {donor.status}</p>
@@ -165,31 +187,31 @@ export default async function FinancialPage({
         </div>
       </section>
 
-      <details className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <details className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <summary className="cursor-pointer text-xl font-bold text-slate-900">Betaling registreren</summary>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-md bg-emerald-50 p-3">
-            <p className="text-sm font-bold text-emerald-700">+ Ontvangen</p>
-            <p className="mt-1 text-xl font-black text-emerald-900">{formatCurrency(receivedTotal)}</p>
+          <div className="rounded-xl bg-teal-50 p-3 ring-1 ring-teal-100">
+            <p className="text-sm font-bold text-teal-700">+ Ontvangen</p>
+            <p className="mt-1 text-xl font-black text-teal-900">{formatCurrency(receivedTotal)}</p>
           </div>
-          <div className="rounded-md bg-red-50 p-3">
+          <div className="rounded-xl bg-red-50 p-3 ring-1 ring-red-100">
             <p className="text-sm font-bold text-red-700">- Aftrek</p>
             <p className="mt-1 text-xl font-black text-red-900">{formatCurrency(deductionTotal)}</p>
           </div>
-          <div className="rounded-md bg-slate-100 p-3">
+          <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
             <p className="text-sm font-bold text-slate-600">Netto verwerkt</p>
             <p className="mt-1 text-xl font-black text-slate-900">{formatCurrency(paidTotal)}</p>
           </div>
-          <div className="rounded-md bg-slate-100 p-3">
+          <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
             <p className="text-sm font-bold text-slate-600">Administratief saldo</p>
-            <p className={`mt-1 text-xl font-black ${remainingTotal > 0 ? "text-red-700" : creditTotal > 0 ? "text-emerald-800" : "text-slate-900"}`}>
+            <p className={`mt-1 text-xl font-black ${remainingTotal > 0 ? "text-red-700" : creditTotal > 0 ? "text-[#0f5f9f]" : "text-slate-900"}`}>
               {remainingTotal > 0 ? formatCurrency(remainingTotal) : creditTotal > 0 ? `+ ${formatCurrency(creditTotal)}` : formatCurrency(0)}
             </p>
             <p className="mt-1 text-xs text-slate-600">{remainingTotal > 0 ? "Nog te betalen" : creditTotal > 0 ? "Tegoed" : "Geen open saldo"}</p>
           </div>
-          <div className="rounded-md bg-emerald-50 p-3">
-            <p className="text-sm font-bold text-emerald-700">Extra ontvangen</p>
-            <p className="mt-1 text-xl font-black text-emerald-900">{formatCurrency(extraReceivedTotal)}</p>
+          <div className="rounded-xl bg-teal-50 p-3 ring-1 ring-teal-100">
+            <p className="text-sm font-bold text-teal-700">Extra ontvangen</p>
+            <p className="mt-1 text-xl font-black text-teal-900">{formatCurrency(extraReceivedTotal)}</p>
           </div>
         </div>
         <form action={registerBankPayment} className="mt-5 grid gap-4 lg:grid-cols-5">
@@ -214,9 +236,9 @@ export default async function FinancialPage({
             Interne notitie
             <input name="adminNote" placeholder="Bijv. bankafschrift gecontroleerd" />
           </label>
-          <div className="lg:col-span-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-stone-100 p-3">
+          <div className="lg:col-span-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 p-3">
             <p className="text-sm text-slate-700">Gebruik een positief bedrag voor ontvangen geld. Gebruik een minteken voor aftrek/correctie, bijvoorbeeld -72,00. Alleen positieve betalingen zetten een e-mailconcept klaar.</p>
-            <button className="rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" type="submit">Bankbetaling opslaan</button>
+            <button className="rounded-lg bg-[#1483d6] px-4 py-3 font-semibold text-white shadow-sm hover:bg-[#0f5f9f]" type="submit">Bankbetaling opslaan</button>
           </div>
         </form>
         <form action={markAnnualPaymentDue} className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4">
@@ -255,35 +277,35 @@ export default async function FinancialPage({
       </details>
 
       {canActivate ? (
-        <form action={activateDonorManually} className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+        <form action={activateDonorManually} className="mt-5 rounded-xl border border-teal-200 bg-teal-50 p-5 shadow-sm">
           <input name="donorId" type="hidden" value={donor.id} />
-          <p className="font-semibold text-emerald-900">De jaarbijdrage en eenmalige bijdrage zijn volledig betaald. Deze donateur kan actief worden gezet.</p>
-          <button className="mt-3 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" type="submit">
+          <p className="font-semibold text-teal-900">Het restant van de inschrijving is 0 euro. Deze donateur kan actief worden gezet.</p>
+          <button className="mt-3 rounded-lg bg-[#1483d6] px-4 py-3 font-semibold text-white shadow-sm hover:bg-[#0f5f9f]" type="submit">
             Donateur actief zetten
           </button>
         </form>
       ) : null}
 
       {paymentPreview ? (
-        <section className="mt-6 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Preview betalingsbevestiging</h2>
           <p className="mt-4 text-sm font-semibold text-slate-700">Onderwerp</p>
-          <p className="mt-1 rounded-md bg-stone-100 p-3">{paymentPreview.subject}</p>
+          <p className="mt-1 rounded-md bg-slate-50 p-3">{paymentPreview.subject}</p>
           <p className="mt-4 text-sm font-semibold text-slate-700">Body</p>
-          <pre className="mt-1 whitespace-pre-wrap rounded-md bg-stone-100 p-3 text-sm">{paymentPreview.bodyText}</pre>
+          <pre className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm">{paymentPreview.bodyText}</pre>
         </section>
       ) : null}
 
-      <section className="mt-6 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold text-slate-900">Betaalhistorie</h2>
         <p className="mt-1 text-sm text-slate-600">Hier staat wat er via bankimport of handmatige registratie is verwerkt. IBAN is alleen betaalbewijs en bepaalt niet voor welk lid betaald is.</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[950px] text-left text-sm">
-            <thead className="bg-slate-100 text-slate-700">
+            <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="p-3">Datum</th>
                 <th className="p-3">Bedrag</th>
-                <th className="p-3">IBAN betaler</th>
+                <th className="p-3">Betaalrekening</th>
                 <th className="p-3">Importbestand</th>
                 <th className="p-3">Omschrijving</th>
               </tr>
@@ -294,7 +316,7 @@ export default async function FinancialPage({
                   <tr className="border-t border-slate-200 align-top" key={item.id}>
                     <td className="p-3">{formatDate(item.paidAt)}</td>
                     <td className="p-3 font-bold">{formatCurrency(item.amountCents)}</td>
-                    <td className="p-3">{noteValue(item.notes, "IBAN betaler") || "-"}</td>
+                    <td className="p-3">{paymentAccount(item.notes) || "-"}</td>
                     <td className="p-3">{noteValue(item.notes, "Importbestand") || (item.source ?? "-")}</td>
                     <td className="p-3">{noteValue(item.notes, "Omschrijving") || item.adminNote || item.notes || "-"}</td>
                   </tr>

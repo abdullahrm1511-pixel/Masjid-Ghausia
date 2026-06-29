@@ -1,4 +1,5 @@
 import type { DonorProfile, FamilyMember, RegistrationRequest, User } from "@prisma/client";
+import { formatDateWithAge } from "@/lib/display";
 import { formatIban } from "@/lib/iban";
 
 type RegistrationWithDetails = RegistrationRequest & {
@@ -113,7 +114,7 @@ export function buildRegistrationSummaryLines(request: RegistrationWithDetails) 
     `E-mail: ${request.requestedBy.email}`,
     `Telefoon: ${donor.phone}`,
     `Adres: ${donor.addressLine1}, ${donor.postalCode} ${donor.city}`,
-    `Geboortedatum: ${donor.dateOfBirth.toLocaleDateString("nl-NL")}`,
+    `Geboortedatum: ${formatDateWithAge(donor.dateOfBirth)}`,
     `Geboorteplaats: ${donor.birthPlace}`,
     `Geslacht: ${donor.gender ?? "-"}`,
     `Burgerlijke staat: ${donor.maritalStatus ?? "-"}`,
@@ -122,12 +123,12 @@ export function buildRegistrationSummaryLines(request: RegistrationWithDetails) 
     "",
     "Partner",
     partner
-      ? `${partner.firstName} ${partner.lastName}, geboren op ${partner.dateOfBirth.toLocaleDateString("nl-NL")} te ${partner.birthPlace ?? "-"}`
+      ? `${partner.firstName} ${partner.lastName}, geboren op ${formatDateWithAge(partner.dateOfBirth)} te ${partner.birthPlace ?? "-"}`
       : "Geen partner opgegeven.",
     "",
     "Kinderen",
     ...(children.length
-      ? children.map((child, index) => `${index + 1}. ${child.firstName} ${child.lastName}, geboren op ${child.dateOfBirth.toLocaleDateString("nl-NL")} te ${child.birthPlace ?? "-"}`)
+      ? children.map((child, index) => `${index + 1}. ${child.firstName} ${child.lastName}, geboren op ${formatDateWithAge(child.dateOfBirth)} te ${child.birthPlace ?? "-"}`)
       : ["Geen kinderen opgegeven."]),
     "",
     "Contact Pakistan",

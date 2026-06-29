@@ -35,9 +35,11 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto max-w-md px-4 py-12">
-      <h1 className="text-3xl font-bold text-slate-900">Inloggen</h1>
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Masjid Ghausia</p>
+      <h1 className="mt-2 text-3xl font-black text-slate-950">Inloggen</h1>
       {params.registered === "1" ? (
-        <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+        <div className="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-900">
           Uw registratie is succesvol ontvangen. U kunt inloggen zodra uw account is goedgekeurd door het bestuur.
         </div>
       ) : null}
@@ -46,7 +48,7 @@ export default async function LoginPage({
           Inloggen is niet gelukt. Controleer uw gegevens.
         </div>
       ) : null}
-      <form action={loginAction} className="mt-8 grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <form action={loginAction} className="mt-8 grid gap-4">
         <label>
           E-mailadres
           <input name="email" type="email" autoComplete="email" required />
@@ -55,10 +57,11 @@ export default async function LoginPage({
           Wachtwoord
           <input name="password" type="password" autoComplete="current-password" required />
         </label>
-        <button className="rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800" type="submit">
+        <button className="rounded-lg bg-[#1483d6] px-4 py-3 font-semibold text-white shadow-sm hover:bg-[#0f5f9f]" type="submit">
           Inloggen
         </button>
       </form>
+      </section>
     </main>
   );
 }

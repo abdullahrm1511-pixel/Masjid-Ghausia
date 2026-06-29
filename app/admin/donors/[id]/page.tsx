@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { syncAdultChildTransitions } from "@/lib/adult-child-transitions";
 import { auth } from "@/lib/auth";
-import { displayEmail, formatCurrency, formatDate } from "@/lib/display";
+import { ageLabel, displayEmail, formatCurrency, formatDate, formatDateWithAge } from "@/lib/display";
 import { familyMemberStatusBadgeClass, familyMemberStatusLabel } from "@/lib/family-status";
 import { formatIban } from "@/lib/iban";
 import { donorStatusBadgeClass, donorStatusLabel, obligationTypeLabel, paymentStatusBadgeClass, paymentStatusLabel } from "@/lib/labels";
@@ -24,16 +24,6 @@ const tabs = [
 ] as const;
 
 type TabKey = (typeof tabs)[number][1];
-
-function ageLabel(dateOfBirth: Date) {
-  const today = new Date();
-  let age = today.getFullYear() - dateOfBirth.getFullYear();
-  const hasHadBirthday =
-    today.getMonth() > dateOfBirth.getMonth() ||
-    (today.getMonth() === dateOfBirth.getMonth() && today.getDate() >= dateOfBirth.getDate());
-  if (!hasHadBirthday) age -= 1;
-  return `${age} jaar`;
-}
 
 export default async function DonorDetailPage({
   params,
@@ -69,6 +59,7 @@ export default async function DonorDetailPage({
   const isCancelledForNonPayment = donor.status === "INACTIVE" && /geannuleerd|niet betalen/i.test(donor.statusInternalNote ?? "");
   const partners = donor.familyMembers.filter((member) => member.type === "PARTNER");
   const children = donor.familyMembers.filter((member) => member.type === "CHILD");
+  const primaryContact = partners.find((member) => member.relationship === "Primaire contactpersoon" && member.status === "ACTIVE_DEPENDENT");
   const visibleTabs = canManageSettings(session?.user.role) ? tabs : tabs.filter(([, value]) => value !== "status");
   const safeActiveTab: TabKey = visibleTabs.some(([, value]) => value === activeTab) ? activeTab : "profile";
   const displayedAmount = dueTotal > 0 ? dueTotal : paidTotal;
@@ -79,7 +70,7 @@ export default async function DonorDetailPage({
       <BackButton fallbackHref="/admin/donors" />
       <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">Lidmaatschap</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Lidmaatschap</p>
           <h1 className="mt-1 text-4xl font-bold text-slate-900">{donor.registrationNumber ?? "Geen lidnummer"}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={`rounded-md px-3 py-2 text-sm font-bold ${donorStatusBadgeClass(donor.status)}`}>
@@ -87,22 +78,25 @@ export default async function DonorDetailPage({
             </span>
             {isCancelledForNonPayment ? <span className="rounded-md bg-red-100 px-3 py-2 text-sm font-bold text-red-900">Geannuleerd</span> : null}
             {dueTotal > 0 ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-800">{formatCurrency(dueTotal)} open</span> : null}
-            {paidTotal > 0 ? <span className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">{formatCurrency(paidTotal)} ontvangen</span> : null}
+            {paidTotal > 0 ? <span className="rounded-md bg-teal-50 px-3 py-2 text-sm font-bold text-[#0f5f9f]">{formatCurrency(paidTotal)} ontvangen</span> : null}
           </div>
         </div>
-        <Link className="inline-flex rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" href={`/admin/donors/${donor.id}/financial`}>
+        <Link className="inline-flex rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" href={`/admin/donors/${donor.id}/financial`}>
           Financieel overzicht
         </Link>
       </div>
 
       <section className="mt-5 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
         <div>
-          <p className="text-xs font-bold uppercase text-slate-500">Primair</p>
-          <p className="mt-1 font-black text-slate-950">{donor.firstName} {donor.lastName}</p>
+          <p className="text-xs font-bold uppercase text-slate-500">{primaryContact ? "Primair contact" : "Primair"}</p>
+          <p className="mt-1 font-black text-slate-950">
+            {primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : `${donor.firstName} ${donor.lastName}`}
+          </p>
+          {primaryContact ? <p className="mt-1 text-xs font-semibold text-slate-500">Namens overleden primair lid</p> : null}
         </div>
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">Betaalstatus</p>
-          <p className={`mt-1 font-black ${dueTotal > 0 ? "text-red-700" : paidTotal > 0 ? "text-emerald-800" : "text-slate-950"}`}>{paymentStatusText}</p>
+          <p className={`mt-1 font-black ${dueTotal > 0 ? "text-red-700" : paidTotal > 0 ? "text-[#0f5f9f]" : "text-slate-950"}`}>{paymentStatusText}</p>
         </div>
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">{displayedAmountLabel}</p>
@@ -122,7 +116,7 @@ export default async function DonorDetailPage({
             {visibleTabs.map(([label, value]) => (
               <Link
                 className={`rounded-md border px-3 py-2 text-sm font-semibold ${
-                  safeActiveTab === value ? "border-emerald-700 bg-emerald-700 text-white" : "border-stone-300 bg-white text-slate-800 hover:bg-stone-100"
+                  safeActiveTab === value ? "border-[#1483d6] bg-[#1483d6] text-white" : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                 }`}
                 href={`/admin/donors/${donor.id}?tab=${value}`}
                 key={value}
@@ -138,7 +132,7 @@ export default async function DonorDetailPage({
                 <div>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase text-emerald-700">Primair</p>
+                      <p className="text-xs font-bold uppercase text-[#1483d6]">Primair</p>
                       <h2 className="mt-1 text-2xl font-black text-slate-950">{donor.firstName} {donor.lastName}</h2>
                     </div>
                     <span className={`rounded-md px-2 py-1 text-xs font-bold ${donorStatusBadgeClass(donor.status)}`}>{donorStatusLabel(donor.status)}</span>
@@ -160,7 +154,10 @@ export default async function DonorDetailPage({
                       <div className="mt-2 grid gap-2">
                         {partners.map((partner) => (
                           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-sm" key={partner.id}>
-                            <p className="font-bold text-slate-950">{partner.firstName} {partner.lastName} <span className="font-semibold text-slate-500">({ageLabel(partner.dateOfBirth)})</span></p>
+                            <div>
+                              <p className="font-bold text-slate-950">{partner.firstName} {partner.lastName} <span className="font-semibold text-slate-500">({ageLabel(partner.dateOfBirth)})</span></p>
+                              {partner.relationship === "Primaire contactpersoon" ? <p className="mt-1 text-xs font-bold text-[#0f766e]">Primaire contactpersoon</p> : null}
+                            </div>
                             <span className={`rounded-md px-2 py-1 text-xs font-bold ${familyMemberStatusBadgeClass(partner.status)}`}>
                               {familyMemberStatusLabel(partner.status)}
                             </span>
@@ -190,8 +187,8 @@ export default async function DonorDetailPage({
                   </div>
                 </div>
 
-                <dl className="grid content-start gap-3 rounded-md bg-emerald-50 p-4 text-sm">
-                  <div><dt className="font-semibold text-slate-600">Betaalstatus</dt><dd className={dueTotal > 0 ? "font-bold text-red-700" : paidTotal > 0 ? "font-bold text-emerald-800" : "font-bold text-slate-950"}>{paymentStatusText}</dd></div>
+                <dl className="grid content-start gap-3 rounded-md bg-teal-50 p-4 text-sm">
+                  <div><dt className="font-semibold text-slate-600">Betaalstatus</dt><dd className={dueTotal > 0 ? "font-bold text-red-700" : paidTotal > 0 ? "font-bold text-[#0f5f9f]" : "font-bold text-slate-950"}>{paymentStatusText}</dd></div>
                   <div><dt className="font-semibold text-slate-600">{displayedAmountLabel}</dt><dd className="text-xl font-black text-slate-950">{formatCurrency(displayedAmount)}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Laatste betaling</dt><dd className="font-bold text-slate-950">{formatDate(latestPayment?.paidAt)}</dd></div>
                 </dl>
@@ -203,11 +200,11 @@ export default async function DonorDetailPage({
           {safeActiveTab === "personal" ? (
             <section className="mt-4 grid gap-4 md:grid-cols-2">
               <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-bold uppercase text-emerald-700">Personalia primair</p>
+                <p className="text-xs font-bold uppercase text-[#1483d6]">Personalia primair</p>
                 <h2 className="mt-1 text-xl font-black text-slate-950">{donor.firstName} {donor.lastName}</h2>
                 <dl className="mt-4 grid gap-3 text-sm">
                   <div><dt className="font-semibold text-slate-600">Lidnummer</dt><dd className="font-bold text-slate-950">{donor.registrationNumber ?? "-"}</dd></div>
-                  <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{donor.dateOfBirth.toLocaleDateString("nl-NL")}</dd></div>
+                  <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDateWithAge(donor.dateOfBirth)}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Geboorteplaats</dt><dd>{donor.birthPlace || "-"}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Geslacht</dt><dd>{donor.gender ?? "-"}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Actief sinds</dt><dd>{formatDate(donor.activeSince)}</dd></div>
@@ -223,7 +220,7 @@ export default async function DonorDetailPage({
                   <h2 className="mt-1 text-xl font-black text-slate-950">{partner.firstName} {partner.lastName}</h2>
                   <dl className="mt-4 grid gap-3 text-sm">
                     <div><dt className="font-semibold text-slate-600">Lidnummerweergave</dt><dd className="font-bold text-slate-950">{donor.registrationNumber ? `${donor.registrationNumber}-P` : "-"}</dd></div>
-                    <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDate(partner.dateOfBirth)}</dd></div>
+                    <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDateWithAge(partner.dateOfBirth)}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geboorteplaats</dt><dd>{partner.birthPlace || "-"}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geslacht</dt><dd>{partner.gender ?? "-"}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Status</dt><dd>{familyMemberStatusLabel(partner.status)}</dd></div>
@@ -236,7 +233,7 @@ export default async function DonorDetailPage({
                   <p className="text-xs font-bold uppercase text-amber-700">Personalia kind</p>
                   <h2 className="mt-1 text-xl font-black text-slate-950">{child.firstName} {child.lastName}</h2>
                   <dl className="mt-4 grid gap-3 text-sm">
-                    <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDate(child.dateOfBirth)}</dd></div>
+                    <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDateWithAge(child.dateOfBirth)}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geboorteplaats</dt><dd>{child.birthPlace || "-"}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geslacht</dt><dd>{child.gender ?? "-"}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Status</dt><dd>{familyMemberStatusLabel(child.status)}</dd></div>
@@ -247,7 +244,7 @@ export default async function DonorDetailPage({
           ) : null}
 
           {safeActiveTab === "family" ? (
-            <section className="mt-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-bold text-slate-900">Gezinsgegevens</h2>
               <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
                 <div><dt className="font-semibold text-slate-600">Adres</dt><dd className="mt-1 font-bold text-slate-950">{donor.addressLine1 || "-"}, {donor.postalCode || "-"} {donor.city || ""}</dd></div>
@@ -269,16 +266,16 @@ export default async function DonorDetailPage({
           ) : null}
 
           {safeActiveTab === "payments" ? (
-            <section className="mt-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-slate-900">Betalingen en verplichtingen</h2>
-                <Link className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white" href={`/admin/donors/${donor.id}/financial`}>
+                <Link className="rounded-md bg-[#1483d6] px-3 py-2 text-sm font-semibold text-white" href={`/admin/donors/${donor.id}/financial`}>
                   Beheren
                 </Link>
               </div>
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="bg-stone-100 text-slate-700">
+                  <thead className="bg-slate-50 text-slate-700">
                     <tr>
                       <th className="p-3">Soort</th>
                       <th className="p-3">Bedrag</th>
@@ -289,7 +286,7 @@ export default async function DonorDetailPage({
                   </thead>
                   <tbody>
                     {donor.paymentObligations.length ? donor.paymentObligations.map((item) => (
-                      <tr className="border-t border-stone-200" key={item.id}>
+                      <tr className="border-t border-slate-200" key={item.id}>
                         <td className="p-3 font-semibold">{obligationTypeLabel(item.obligationType)}</td>
                         <td className="p-3">{formatCurrency(item.amountCents)}</td>
                         <td className="p-3"><span className={`rounded-md px-2 py-1 text-xs font-bold ${paymentStatusBadgeClass(item.status)}`}>{paymentStatusLabel(item.status)}</span></td>
@@ -306,7 +303,7 @@ export default async function DonorDetailPage({
           ) : null}
 
           {safeActiveTab === "changes" ? (
-            <section className="mt-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-bold text-slate-900">Laatste wijzigingsverzoeken</h2>
               <div className="mt-4 grid gap-2">
                 {donor.changeRequests.length ? donor.changeRequests.map((request) => <p key={request.id}>{request.changeType}: {request.status}</p>) : <p>Geen wijzigingsverzoeken.</p>}
@@ -315,12 +312,12 @@ export default async function DonorDetailPage({
           ) : null}
 
           {safeActiveTab === "history" ? (
-            <section className="mt-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-bold text-slate-900">Statusgeschiedenis</h2>
               <div className="mt-4 grid gap-3">
                 {donor.statusHistory.length ? (
                   donor.statusHistory.map((item) => (
-                    <details className="rounded-md border border-stone-200 p-3" key={item.id}>
+                    <details className="rounded-md border border-slate-200 p-3" key={item.id}>
                       <summary className="cursor-pointer font-semibold">{formatDate(item.createdAt)}: {donorStatusLabel(item.fromStatus) ?? "-"} naar {donorStatusLabel(item.toStatus)}</summary>
                       <p className="mt-2 text-sm text-slate-700">Door: {item.changedBy?.name ?? "-"}</p>
                       <p className="mt-2 text-sm"><strong>Intern:</strong> {item.internalNote}</p>
@@ -343,7 +340,7 @@ export default async function DonorDetailPage({
                 <div className="grid gap-3">
                   <div className="grid gap-3 rounded-md border border-slate-200 p-3 sm:grid-cols-[1fr_220px] sm:items-center">
                     <div>
-                      <p className="text-xs font-bold uppercase text-emerald-700">Primair</p>
+                      <p className="text-xs font-bold uppercase text-[#1483d6]">Primair</p>
                       <p className="font-black text-slate-950">{donor.firstName} {donor.lastName}</p>
                     </div>
                     <label className="grid gap-1 text-sm font-semibold">

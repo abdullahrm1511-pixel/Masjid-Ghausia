@@ -4,33 +4,46 @@
 
 :root {
   color-scheme: light;
+  --gbc-blue: #1483d6;
+  --gbc-blue-dark: #0f5f9f;
+  --gbc-gold: #f0c08d;
+  --gbc-green: #0f766e;
+  --gbc-ink: #0b1b33;
+  --gbc-surface: #f6f8fb;
+  --gbc-border: #dbe3ee;
 }
 
 body {
   min-height: 100vh;
-  background: #f5f7fb;
-  color: #0f172a;
+  background: var(--gbc-surface);
+  color: var(--gbc-ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "liga" 1, "kern" 1;
   text-rendering: optimizeLegibility;
+}
+
+main {
+  width: 100%;
 }
 
 input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.375rem;
+  border: 1px solid var(--gbc-border);
+  border-radius: 0.5rem;
   padding: 0.7rem 0.85rem;
   background: white;
-  color: #0f172a;
+  color: var(--gbc-ink);
+  box-shadow: 0 1px 0 rgba(11, 27, 51, 0.02);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid #047857;
+  outline: 3px solid rgba(20, 131, 214, 0.18);
   outline-offset: 2px;
-  border-color: #047857;
+  border-color: var(--gbc-blue);
 }
 
 label {
@@ -41,8 +54,33 @@ label {
   color: #334155;
 }
 
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+td,
+th {
+  border-color: var(--gbc-border);
+}
+
 button,
 a {
   transition-property: color, background-color, border-color, box-shadow, transform;
   transition-duration: 150ms;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: rgba(240, 192, 141, 0.65);
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { auth } from "@/lib/auth";
+import { formatDateWithAge } from "@/lib/display";
 import { formatIban } from "@/lib/iban";
 import { prisma } from "@/lib/prisma";
 import { submitChangeRequest } from "./actions";
@@ -33,13 +34,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <h1 className="mt-5 text-3xl font-bold text-slate-900">Mijn account</h1>
       {params.error ? <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{params.error}</div> : null}
 
-      <section className="mt-8 grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm sm:grid-cols-2">
+      <section className="mt-8 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
         {profile.registrationNumber ? <p><strong>Lidnummer:</strong> {profile.registrationNumber}</p> : null}
         <p><strong>Naam:</strong> {profile.firstName} {profile.lastName}</p>
         <p><strong>E-mail:</strong> {profile.user.email}</p>
         <p><strong>Telefoon:</strong> {profile.phone}</p>
         <p><strong>Adres:</strong> {profile.addressLine1}, {profile.postalCode} {profile.city}</p>
-        <p><strong>Geboortedatum:</strong> {profile.dateOfBirth.toLocaleDateString("nl-NL")}</p>
+        <p><strong>Geboortedatum:</strong> {formatDateWithAge(profile.dateOfBirth)}</p>
         <p><strong>Geboorteplaats:</strong> {profile.birthPlace}</p>
         <p><strong>Geslacht:</strong> {profile.gender ?? "-"}</p>
         <p><strong>IBAN:</strong> {formatIban(profile.iban)}</p>
@@ -49,14 +50,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <p className="sm:col-span-2"><strong>Uitvaartwensen:</strong> {profile.funeralWishes || "-"}</p>
       </section>
 
-      <section className="mt-6 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold text-slate-900">Gezin</h2>
         <div className="mt-4 grid gap-2">
           {profile.familyMembers.length ? profile.familyMembers.map((member) => <p key={member.id}>{member.type === "PARTNER" ? "Partner" : "Kind"}: {member.firstName} {member.lastName}</p>) : <p>Geen gezinsleden geregistreerd.</p>}
         </div>
       </section>
 
-      <section className="mt-6 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold text-slate-900">Wijziging aanvragen</h2>
         <form action={submitChangeRequest} className="mt-4 grid gap-6">
           <section className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
@@ -131,7 +132,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </section>
 
           <label>Toelichting<textarea name="donorNote" rows={3} /></label>
-          <button className="w-fit rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white" type="submit">Wijziging indienen</button>
+          <button className="w-fit rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" type="submit">Wijziging indienen</button>
         </form>
       </section>
     </main>

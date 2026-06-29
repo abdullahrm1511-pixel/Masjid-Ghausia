@@ -50,7 +50,7 @@ export function RegisterForm({ error }: { error?: string }) {
       <div className="flex flex-wrap gap-2">
         {steps.map((label, index) => (
           <button
-            className={`rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-emerald-700 bg-emerald-700 text-white" : "border-stone-300 text-slate-700"}`}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-[#1483d6] bg-[#1483d6] text-white" : "border-slate-300 text-slate-700"}`}
             key={label}
             onClick={() => setStep(index)}
             type="button"
@@ -59,7 +59,7 @@ export function RegisterForm({ error }: { error?: string }) {
           </button>
         ))}
       </div>
-      <section className={`grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm ${step === 0 ? "" : "hidden"}`}>
+      <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${step === 0 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Hoofddonateur</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>Voornaam<input name="firstName" defaultValue={field("firstName")} required /></label>
@@ -80,7 +80,7 @@ export function RegisterForm({ error }: { error?: string }) {
         </div>
       </section>
 
-      <section className={`grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm ${step === 1 ? "" : "hidden"}`}>
+      <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${step === 1 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Partner</h2>
         <label>Heeft u een partner?<select name="hasPartner" value={hasPartner} onChange={(event) => setHasPartner(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
         {hasPartner === "yes" ? (
@@ -94,14 +94,14 @@ export function RegisterForm({ error }: { error?: string }) {
         ) : null}
       </section>
 
-      <section className={`grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm ${step === 2 ? "" : "hidden"}`}>
+      <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${step === 2 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Kinderen</h2>
         <label>Heeft u kinderen?<select name="hasChildren" value={hasChildren} onChange={(event) => setHasChildren(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
         <input type="hidden" name="childrenCount" value={childCount} />
         {hasChildren === "yes" ? (
           <>
             {children.map((index) => (
-              <div className="grid gap-4 rounded-md border border-stone-200 p-4 sm:grid-cols-2" key={index}>
+              <div className="grid gap-4 rounded-md border border-slate-200 p-4 sm:grid-cols-2" key={index}>
                 <div className="flex items-center justify-between sm:col-span-2">
                   <h3 className="font-bold text-slate-900">Kind {children.indexOf(index) + 1}</h3>
                   <button className="rounded-md border border-red-300 px-3 py-2 text-sm font-semibold text-red-700" type="button" onClick={() => setChildren((items) => items.filter((item) => item !== index))}>
@@ -115,14 +115,14 @@ export function RegisterForm({ error }: { error?: string }) {
                 <label>Geboorteplaats<input name={`child.${index}.birthPlace`} defaultValue={field(`child.${index}.birthPlace`)} /></label>
               </div>
             ))}
-            <button className="w-fit rounded-md border border-emerald-700 px-4 py-2 font-semibold text-emerald-800" type="button" onClick={() => setChildren((items) => [...items, childCount])}>
+            <button className="w-fit rounded-md border border-[#1483d6] px-4 py-2 font-semibold text-[#0f5f9f]" type="button" onClick={() => setChildren((items) => [...items, childCount])}>
               Kind toevoegen
             </button>
           </>
         ) : null}
       </section>
 
-      <section className={`grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm ${step === 3 ? "" : "hidden"}`}>
+      <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${step === 3 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Contactpersoon Pakistan</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>Contactpersoon Pakistan<input name="pakistanContactName" defaultValue={field("pakistanContactName")} /></label>
@@ -131,7 +131,7 @@ export function RegisterForm({ error }: { error?: string }) {
         <label>Uitvaartwensen<textarea name="funeralWishes" rows={4} defaultValue={field("funeralWishes")} /></label>
       </section>
 
-      <section className={`grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm ${step === 4 ? "" : "hidden"}`}>
+      <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${step === 4 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Bevestiging</h2>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="healthDeclaration" type="checkbox" defaultChecked={field("healthDeclaration") === "on"} /> Gezondheidsverklaring bevestigd</label>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="legalResidence" type="checkbox" defaultChecked={field("legalResidence") === "on"} /> Verblijf in Nederland bevestigd</label>
@@ -139,15 +139,15 @@ export function RegisterForm({ error }: { error?: string }) {
       </section>
 
       <div className="flex flex-wrap justify-between gap-3">
-        <button className="rounded-md border border-stone-300 px-5 py-3 font-semibold text-slate-800" disabled={step === 0} formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.max(0, value - 1)); }} type="button">
+        <button className="rounded-md border border-slate-300 px-5 py-3 font-semibold text-slate-800" disabled={step === 0} formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.max(0, value - 1)); }} type="button">
           Vorige
         </button>
         {step < steps.length - 1 ? (
-          <button className="rounded-md bg-emerald-700 px-5 py-3 font-semibold text-white hover:bg-emerald-800" formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
+          <button className="rounded-md bg-[#1483d6] px-5 py-3 font-semibold text-white hover:bg-[#0f5f9f]" formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
             Volgende
           </button>
         ) : (
-          <button className="rounded-md bg-emerald-700 px-5 py-3 font-semibold text-white hover:bg-emerald-800" type="submit">
+          <button className="rounded-md bg-[#1483d6] px-5 py-3 font-semibold text-white hover:bg-[#0f5f9f]" type="submit">
             Inschrijving indienen
           </button>
         )}

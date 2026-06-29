@@ -8,7 +8,8 @@ import { writeAuditLog } from "@/lib/audit";
 import { isAdminRole } from "@/lib/permissions";
 import { prepareEmailLog } from "@/lib/email/templates";
 import { ensurePrimaryMembership } from "@/lib/membership";
-import { calculateCurrentAnnualAmount, getPricingConfig } from "@/lib/pricing";
+import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig, oneTimePaymentDeadline } from "@/lib/pricing";
+import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
 
 async function requireAdmin() {
   const session = await auth();
@@ -35,22 +36,24 @@ export async function approveRegistration(formData: FormData) {
   const pricing = await getPricingConfig();
   const currentYear = now.getFullYear();
   const annualAmountCents = calculateCurrentAnnualAmount(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
+  const oneTimeAmountCents = calculateTotalOneTimeContribution(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
   const hasCurrentAnnualObligation = request.donorProfile.paymentObligations.some(
     (item) =>
       item.obligationType === "ANNUAL" &&
       ((item.dueDate ?? item.paidAt ?? item.createdAt).getFullYear() === currentYear || item.lidnummer === `${registrationNumber}-${currentYear}`)
   );
+  const hasOneTimeObligation = request.donorProfile.paymentObligations.some((item) => item.obligationType === "ONE_TIME");
 
   await prisma.$transaction([
     prisma.donorProfile.update({
       where: { id: request.donorProfile.id },
       data: {
         registrationNumber,
-        status: "PAYMENT_REQUIRED",
+        status: "INACTIVE",
         approvedAt: now,
         statusChangedAt: now,
         inactiveSince: now,
-        statusInternalNote: "Registratie goedgekeurd, wacht op eerste betaling.",
+        statusInternalNote: "Registratie goedgekeurd, eerste betaling staat nog open.",
         statusDonorMessage: "Uw aanvraag is goedgekeurd. De eerste betaling moet nog bevestigd worden."
       }
     }),
@@ -82,18 +85,35 @@ export async function approveRegistration(formData: FormData) {
             }
           })
         ]
+      : []),
+    ...(oneTimeAmountCents > 0 && !hasOneTimeObligation
+      ? [
+          prisma.paymentObligation.create({
+            data: {
+              donorProfileId: request.donorProfile.id,
+              lidnummer: registrationNumber,
+              obligationType: "ONE_TIME",
+              amountCents: oneTimeAmountCents,
+              status: "DUE",
+              dueDate: oneTimePaymentDeadline(now),
+              source: "REGISTRATION_APPROVAL_ONE_TIME",
+              notes: "Eenmalige bijdrage aangemaakt bij registratiegoedkeuring."
+            }
+          })
+        ]
       : [])
   ]);
 
   await ensurePrimaryMembership({
     id: request.donorProfile.id,
     registrationNumber,
-    status: "PAYMENT_REQUIRED",
+    status: "INACTIVE",
     approvedAt: now,
     activeSince: null,
     createdAt: request.donorProfile.createdAt,
     updatedAt: now
   });
+  await syncFamilyActivityForDonorStatus(prisma, request.donorProfile.id, "INACTIVE");
 
   await writeAuditLog({
     actorId: adminId,
@@ -113,7 +133,7 @@ export async function approveRegistration(formData: FormData) {
       voornaam: request.donorProfile.firstName,
       achternaam: request.donorProfile.lastName,
       lidnummer: registrationNumber,
-      status: "PAYMENT_REQUIRED",
+      status: "INACTIVE",
       organisatie: "St. GBC Masjid Ghausia"
     }
   });

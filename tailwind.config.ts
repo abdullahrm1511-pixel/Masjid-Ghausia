@@ -6,9 +6,12 @@ const config: Config = {
     extend: {
       colors: {
         gbc: {
-          emerald: "#047857",
-          stone: "#f5f5f4",
-          slate: "#334155"
+          blue: "#1483d6",
+          gold: "#f0c08d",
+          green: "#0f766e",
+          ink: "#0b1b33",
+          surface: "#f6f8fb",
+          border: "#dbe3ee"
         }
       }
     }

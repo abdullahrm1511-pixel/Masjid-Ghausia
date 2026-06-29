@@ -4,16 +4,16 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatIban } from "@/lib/iban";
 import { formatCurrency, formatDate } from "@/lib/display";
-import { calculateDonorCharges, getPricingConfig } from "@/lib/pricing";
+import { calculateDonorCharges, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
 function statusText(status: string, message?: string | null) {
   if (status === "PENDING") return "Uw aanvraag is in afwachting van beoordeling.";
   if (status === "ACTION_REQUIRED") return message ? `Actie vereist: ${message}` : "Actie vereist: het bestuur vraagt om een correctie.";
-  if (status === "PAYMENT_REQUIRED") return "Uw aanvraag is goedgekeurd. Eerste betaling is vereist.";
+  if (status === "PAYMENT_REQUIRED") return "Uw account is niet actief. Er staat nog een betaling open.";
   if (status === "ACTIVE") return "Uw account is actief.";
-  if (status === "INACTIVE") return "Uw account is niet actief. Neem contact op met het bestuur.";
+  if (status === "INACTIVE") return "Uw account is niet actief. Controleer of er nog een betaling openstaat.";
   if (status === "REJECTED") return message ? `Uw aanvraag is afgewezen. ${message}` : "Uw aanvraag is afgewezen.";
   if (status === "DECEASED") return "Status: overleden.";
   return status;
@@ -51,6 +51,7 @@ export default async function DashboardPage() {
   const latestPaymentDate = profile.paymentObligations.find((item) => item.status === "PAID")?.paidAt;
   const pricing = await getPricingConfig();
   const mainCharge = calculateDonorCharges(profile, profile.familyMembers, pricing, { hasAnnualPayment: false })[0];
+  const oneTimeTotal = calculateTotalOneTimeContribution(profile, profile.familyMembers, pricing, profile.approvedAt ?? new Date());
   const oneTimePaid = profile.paymentObligations
     .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
@@ -61,7 +62,7 @@ export default async function DashboardPage() {
   const annualOpenRegistered = profile.paymentObligations
     .filter((item) => item.status === "DUE" && item.obligationType === "ANNUAL" && paymentYear(item) === currentYear)
     .reduce((sum, item) => sum + item.amountCents, 0);
-  const oneTimeRequired = profile.approvedAt ? (mainCharge?.oneTimeContribution ?? 0) * 100 : 0;
+  const oneTimeRequired = profile.approvedAt ? oneTimeTotal * 100 : 0;
   const oneTimeRemaining = Math.max(oneTimeRequired - oneTimePaid, 0);
   const annualRequired = profile.approvedAt ? (mainCharge?.annualContribution ?? 0) * 100 : annualOpenRegistered;
   const annualRemaining = profile.approvedAt
@@ -71,32 +72,49 @@ export default async function DashboardPage() {
   const totalDue = Math.max(annualRequired + oneTimeRequired + penaltyRequired - totalPaid, 0);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-      <section className="mt-8 rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-        <p className="text-sm font-bold uppercase text-emerald-800">Status</p>
+    <main className="mx-auto max-w-6xl px-4 py-8">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Mijn portaal</p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-slate-950">Dashboard</h1>
+            <p className="mt-2 text-sm text-slate-600">Uw gegevens en betalingen bij St. GBC Masjid Ghausia.</p>
+          </div>
+          {profile.registrationNumber ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+              <p className="text-xs font-bold uppercase text-slate-500">Lidnummer</p>
+              <p className="mt-1 text-2xl font-black text-[#0f5f9f]">{profile.registrationNumber}</p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-bold uppercase text-[#1483d6]">Status</p>
         <p className="mt-2 text-lg font-semibold text-slate-900">{statusText(profile.status, visibleMessage)}</p>
       </section>
 
-      {profile.registrationNumber ? (
-        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-600">Lidnummer</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-800">{profile.registrationNumber}</p>
-        </section>
-      ) : null}
-
-      <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900">Betaaloverzicht</h2>
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div><dt className="text-sm font-semibold text-slate-600">Totaal openstaand</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(totalDue)}</dd></div>
-          <div><dt className="text-sm font-semibold text-slate-600">Totaal betaald</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(totalPaid)}</dd></div>
-          <div><dt className="text-sm font-semibold text-slate-600">Openstaand bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(totalDue)}</dd></div>
-          <div><dt className="text-sm font-semibold text-slate-600">Laatste betaling</dt><dd className="mt-1 font-bold text-slate-900">{formatDate(latestPaymentDate)}</dd></div>
+      <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">Betaaloverzicht</h2>
+            <p className="mt-1 text-sm text-slate-600">Betalingen worden door de administratie gecontroleerd op basis van bankoverschrijvingen.</p>
+          </div>
+          <div className={`rounded-xl px-4 py-3 text-right ${totalDue > 0 ? "bg-red-50 text-red-800" : "bg-teal-50 text-teal-800"}`}>
+            <p className="text-xs font-bold uppercase">{totalDue > 0 ? "Openstaand" : "Bijgewerkt"}</p>
+            <p className="mt-1 text-2xl font-black">{formatCurrency(totalDue)}</p>
+          </div>
+        </div>
+        <dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg bg-slate-50 p-4"><dt className="text-sm font-semibold text-slate-600">Totaal betaald</dt><dd className="mt-1 text-xl font-black text-slate-900">{formatCurrency(totalPaid)}</dd></div>
+          <div className="rounded-lg bg-slate-50 p-4"><dt className="text-sm font-semibold text-slate-600">Openstaand bedrag</dt><dd className={`mt-1 text-xl font-black ${totalDue > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(totalDue)}</dd></div>
+          <div className="rounded-lg bg-slate-50 p-4"><dt className="text-sm font-semibold text-slate-600">Laatste betaling</dt><dd className="mt-1 text-xl font-black text-slate-900">{formatDate(latestPaymentDate)}</dd></div>
+          <div className="rounded-lg bg-slate-50 p-4"><dt className="text-sm font-semibold text-slate-600">IBAN</dt><dd className="mt-1 font-black text-slate-900">{formatIban(profile.iban)}</dd></div>
         </dl>
       </section>
 
       {oneTimeRequired > 0 ? (
-        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Eenmalige bijdrage</h2>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div><dt className="text-sm font-semibold text-slate-600">Bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(oneTimeRequired)}</dd></div>
@@ -108,7 +126,7 @@ export default async function DashboardPage() {
       ) : null}
 
       {annualRequired > 0 ? (
-        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Jaarlijkse bijdrage</h2>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div><dt className="text-sm font-semibold text-slate-600">Bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(annualRequired)}</dd></div>
@@ -121,30 +139,30 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
-      {profile.status === "PAYMENT_REQUIRED" ? (
-        <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      {profile.status === "INACTIVE" && totalDue > 0 ? (
+        <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Betaling</h2>
           <p className="mt-2 text-slate-700">Uw betaling wordt extern verwerkt. Zodra het bestuur uw betaling heeft bevestigd, wordt uw status bijgewerkt.</p>
         </section>
       ) : null}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Account</h2>
           <dl className="mt-4 grid gap-2 text-sm">
             <div><dt className="font-semibold">Naam</dt><dd>{profile.firstName} {profile.lastName}</dd></div>
             <div><dt className="font-semibold">IBAN</dt><dd>{formatIban(profile.iban)}</dd></div>
           </dl>
-          <Link className="mt-5 inline-flex rounded-md border border-stone-300 px-4 py-2 font-semibold text-slate-800" href="/account">
+          <Link className="mt-5 inline-flex rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50" href="/account">
             Mijn account bekijken
           </Link>
           {latestRegistration ? (
-            <Link className="ml-3 mt-5 inline-flex rounded-md border border-stone-300 px-4 py-2 font-semibold text-slate-800" href="/dashboard/registration-pdf">
+            <Link className="ml-3 mt-5 inline-flex rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50" href="/dashboard/registration-pdf">
               Inschrijfoverzicht downloaden
             </Link>
           ) : null}
         </section>
-        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Gezin</h2>
           <div className="mt-4 grid gap-2 text-sm">
             {profile.familyMembers.length ? (
@@ -156,7 +174,7 @@ export default async function DashboardPage() {
         </section>
       </div>
 
-      <section className="mt-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold text-slate-900">Laatste wijzigingsverzoek</h2>
         <p className="mt-2 text-slate-700">{latestChange ? `${latestChange.changeType}: ${latestChange.status}` : "Geen wijzigingsverzoeken."}</p>
       </section>

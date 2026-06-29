@@ -65,7 +65,7 @@ async function main() {
 
   await prisma.registrationCounter.upsert({
     where: { prefix: "11" },
-    update: {},
+    update: { current: 0 },
     create: { prefix: "11", current: 0 }
   });
 }

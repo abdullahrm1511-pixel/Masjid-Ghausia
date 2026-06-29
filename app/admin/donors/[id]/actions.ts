@@ -8,9 +8,14 @@ import { canManageSettings } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { contributesToHousehold } from "@/lib/family-status";
+import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
 
 const editableStatuses = ["ACTIVE", "INACTIVE", "DECEASED"] as const;
 const editableFamilyStatuses = ["ACTIVE_DEPENDENT", "UNDER_18", "ADULT_NEEDS_REGISTRATION", "REGISTERED_SEPARATELY", "NOT_A_MEMBER", "DECEASED"] as const;
+
+function memberFullName(member: { firstName: string; lastName: string | null }) {
+  return [member.firstName, member.lastName].filter(Boolean).join(" ");
+}
 
 export async function updateDonorStatus(formData: FormData) {
   const session = await auth();
@@ -29,12 +34,28 @@ export async function updateDonorStatus(formData: FormData) {
     redirect(`${path}?error=Vul+zowel+een+interne+als+externe+notitie+in`);
   }
 
-  const donor = await prisma.donorProfile.findUnique({ where: { id: donorId } });
+  const donor = await prisma.donorProfile.findUnique({
+    where: { id: donorId },
+    include: { familyMembers: { orderBy: [{ type: "asc" }, { dateOfBirth: "asc" }] } }
+  });
   if (!donor) redirect("/admin/donors");
 
   const now = new Date();
-  await prisma.$transaction([
-    prisma.donorProfile.update({
+  const promotedParent =
+    nextStatus === "DECEASED"
+      ? donor.familyMembers.find((member) => member.type === "PARTNER" && contributesToHousehold(member.status) && member.status !== "DECEASED")
+      : null;
+  const promotionInternalNote = promotedParent
+    ? `Partner (${memberFullName(promotedParent)}) automatisch ingesteld als primaire contactpersoon omdat de primaire donateur overleden is.`
+    : null;
+  const promotionDonorMessage = promotedParent
+    ? `De partner ${memberFullName(promotedParent)} is administratief vastgelegd als primaire contactpersoon voor het huishouden.`
+    : null;
+  const finalInternalNote = [internalNote, promotionInternalNote].filter(Boolean).join("\n");
+  const finalDonorMessage = [donorMessage, promotionDonorMessage].filter(Boolean).join("\n");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.donorProfile.update({
       where: { id: donorId },
       data: {
         status: nextStatus,
@@ -42,21 +63,39 @@ export async function updateDonorStatus(formData: FormData) {
         activeSince: nextStatus === "ACTIVE" ? now : donor.activeSince,
         inactiveSince: nextStatus === "INACTIVE" ? now : donor.inactiveSince,
         deceasedAt: nextStatus === "DECEASED" ? now : donor.deceasedAt,
-        statusInternalNote: internalNote,
-        statusDonorMessage: donorMessage
+        statusInternalNote: finalInternalNote,
+        statusDonorMessage: finalDonorMessage
       }
-    }),
-    prisma.donorStatusHistory.create({
+    });
+    await tx.donorStatusHistory.create({
       data: {
         donorProfileId: donorId,
         changedById: session.user.id,
         fromStatus: donor.status,
         toStatus: nextStatus,
-        internalNote,
-        donorMessage
+        internalNote: finalInternalNote,
+        donorMessage: finalDonorMessage
       }
-    })
-  ]);
+    });
+    await syncFamilyActivityForDonorStatus(tx, donorId, nextStatus);
+    if (promotedParent) {
+      await tx.familyMember.update({
+        where: { id: promotedParent.id },
+        data: { status: "ACTIVE_DEPENDENT", isActive: true, relationship: "Primaire contactpersoon" }
+      });
+      await tx.familyMemberStatusHistory.create({
+        data: {
+          familyMemberId: promotedParent.id,
+          donorProfileId: donorId,
+          changedById: session.user.id,
+          fromStatus: promotedParent.status,
+          toStatus: "ACTIVE_DEPENDENT",
+          internalNote: promotionInternalNote ?? "Automatisch ingesteld als primaire contactpersoon.",
+          donorMessage: promotionDonorMessage ?? "Automatisch ingesteld als primaire contactpersoon."
+        }
+      });
+    }
+  });
 
   await writeAuditLog({
     actorId: session.user.id,
@@ -64,7 +103,7 @@ export async function updateDonorStatus(formData: FormData) {
     entityType: "DonorProfile",
     entityId: donorId,
     message: `Donateurstatus gewijzigd van ${donor.status} naar ${nextStatus}`,
-    metadata: { internalNote, donorMessage }
+    metadata: { internalNote: finalInternalNote, donorMessage: finalDonorMessage, promotedParentId: promotedParent?.id ?? null }
   });
 
   revalidatePath(path);
@@ -128,15 +167,46 @@ export async function updateHouseholdStatuses(formData: FormData) {
     redirect(`${path}&error=Er+is+geen+statuswijziging+gekozen`);
   }
 
+  const promotedParent =
+    nextStatus === "DECEASED"
+      ? donor.familyMembers.find((member) => {
+          if (member.type !== "PARTNER") return false;
+          const planned = familyChanges.find((change) => change.id === member.id);
+          const effectiveStatus = planned?.toStatus ?? member.status;
+          return contributesToHousehold(effectiveStatus) && effectiveStatus !== "DECEASED";
+        })
+      : null;
+  const needsGuardian =
+    nextStatus === "DECEASED" &&
+    !promotedParent &&
+    donor.familyMembers.some((member) => {
+      if (member.type !== "CHILD") return false;
+      const planned = familyChanges.find((change) => change.id === member.id);
+      const effectiveStatus = planned?.toStatus ?? member.status;
+      return effectiveStatus === "UNDER_18";
+    });
+  const promotionInternalNote = promotedParent
+    ? `Partner (${memberFullName(promotedParent)}) automatisch ingesteld als primaire contactpersoon omdat de primaire donateur overleden is.`
+    : null;
+  const promotionDonorMessage = promotedParent
+    ? `De partner ${memberFullName(promotedParent)} is administratief vastgelegd als primaire contactpersoon voor het huishouden.`
+    : null;
+  const guardianInternalNote = needsGuardian ? "Geen actieve partner gevonden; voogd/contactpersoon nodig voor kinderen onder 18." : null;
+  const guardianDonorMessage = needsGuardian ? "Er is administratief vastgelegd dat er een voogd/contactpersoon nodig is voor dit huishouden." : null;
+
   const latestInternalNote = [
     donorStatusChanged ? `Primair (${donor.firstName} ${donor.lastName}): ${primaryInternalNote}` : null,
-    ...familyChanges.map((change) => `${change.name}: ${change.internalNote}`)
+    ...familyChanges.map((change) => `${change.name}: ${change.internalNote}`),
+    promotionInternalNote,
+    guardianInternalNote
   ]
     .filter(Boolean)
     .join("\n");
   const latestDonorMessage = [
     donorStatusChanged ? `Primair (${donor.firstName} ${donor.lastName}): ${primaryDonorMessage}` : null,
-    ...familyChanges.map((change) => `${change.name}: ${change.donorMessage}`)
+    ...familyChanges.map((change) => `${change.name}: ${change.donorMessage}`),
+    promotionDonorMessage,
+    guardianDonorMessage
   ]
     .filter(Boolean)
     .join("\n");
@@ -166,6 +236,7 @@ export async function updateHouseholdStatuses(formData: FormData) {
           donorMessage: primaryDonorMessage
         }
       });
+      await syncFamilyActivityForDonorStatus(tx, donorId, nextStatus);
     } else {
       await tx.donorProfile.update({
         where: { id: donorId },
@@ -226,6 +297,28 @@ export async function updateHouseholdStatuses(formData: FormData) {
         });
       }
     }
+
+    if (donorStatusChanged) {
+      await syncFamilyActivityForDonorStatus(tx, donorId, nextStatus);
+    }
+
+    if (promotedParent) {
+      await tx.familyMember.update({
+        where: { id: promotedParent.id },
+        data: { status: "ACTIVE_DEPENDENT", isActive: true, relationship: "Primaire contactpersoon" }
+      });
+      await tx.familyMemberStatusHistory.create({
+        data: {
+          familyMemberId: promotedParent.id,
+          donorProfileId: donorId,
+          changedById: session.user.id,
+          fromStatus: promotedParent.status,
+          toStatus: "ACTIVE_DEPENDENT",
+          internalNote: promotionInternalNote ?? "Automatisch ingesteld als primaire contactpersoon.",
+          donorMessage: promotionDonorMessage ?? "Automatisch ingesteld als primaire contactpersoon."
+        }
+      });
+    }
   });
 
   await writeAuditLog({
@@ -245,7 +338,9 @@ export async function updateHouseholdStatuses(formData: FormData) {
             donorMessage: primaryDonorMessage
           }
         : null,
-      familyChanges
+      familyChanges,
+      promotedParent: promotedParent ? { id: promotedParent.id, name: memberFullName(promotedParent) } : null,
+      needsGuardian
     }
   });
 
