@@ -6,3 +6,7 @@ node_modules
 dist
 coverage
 .npm-cache
+.vercel-cli-home
+
+.vercel
+.env*

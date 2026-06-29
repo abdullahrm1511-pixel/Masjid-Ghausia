@@ -2,8 +2,8 @@
 
 Project: St. GBC Donateursportaal  
 Organisatie: St. GBC Masjid Ghausia  
-Versie: 1.2  
-Datum: 21 juni 2026
+Versie: 1.3  
+Datum: 29 juni 2026
 
 ## 1. Doel van het portaal
 
@@ -23,7 +23,7 @@ Donateur betekent een persoon die in het systeem staat als lid of donateur van S
 
 Hoofddonateur of primary member betekent de persoon op wie het account en het lidnummer staan.
 
-Lidnummer betekent het registratienummer van de donateur. De opbouw begint met `11-001` tot en met `11-999`. Als die reeks vol is, start de volgende reeks met een extra cijfer: `11-0001` tot en met `11-9999`. Daarna gaat het verder met `11-00001`. `11-054` en `11-0054` zijn dus twee verschillende lidnummers.
+Lidnummer betekent het registratienummer van de donateur. Nieuwe lidnummers beginnen met `11-00001` en lopen daarna oplopend door, bijvoorbeeld `11-00002`, `11-00003` enzovoort.
 
 Lidmaatschap betekent de huishoudlaag onder een lidnummer. Onder een lidmaatschap kunnen een primary member, partner en kinderen vallen.
 
@@ -47,11 +47,9 @@ Auditlog betekent een interne registratie van belangrijke acties, zoals goedkeur
 
 `ACTION_REQUIRED` betekent dat het bestuur extra informatie nodig heeft of een correctie vraagt.
 
-`PAYMENT_REQUIRED` betekent dat de aanvraag is goedgekeurd, maar dat de eerste betaling nog openstaat. Deze groep telt mee bij "Inactief / betaling afwachtend".
-
 `ACTIVE` betekent dat de donateur actief is.
 
-`INACTIVE` betekent dat de donateur administratief niet actief is.
+`INACTIVE` betekent dat de donateur administratief niet actief is. Nieuwe goedgekeurde registraties blijven inactief totdat het restant van de inschrijving 0 euro is.
 
 `REJECTED` betekent dat de aanvraag of donateur is afgewezen.
 
@@ -59,7 +57,7 @@ Auditlog betekent een interne registratie van belangrijke acties, zoals goedkeur
 
 ## 4. Actief, inactief en overleden
 
-Een nieuwe goedgekeurde registratie komt eerst op `PAYMENT_REQUIRED`. Zodra de eerste betaling administratief is verwerkt en het bestuur dit akkoord vindt, kan de donateur actief worden gezet.
+Een nieuwe goedgekeurde registratie komt eerst op `INACTIVE`. Zodra de volledige inschrijfschuld is voldaan en het restant 0 euro is, kan de donateur actief worden gezet.
 
 Inactief betekent dat de donateur niet als actief meetelt. Het dashboardblok "Inactief / betaling afwachtend" telt ook donateurs mee die nog op eerste betaling wachten.
 
@@ -73,9 +71,11 @@ Een nieuwe donateur vult de registratie in stappen in:
 - Partner: gegevens van de partner als die aanwezig is.
 - Kinderen: gegevens van kinderen.
 - Contact: contactpersoon Pakistan en eventuele uitvaartwensen.
-- Bevestiging: verklaringen en akkoord met voorwaarden/privacy.
+- Bevestiging: verklaringen en akkoord met voorwaarden/privacy. De privacy- en voorwaardeninformatie moet eerst volledig naar beneden worden gescrold voordat de akkoord-optie verschijnt.
 
 Na verzenden komt de aanvraag binnen bij het bestuur met status `PENDING`.
+
+Burgerlijke staat wordt bij een nieuwe inschrijving niet apart gevraagd in de eerste stap. Het portaal leidt de standaardsituatie af uit de partnerstap: met partner wordt dit als getrouwd/gezin verwerkt, zonder partner als alleenstaand. Latere administratieve correcties kunnen via beheer of wijzigingsverzoeken worden vastgelegd.
 
 ## 6. Donateur: dashboard en account
 
@@ -140,7 +140,7 @@ Het controlecentrum voert geen aparte nieuwe berekening uit. Het maakt bestaande
 
 De registratiepagina toont nieuwe aanvragen. De admin ziet onder andere naam, status, e-mail, telefoon, adres, geboortedatum, geboorteplaats, geslacht, IBAN, rekeninghouder, partner, kinderen en verklaringen.
 
-Goedkeuren betekent dat er een lidnummer wordt toegekend en de donateur op `PAYMENT_REQUIRED` komt.
+Goedkeuren betekent dat er een lidnummer wordt toegekend en dat de berekende jaarlijkse bijdrage en eenmalige bijdrage worden klaargezet. De donateur blijft `INACTIVE` totdat het restant van de inschrijving 0 euro is.
 
 Correctie vragen zet de aanvraag op `ACTION_REQUIRED` met een bericht voor de donateur en eventueel een interne notitie.
 
@@ -183,6 +183,8 @@ Betalingsregistraties resetten wist ontvangen betalingen, aftrekken, correcties 
 De standaard betaalperiode voor de jaarlijkse bijdrage is 1 januari tot en met 31 maart.
 
 Jaarbetalingen mogen in termijnen binnen hetzelfde jaar worden betaald. Het systeem telt termijnen op. Bij gedeeltelijke betaling blijft het restant zichtbaar.
+
+Voor nieuwe inschrijvingen moet het totaal van de inschrijving volledig betaald zijn voordat de donateur actief wordt. Dit bestaat uit de jaarbijdrage van het inschrijfjaar plus eventuele eenmalige bijdrage.
 
 Na 31 maart kan een boete ontstaan. De standaardboete is 5 euro per maand vanaf april tot en met december zolang de jaarbetaling niet volledig is betaald.
 
@@ -278,9 +280,9 @@ Bij een inschrijving kan een PDF-overzicht worden gegenereerd. Deze PDF bevat ee
 
 Prijsinstellingen bepalen jaarlijkse bijdragen, eenmalige bijdragen, betaalperiode en boete.
 
-Jaarlijkse bijdragen kunnen verschillen voor individuele volwassenen, gezinssituaties en alleenstaande ouder met kinderen.
+Jaarlijkse bijdragen kunnen verschillen voor individuele volwassenen, gezinssituaties en alleenstaande ouder met kinderen. Standaard is individueel 72 euro per jaar en gezin/gehuwd 144 euro per jaar.
 
-Eenmalige bijdragen kunnen verschillen per leeftijdsgroep.
+Eenmalige bijdragen kunnen verschillen per leeftijdsgroep. Standaard betalen 0 tot en met 18 jaar geen eenmalige bijdrage. Vanaf 19 jaar start de eerste eenmalige leeftijdsschijf met 150 euro.
 
 Als instellingen worden aangepast, veranderen bestaande handmatig geimporteerde of geregistreerde betalingen niet automatisch.
 
@@ -341,7 +343,7 @@ Online betalen staat niet actief in het portaal.
 
 E-mails worden niet automatisch verzonden. Ze worden voorbereid in de e-maillog.
 
-De overgang van `PAYMENT_REQUIRED` naar `ACTIVE` moet bestuurlijk en administratief goed worden afgesproken.
+De overgang van `INACTIVE` naar `ACTIVE` bij nieuwe registraties mag pas plaatsvinden wanneer het restant van de inschrijving 0 euro is.
 
 De lokale bankomschrijving-parser kan varianten herkennen, maar is geen garantie dat elke omschrijving correct wordt begrepen. Daarom bestaat de preview en controle-nodig werkwijze.
 

@@ -2,8 +2,8 @@
 
 Organisatie: St. GBC Masjid Ghausia  
 Portaal: St. GBC Donateursportaal  
-Versie: 1.2  
-Datum: 21 juni 2026  
+Versie: 1.3  
+Datum: 29 juni 2026  
 Contact privacy: [vul e-mailadres of contactpersoon in]
 
 ## 1. Doel van dit beleid
@@ -30,7 +30,7 @@ Het portaal kan de volgende gegevens verwerken:
 - Naam, e-mailadres en telefoonnummer.
 - Adres, postcode, woonplaats en land.
 - Geboortedatum en geboorteplaats.
-- Geslacht en burgerlijke staat.
+- Geslacht en, waar administratief nodig, burgerlijke staat of gezinssituatie.
 - IBAN en naam rekeninghouder.
 - Lidnummer of registratienummer.
 - Partner- en kindgegevens, zoals naam, geboortedatum, geboorteplaats en relatie.
@@ -83,11 +83,9 @@ Voor gevoelige of bijzondere informatie, zoals uitvaartwensen, geldt dat deze al
 
 `ACTION_REQUIRED` betekent dat het bestuur extra informatie of een correctie nodig heeft.
 
-`PAYMENT_REQUIRED` betekent dat de inschrijving is goedgekeurd, maar dat de eerste betaling nog nodig is.
-
 `ACTIVE` betekent dat de donateur actief is.
 
-`INACTIVE` betekent dat de donateur niet actief is of administratief niet meetelt.
+`INACTIVE` betekent dat de donateur niet actief is of administratief niet meetelt. Nieuwe goedgekeurde inschrijvingen blijven inactief totdat het restant van de inschrijving 0 euro is.
 
 `REJECTED` betekent dat een inschrijving of donateur is afgewezen.
 
@@ -105,9 +103,11 @@ Als een bankomschrijving geen lidnummer bevat of het lidnummer niet bestaat, wor
 
 Bankbetalingen kunnen in termijnen worden verwerkt. Meerdere betalingen voor hetzelfde jaar kunnen worden opgeteld. Als niet volledig is betaald, blijft het restant zichtbaar.
 
+Bij nieuwe inschrijvingen wordt de donateur pas actief nadat de inschrijfschuld volledig is voldaan. Deze schuld bestaat uit de jaarbijdrage van het inschrijfjaar plus eventuele eenmalige bijdrage.
+
 Na de betaalperiode kan het systeem leden zonder volledige jaarbetaling administratief op `INACTIVE` zetten en een open bedrag inclusief boete registreren. Het oude lidnummer en de historie blijven bewaard.
 
-Bestaande geimporteerde donateurs krijgen geen eenmalige inschrijfschuld. De eenmalige bijdrage geldt alleen voor nieuwe inschrijvingen via het portaal.
+Bestaande geimporteerde donateurs krijgen geen eenmalige inschrijfschuld. De eenmalige bijdrage geldt alleen voor nieuwe inschrijvingen via het portaal. Standaard betalen 0 tot en met 18 jaar geen eenmalige bijdrage; vanaf 19 jaar start de eerste eenmalige leeftijdsschijf.
 
 ## 8. Controlecentrum
 

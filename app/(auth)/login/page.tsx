@@ -1,14 +1,19 @@
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
-import { signIn, auth } from "@/lib/auth";
+import { auth, signIn } from "@/lib/auth";
 import { isAdminRole } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 async function loginAction(formData: FormData) {
   "use server";
 
+  const email = String(formData.get("email") ?? "").toLowerCase();
+
   try {
     await signIn("credentials", {
-      email: String(formData.get("email") ?? ""),
+      email,
       password: String(formData.get("password") ?? ""),
       redirect: false
     });
@@ -19,8 +24,12 @@ async function loginAction(formData: FormData) {
     throw error;
   }
 
-  const session = await auth();
-  if (isAdminRole(session?.user.role)) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { role: true }
+  });
+
+  if (isAdminRole(user?.role)) {
     redirect("/admin");
   }
   redirect("/dashboard");
@@ -32,6 +41,15 @@ export default async function LoginPage({
   searchParams: Promise<{ registered?: string; error?: string }>;
 }) {
   const params = await searchParams;
+  const session = await auth();
+
+  if (isAdminRole(session?.user.role)) {
+    redirect("/admin");
+  }
+
+  if (session?.user.role === "DONOR") {
+    redirect("/dashboard");
+  }
 
   return (
     <main className="mx-auto max-w-md px-4 py-12">

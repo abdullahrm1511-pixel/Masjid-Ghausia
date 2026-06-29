@@ -1,0 +1,14 @@
+node_modules
+.next
+.next-build
+.npm-cache
+.vercel-cli-home
+.vercel
+.git
+.env
+.env.*
+!.env.example
+dist
+coverage
+tsconfig.tsbuildinfo
+.vercel-login.ps1

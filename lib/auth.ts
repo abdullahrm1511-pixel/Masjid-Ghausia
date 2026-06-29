@@ -11,6 +11,14 @@ const loginSchema = z.object({
   password: z.string().min(1)
 });
 
+async function userAccess(userId?: string | null) {
+  if (!userId) return null;
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, isActive: true }
+  });
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   trustHost: true,
@@ -61,16 +69,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
+        token.isActive = true;
+        return token;
       }
+
+      const access = await userAccess(token.sub);
+      if (!access?.isActive) {
+        token.role = undefined;
+        token.isActive = false;
+        return token;
+      }
+      token.role = access.role;
+      token.isActive = true;
       return token;
     },
-    session({ session, token }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.role = (token.role ?? "DONOR") as UserRole;
+        const access = await userAccess(token.sub);
+        session.user.role = (access?.isActive ? access.role : token.role ?? "DONOR") as UserRole;
       }
       return session;
     }

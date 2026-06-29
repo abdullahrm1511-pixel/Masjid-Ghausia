@@ -9,6 +9,7 @@
     "lint": "next lint",
     "db": "node prisma/seed.cjs",
     "db:reset-data": "node scripts/reset-database.cjs",
+    "db:reset-counter": "node scripts/reset-registration-counter.cjs",
     "prisma:generate": "prisma generate",
     "prisma:format": "prisma format"
   },
