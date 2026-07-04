@@ -1,5 +1,7 @@
+import { readFile } from "fs/promises";
+import path from "path";
 import type { DonorProfile, FamilyMember, RegistrationRequest, User } from "@prisma/client";
-import { formatDateWithAge } from "@/lib/display";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatIban } from "@/lib/iban";
 
 type RegistrationWithDetails = RegistrationRequest & {
@@ -7,148 +9,141 @@ type RegistrationWithDetails = RegistrationRequest & {
   donorProfile: (DonorProfile & { familyMembers: FamilyMember[] }) | null;
 };
 
-function pdfEscape(input: string) {
-  return input.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+type SubmittedRegistrationData = {
+  donationAmount?: number | string | null;
+  healthDeclaration?: boolean;
+  legalResidence?: boolean;
+  termsAccepted?: boolean;
+};
+
+function formatDateOnly(date?: Date | null) {
+  if (!date) return "";
+  return date.toLocaleDateString("nl-NL");
 }
 
-function wrapLine(input: string, maxLength = 92) {
-  const words = input.split(" ");
-  const lines: string[] = [];
-  let current = "";
+function formatMoney(value?: number | string | null) {
+  const amount = Number(String(value ?? 0).replace(",", "."));
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  return amount.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
+function fullName(person?: { firstName?: string | null; lastName?: string | null } | null) {
+  return [person?.firstName, person?.lastName].filter(Boolean).join(" ");
+}
+
+function setText(form: ReturnType<PDFDocument["getForm"]>, name: string, value?: string | null, fontSize = 10) {
+  if (!value) return;
+  try {
+    const field = form.getTextField(name);
+    field.setText(value);
+    field.setFontSize(fontSize);
+  } catch {
+    // The source PDF has a few unnamed/legacy fields. Missing fields should not block PDF generation.
+  }
+}
+
+function drawWrappedText(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, maxWidth: number, size = 10) {
+  const words = text.split(/\s+/);
+  let line = "";
+  let cursorY = y;
   for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > maxLength && current) {
-      lines.push(current);
-      current = word;
+    const next = line ? `${line} ${word}` : word;
+    if (next.length * size * 0.52 > maxWidth && line) {
+      page.drawText(line, { x, y: cursorY, size, color: rgb(0.08, 0.1, 0.16) });
+      cursorY -= size + 5;
+      line = word;
     } else {
-      current = next;
+      line = next;
     }
   }
-
-  if (current) lines.push(current);
-  return lines.length ? lines : [""];
+  if (line) page.drawText(line, { x, y: cursorY, size, color: rgb(0.08, 0.1, 0.16) });
 }
 
-function createPdf(lines: string[]) {
-  const linesPerPage = 48;
-  const pages = Array.from({ length: Math.max(1, Math.ceil(lines.length / linesPerPage)) }, (_, index) =>
-    lines.slice(index * linesPerPage, (index + 1) * linesPerPage)
-  );
-
-  const objects: string[] = [];
-  const addObject = (body: string) => {
-    objects.push(body);
-    return objects.length;
-  };
-
-  const fontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-  const pageIds: number[] = [];
-  const pagePlaceholders: Array<{ id: number; content: string }> = [];
-
-  for (const pageLines of pages) {
-    const stream = [
-      "BT",
-      "/F1 11 Tf",
-      "14 TL",
-      "50 800 Td",
-      ...pageLines.flatMap((line) => [`(${pdfEscape(line)}) Tj`, "T*"]),
-      "ET"
-    ].join("\n");
-    const contentId = addObject(`<< /Length ${Buffer.byteLength(stream, "utf8")} >>\nstream\n${stream}\nendstream`);
-    const pageId = addObject("");
-    pageIds.push(pageId);
-    pagePlaceholders.push({ id: pageId, content: `<< /Type /Page /Parent 0 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>` });
-  }
-
-  const pagesId = addObject(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`);
-  const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
-
-  for (const placeholder of pagePlaceholders) {
-    objects[placeholder.id - 1] = placeholder.content.replace("/Parent 0 0 R", `/Parent ${pagesId} 0 R`);
-  }
-
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((body, index) => {
-    offsets.push(Buffer.byteLength(pdf, "utf8"));
-    pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
-  });
-
-  const xrefStart = Buffer.byteLength(pdf, "utf8");
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (let index = 1; index < offsets.length; index += 1) {
-    pdf += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-
-  return Buffer.from(pdf, "utf8");
-}
-
-function yesNo(value?: boolean) {
-  return value ? "Ja" : "Nee";
-}
-
-export function buildRegistrationSummaryLines(request: RegistrationWithDetails) {
+export async function createRegistrationSummaryPdf(request: RegistrationWithDetails) {
+  const templatePath = path.join(process.cwd(), "public", "templates", "inschrijf-formulier-stgbc.pdf");
+  const template = await readFile(templatePath);
+  const pdfDoc = await PDFDocument.load(template);
+  const form = pdfDoc.getForm();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const donor = request.donorProfile;
-  const submitted = request.submittedData as {
-    healthDeclaration?: boolean;
-    legalResidence?: boolean;
-    termsAccepted?: boolean;
-  };
 
   if (!donor) {
-    return ["Inschrijfoverzicht St. GBC", "", "Geen donateursprofiel gevonden bij deze inschrijving."];
+    return Buffer.from(await pdfDoc.save());
   }
 
+  const submitted = request.submittedData as SubmittedRegistrationData;
   const partner = donor.familyMembers.find((member) => member.type === "PARTNER");
   const children = donor.familyMembers.filter((member) => member.type === "CHILD");
-  const rawLines = [
-    "Inschrijfoverzicht St. GBC",
-    "",
-    `Inzenddatum: ${(request.submittedAt ?? request.createdAt).toLocaleDateString("nl-NL")}`,
-    `Status: ${request.status}`,
-    "",
-    "Hoofddonateur",
-    `Naam: ${donor.firstName} ${donor.lastName}`,
-    `E-mail: ${request.requestedBy.email}`,
-    `Telefoon: ${donor.phone}`,
-    `Adres: ${donor.addressLine1}, ${donor.postalCode} ${donor.city}`,
-    `Geboortedatum: ${formatDateWithAge(donor.dateOfBirth)}`,
-    `Geboorteplaats: ${donor.birthPlace}`,
-    `Geslacht: ${donor.gender ?? "-"}`,
-    `Burgerlijke staat: ${donor.maritalStatus ?? "-"}`,
-    `IBAN: ${formatIban(donor.iban)}`,
-    `Rekeninghouder: ${donor.accountHolderName}`,
-    "",
-    "Partner",
-    partner
-      ? `${partner.firstName} ${partner.lastName}, geboren op ${formatDateWithAge(partner.dateOfBirth)} te ${partner.birthPlace ?? "-"}`
-      : "Geen partner opgegeven.",
-    "",
-    "Kinderen",
-    ...(children.length
-      ? children.map((child, index) => `${index + 1}. ${child.firstName} ${child.lastName}, geboren op ${formatDateWithAge(child.dateOfBirth)} te ${child.birthPlace ?? "-"}`)
-      : ["Geen kinderen opgegeven."]),
-    "",
-    "Contact Pakistan",
-    `Naam: ${donor.pakistanContactName || "-"}`,
-    `Telefoon: ${donor.pakistanContactPhone || "-"}`,
-    "",
-    "Uitvaartwensen",
-    donor.funeralWishes || "-",
-    "",
-    "Verklaringen",
-    `Gezondheidsverklaring geaccepteerd: ${yesNo(submitted.healthDeclaration)}`,
-    `Verblijf in Nederland bevestigd: ${yesNo(submitted.legalResidence)}`,
-    `Voorwaarden en privacy akkoord: ${yesNo(submitted.termsAccepted)}`,
-    "",
-    "Dit document is een kopie van de ingevulde inschrijving."
-  ];
+  const donation = formatMoney(submitted.donationAmount);
+  const today = formatDateOnly(request.submittedAt ?? request.createdAt);
+  const applicantName = fullName(donor);
+  const address = [donor.addressLine1, donor.addressLine2].filter(Boolean).join(", ");
+  const postalCity = [donor.postalCode, donor.city].filter(Boolean).join(" ");
 
-  return rawLines.flatMap((line) => wrapLine(line));
-}
+  setText(form, "Jaarlijks donatie €", donation);
+  setText(form, "undefined", applicantName);
+  setText(form, "undefined_2", address);
+  setText(form, "Postcodeplaats", postalCity);
+  setText(form, "undefined_3", donor.phone);
+  setText(form, "Geboortedatum", formatDateOnly(donor.dateOfBirth));
+  setText(form, "Geboorteplaats", donor.birthPlace);
+  setText(form, "IBAN Rekening nr", formatIban(donor.iban));
+  setText(form, "undefined_4", fullName(partner));
+  setText(form, "Geboortedatum_2", formatDateOnly(partner?.dateOfBirth));
+  setText(form, "Geboorteplaats_2", partner?.birthPlace);
+  setText(form, "undefined_8", donor.pakistanContactName);
+  setText(form, "undefined_9", donor.pakistanContactPhone);
+  setText(form, "Begrafeniswensen", donor.funeralWishes);
+  setText(form, "Datum", today);
+  setText(form, "Akkoord aanvrager", applicantName);
 
-export function createRegistrationSummaryPdf(request: RegistrationWithDetails) {
-  return createPdf(buildRegistrationSummaryLines(request));
+  children.slice(0, 3).forEach((child, index) => {
+    const nameField = ["undefined_5", "undefined_6", "undefined_7"][index];
+    const dateField = ["Geboortedatum_3", "Geboortedatum_4", "Geboortedatum_5"][index];
+    setText(form, nameField, fullName(child), 9);
+    setText(form, dateField, formatDateOnly(child.dateOfBirth), 9);
+  });
+
+  setText(form, "Naam", applicantName);
+  setText(form, "Adres", address);
+  setText(form, "Post Code Woonplaats", postalCity);
+  setText(form, "Tel nr", donor.phone);
+  setText(form, "BankGiro Nummer", formatIban(donor.iban));
+  setText(form, "Naam Rekening houder", donor.accountHolderName);
+
+  if (children.length > 3) {
+    const page = pdfDoc.insertPage(2, [595, 842]);
+    page.drawText("Aanvullende kinderen", { x: 50, y: 790, size: 18, color: rgb(0.03, 0.22, 0.42) });
+    page.drawText("Deze kinderen zijn aanvullend op de eerste drie kinderen op het inschrijfformulier.", {
+      x: 50,
+      y: 765,
+      size: 10,
+      color: rgb(0.29, 0.33, 0.41)
+    });
+    let y = 725;
+    children.slice(3).forEach((child, index) => {
+      drawWrappedText(
+        page,
+        `${index + 4}. ${fullName(child)} - geboren op ${formatDateOnly(child.dateOfBirth)} te ${child.birthPlace || "-"}`,
+        50,
+        y,
+        495,
+        11
+      );
+      y -= 34;
+    });
+  }
+
+  form.updateFieldAppearances(font);
+  form.flatten();
+
+  const pages = pdfDoc.getPages();
+  if (donation) {
+    pages[0]?.drawText(donation, { x: 420, y: 722, size: 10, color: rgb(0.08, 0.1, 0.16) });
+    pages[1]?.drawText(donation, { x: 165, y: 360, size: 10, color: rgb(0.08, 0.1, 0.16) });
+  }
+  pages[0]?.drawText(request.requestedBy.email, { x: 300, y: 569, size: 9, color: rgb(0.08, 0.1, 0.16) });
+  pages[1]?.drawText(request.requestedBy.email, { x: 105, y: 389, size: 10, color: rgb(0.08, 0.1, 0.16) });
+
+  return Buffer.from(await pdfDoc.save());
 }

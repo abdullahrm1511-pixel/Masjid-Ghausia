@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return new NextResponse("Registratie niet gevonden", { status: 404 });
   }
 
-  const pdf = createRegistrationSummaryPdf(registration);
+  const pdf = await createRegistrationSummaryPdf(registration);
   return new NextResponse(pdf, {
     headers: {
       "Content-Type": "application/pdf",

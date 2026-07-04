@@ -18,8 +18,8 @@ export default async function HomePage() {
     <main className="mx-auto grid min-h-[calc(100vh-73px)] max-w-6xl content-center px-4 py-12">
       <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-7 shadow-sm">
         <div className="mb-5 flex items-center gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <Image alt="Masjid Ghausia logo" className="h-full w-full object-cover" height={64} src="/masjid-ghausia-logo.png" width={64} />
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#1483d6]">
+            <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={64} src="/masjid-ghausia-logo.png" width={64} />
           </span>
           <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">St. GBC Masjid Ghausia</p>
         </div>

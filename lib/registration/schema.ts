@@ -3,6 +3,15 @@ import { isValidIban, normalizeIban } from "@/lib/iban";
 
 const requiredText = z.string().trim().min(1, "Dit veld is verplicht");
 const optionalText = z.string().trim().optional().or(z.literal(""));
+const optionalAmount = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(""))
+  .transform((value) => {
+    if (!value) return 0;
+    return Number(value.replace(",", "."));
+  });
 
 export const familyMemberSchema = z.object({
   type: z.enum(["PARTNER", "CHILD"]),
@@ -37,6 +46,7 @@ export const registrationBaseSchema = z.object({
   pakistanContactName: optionalText,
   pakistanContactPhone: optionalText,
   funeralWishes: optionalText,
+  donationAmount: optionalAmount,
   healthDeclaration: z.boolean().default(false),
   legalResidence: z.boolean().default(false),
   termsAccepted: z.boolean().default(false)
@@ -63,6 +73,20 @@ export const registrationSubmitSchema = registrationBaseSchema.superRefine((data
       code: z.ZodIssueCode.custom,
       path: ["iban"],
       message: "Vul een geldige Nederlandse IBAN in"
+    });
+  }
+  if (!Number.isFinite(data.donationAmount) || data.donationAmount < 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["donationAmount"],
+      message: "Vul een geldig donatiebedrag in"
+    });
+  }
+  if (data.donationAmount > 0 && data.donationAmount < 5) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["donationAmount"],
+      message: "Het minimum donatiebedrag is €5"
     });
   }
   if (data.hasPartner === "yes" && !data.partner) {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
+import { EmailLogOverview } from "@/components/admin/EmailLogOverview";
 import { syncAdultChildTransitions } from "@/lib/adult-child-transitions";
 import { auth } from "@/lib/auth";
 import { ageLabel, displayEmail, formatCurrency, formatDate, formatDateWithAge } from "@/lib/display";
@@ -18,6 +19,7 @@ const tabs = [
   ["Personalia", "personal"],
   ["Gezin", "family"],
   ["Betalingen", "payments"],
+  ["E-mails", "emails"],
   ["Wijzigingen", "changes"],
   ["Statushistorie", "history"],
   ["Status aanpassen", "status"]
@@ -49,6 +51,11 @@ export default async function DonorDetailPage({
   if (!donor) {
     notFound();
   }
+  const emailLogs = await prisma.emailLog.findMany({
+    where: { recipient: donor.user.email },
+    orderBy: { createdAt: "desc" },
+    take: 100
+  });
 
   const paidTotal = donor.paymentObligations.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountCents, 0);
   const dueTotal = donor.paymentObligations
@@ -299,6 +306,12 @@ export default async function DonorDetailPage({
                   </tbody>
                 </table>
               </div>
+            </section>
+          ) : null}
+
+          {safeActiveTab === "emails" ? (
+            <section className="mt-4">
+              <EmailLogOverview logs={emailLogs} emptyMessage="Voor deze gebruiker zijn nog geen e-mails geregistreerd." />
             </section>
           ) : null}
 

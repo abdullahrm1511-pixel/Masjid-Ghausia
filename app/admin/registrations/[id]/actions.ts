@@ -35,6 +35,9 @@ export async function approveRegistration(formData: FormData) {
   const now = new Date();
   const pricing = await getPricingConfig();
   const currentYear = now.getFullYear();
+  const submittedData = request.submittedData as { donationAmount?: number | string | null };
+  const donationAmount = Number(String(submittedData.donationAmount ?? 0).replace(",", "."));
+  const donationAmountCents = Number.isFinite(donationAmount) && donationAmount >= 5 ? Math.round(donationAmount * 100) : 0;
   const annualAmountCents = calculateCurrentAnnualAmount(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
   const oneTimeAmountCents = calculateTotalOneTimeContribution(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
   const hasCurrentAnnualObligation = request.donorProfile.paymentObligations.some(
@@ -43,6 +46,7 @@ export async function approveRegistration(formData: FormData) {
       ((item.dueDate ?? item.paidAt ?? item.createdAt).getFullYear() === currentYear || item.lidnummer === `${registrationNumber}-${currentYear}`)
   );
   const hasOneTimeObligation = request.donorProfile.paymentObligations.some((item) => item.obligationType === "ONE_TIME");
+  const hasDonationObligation = request.donorProfile.paymentObligations.some((item) => item.source === "REGISTRATION_APPROVAL_DONATION");
 
   await prisma.$transaction([
     prisma.donorProfile.update({
@@ -98,6 +102,22 @@ export async function approveRegistration(formData: FormData) {
               dueDate: oneTimePaymentDeadline(now),
               source: "REGISTRATION_APPROVAL_ONE_TIME",
               notes: "Eenmalige bijdrage aangemaakt bij registratiegoedkeuring."
+            }
+          })
+        ]
+      : []),
+    ...(donationAmountCents > 0 && !hasDonationObligation
+      ? [
+          prisma.paymentObligation.create({
+            data: {
+              donorProfileId: request.donorProfile.id,
+              lidnummer: `${registrationNumber}-${currentYear}-DONATIE`,
+              obligationType: "ANNUAL",
+              amountCents: donationAmountCents,
+              status: "DUE",
+              dueDate: now,
+              source: "REGISTRATION_APPROVAL_DONATION",
+              notes: `Donatie aangemaakt bij registratiegoedkeuring voor ${currentYear}.`
             }
           })
         ]

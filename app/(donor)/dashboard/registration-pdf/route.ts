@@ -24,7 +24,7 @@ export async function GET() {
     return new NextResponse("Geen inschrijving gevonden", { status: 404 });
   }
 
-  const pdf = createRegistrationSummaryPdf(request);
+  const pdf = await createRegistrationSummaryPdf(request);
   return new NextResponse(pdf, {
     headers: {
       "Content-Type": "application/pdf",

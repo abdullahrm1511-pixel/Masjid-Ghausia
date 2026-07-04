@@ -186,6 +186,13 @@ export function RegisterForm({ error }: { error?: string }) {
 
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 4 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Bevestiging</h2>
+        <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
+          <h3 className="font-bold text-slate-900">Donatie</h3>
+          <label>
+            Donatiebedrag
+            <input name="donationAmount" type="number" min="0" step="0.01" placeholder="0,00" defaultValue={field("donationAmount")} />
+          </label>
+        </div>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="healthDeclaration" type="checkbox" defaultChecked={field("healthDeclaration") === "on"} /> Gezondheidsverklaring bevestigd</label>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="legalResidence" type="checkbox" defaultChecked={field("legalResidence") === "on"} /> Verblijf in Nederland bevestigd</label>
         <div className="grid gap-3">
@@ -214,6 +221,14 @@ export function RegisterForm({ error }: { error?: string }) {
               </p>
             </div>
           </div>
+          <a
+            className="rounded-md border border-[#1483d6] bg-white px-4 py-3 text-sm font-bold text-[#0f5f9f] hover:bg-blue-50"
+            href="/documents/reglement-stgbc-13-02-2026.pdf"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Reglement St. GBC openen of downloaden
+          </a>
           {privacyScrolled ? (
             <label className="flex grid-cols-none flex-row items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-medium text-emerald-950">
               <input className="w-auto" name="termsAccepted" type="checkbox" defaultChecked={field("termsAccepted") === "on"} /> Voorwaarden en privacy akkoord

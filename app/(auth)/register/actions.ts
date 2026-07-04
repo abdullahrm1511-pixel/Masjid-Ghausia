@@ -34,6 +34,7 @@ const fieldLabels: Record<string, string> = {
   confirmPassword: "Wachtwoord bevestigen",
   partner: "Partner",
   children: "Kinderen",
+  donationAmount: "Donatie",
   healthDeclaration: "Gezondheidsverklaring",
   legalResidence: "Verblijf in Nederland",
   termsAccepted: "Voorwaarden en privacy"
@@ -170,6 +171,7 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     pakistanContactName: value(formData, "pakistanContactName"),
     pakistanContactPhone: value(formData, "pakistanContactPhone"),
     funeralWishes: value(formData, "funeralWishes"),
+    donationAmount: value(formData, "donationAmount"),
     healthDeclaration: formData.get("healthDeclaration") === "on",
     legalResidence: formData.get("legalResidence") === "on",
     termsAccepted: formData.get("termsAccepted") === "on"
@@ -305,7 +307,7 @@ export async function submitRegistration(_previous: RegistrationState, formData:
       donorProfile: { include: { familyMembers: true } }
     }
   });
-  const registrationPdf = registrationSummary ? createRegistrationSummaryPdf(registrationSummary) : null;
+  const registrationPdf = registrationSummary ? await createRegistrationSummaryPdf(registrationSummary) : null;
 
   const templateData = {
     naam: `${data.firstName} ${data.lastName}`.trim(),

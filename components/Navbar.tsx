@@ -35,8 +35,8 @@ export function Navbar({ session }: { session: Session | null }) {
     <header className="sticky top-0 z-30 border-b border-[#0f5f9f] bg-[#1483d6] shadow-sm">
       <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-3 lg:flex lg:items-center lg:justify-between">
         <Link href="/" className="flex min-w-0 items-center gap-3 leading-tight">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-white/40">
-            <Image alt="Masjid Ghausia logo" className="h-full w-full object-cover" height={44} src="/masjid-ghausia-logo.png" width={44} />
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1483d6]">
+            <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={48} src="/masjid-ghausia-logo.png" width={48} />
           </span>
           <span className="grid min-w-0">
             <span className="truncate text-lg font-black text-white">Masjid Ghausia</span>
