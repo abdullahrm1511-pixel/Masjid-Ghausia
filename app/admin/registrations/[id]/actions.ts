@@ -122,7 +122,7 @@ export async function approveRegistration(formData: FormData) {
               status: "DUE",
               dueDate: now,
               source: "REGISTRATION_APPROVAL_DONATION",
-              notes: `Donatie aangemaakt bij registratiegoedkeuring voor ${currentYear}.`
+              notes: "Maandelijkse moskee donatie aangemaakt bij registratiegoedkeuring."
             }
           })
         ]
@@ -170,6 +170,7 @@ export async function approveRegistration(formData: FormData) {
     eenmalig_bedrag: formatEuroCents(oneTimeAmountCents),
     jaarlijks_bedrag: formatEuroCents(annualAmountCents),
     donatie_bedrag: formatEuroCents(donationAmountCents),
+    rekeningnummer: "NL72ABNA0808763342",
     organisatie: "St. GBC Masjid Ghausia"
   };
 

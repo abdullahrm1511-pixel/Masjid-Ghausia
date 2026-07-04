@@ -8,6 +8,7 @@ export const EMAIL_PLACEHOLDERS = [
   "eenmalig_bedrag",
   "jaarlijks_bedrag",
   "donatie_bedrag",
+  "rekeningnummer",
   "betaaldatum",
   "reden",
   "correctiebericht",
@@ -114,10 +115,13 @@ Uw lidnummer is:
 {{lidnummer}}
 
 Openstaande bedragen:
-Eenmalig bedrag: {{eenmalig_bedrag}}
-Jaarlijks bedrag: {{jaarlijks_bedrag}}
-Eenmalige donatie: {{donatie_bedrag}}
+Eenmalig donatie: {{eenmalig_bedrag}}
+Jaarlijks donatie: {{jaarlijks_bedrag}}
+Maandelijkse moskee donatie: {{donatie_bedrag}}
 Totaal: {{bedrag}}
+
+Rekeningnummer:
+{{rekeningnummer}}
 
 In de aparte bijlage vindt u een PDF-kopie van uw ingevulde inschrijving.
 

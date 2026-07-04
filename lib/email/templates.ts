@@ -29,7 +29,8 @@ export async function ensureDefaultEmailTemplates() {
     DEFAULT_EMAIL_TEMPLATES.map(async (template) => {
       const existing = await prisma.emailTemplate.findUnique({ where: { key: template.key } });
       const shouldRefreshBody =
-        (template.key === "REGISTRATION_APPROVED_PAYMENT_REQUIRED" && !existing?.bodyText?.includes("{{eenmalig_bedrag}}")) ||
+        (template.key === "REGISTRATION_APPROVED_PAYMENT_REQUIRED" &&
+          (!existing?.bodyText?.includes("{{eenmalig_bedrag}}") || !existing?.bodyText?.includes("{{rekeningnummer}}"))) ||
         (template.key === "REGISTRATION_ANSWERS_COPY" && !existing?.bodyText?.includes("{{lidnummer}}"));
 
       return prisma.emailTemplate.upsert({
