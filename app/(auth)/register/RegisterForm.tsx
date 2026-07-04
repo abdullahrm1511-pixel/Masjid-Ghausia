@@ -49,7 +49,8 @@ const privacyText = [
 export function RegisterForm({ error }: { error?: string }) {
   const [state, formAction] = useActionState<RegistrationState, FormData>(submitRegistration, {
     errors: error ? [error] : [],
-    values: {}
+    values: {},
+    verificationRequired: false
   });
   const [hasPartner, setHasPartner] = useState("no");
   const [hasChildren, setHasChildren] = useState("no");
@@ -79,8 +80,9 @@ export function RegisterForm({ error }: { error?: string }) {
       )
     );
     setChildren(nextChildren);
-    setStep(0);
-  }, [state.values]);
+    setPrivacyScrolled(state.values.termsAccepted === "on");
+    setStep(state.verificationRequired ? 4 : 0);
+  }, [state.values, state.verificationRequired]);
 
   const maritalStatus = hasPartner === "yes" ? "MARRIED" : "SINGLE";
 
@@ -92,6 +94,11 @@ export function RegisterForm({ error }: { error?: string }) {
           {state.errors.map((message) => (
             <p key={message}>{message}</p>
           ))}
+        </div>
+      ) : null}
+      {state.message ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+          {state.message}
         </div>
       ) : null}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
@@ -217,6 +224,25 @@ export function RegisterForm({ error }: { error?: string }) {
             </p>
           )}
         </div>
+        {state.verificationRequired ? (
+          <div className="grid gap-2 rounded-md border border-[#1483d6]/25 bg-blue-50 p-4">
+            <label className="font-semibold text-slate-900">
+              Verificatiecode uit uw e-mail
+              <input
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={6}
+                name="verificationCode"
+                pattern="[0-9]{6}"
+                placeholder="123456"
+                required
+              />
+            </label>
+            <p className="text-sm text-slate-600">
+              De code is 15 minuten geldig. Na een verlopen code kunt u het formulier opnieuw indienen om een nieuwe code te ontvangen.
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-3 border-t border-slate-200 bg-[#f6f8fb]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:flex-wrap sm:justify-between sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
@@ -229,7 +255,7 @@ export function RegisterForm({ error }: { error?: string }) {
           </button>
         ) : (
           <button className="rounded-md bg-[#1483d6] px-5 py-3 font-semibold text-white hover:bg-[#0f5f9f] disabled:bg-slate-300 disabled:text-slate-600" disabled={!privacyScrolled} type="submit">
-            Inschrijving indienen
+            {state.verificationRequired ? "Code controleren en indienen" : "Verificatiecode ontvangen"}
           </button>
         )}
       </div>

@@ -12,11 +12,13 @@ export const EMAIL_PLACEHOLDERS = [
   "contact_email",
   "organisatie",
   "verification_link",
+  "verification_code",
   "reset_link"
 ] as const;
 
 export type EmailTemplateKey =
   | "EMAIL_VERIFICATION"
+  | "REGISTRATION_VERIFICATION_CODE"
   | "REGISTRATION_RECEIVED"
   | "REGISTRATION_ANSWERS_COPY"
   | "REGISTRATION_APPROVED_PAYMENT_REQUIRED"
@@ -47,6 +49,23 @@ Bedankt voor uw registratie bij het St. GBC Donateursportaal.
 
 Klik op onderstaande link om uw e-mailadres te bevestigen:
 {{verification_link}}
+
+Met vriendelijke groet,
+St. GBC Masjid Ghausia`
+  },
+  {
+    key: "REGISTRATION_VERIFICATION_CODE",
+    name: "Registratiecode per e-mail",
+    subject: "Uw verificatiecode voor het St. GBC Donateursportaal",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Gebruik onderstaande code om uw registratie af te ronden:
+
+{{verification_code}}
+
+Deze code is 15 minuten geldig.
+
+Als u deze registratie niet bent gestart, kunt u deze e-mail negeren.
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`

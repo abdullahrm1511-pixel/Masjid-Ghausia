@@ -29,7 +29,7 @@ async function main() {
     create: {
       userId: user.id,
       displayName: "St. GBC Admin",
-      twoFactorRequired: true,
+      twoFactorRequired: false,
       twoFactorEnabled: false
     }
   });

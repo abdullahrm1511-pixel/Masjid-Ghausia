@@ -1,15 +1,19 @@
 "use server";
 
+import { createHash, randomInt } from "crypto";
 import { hash } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { registrationSubmitSchema } from "@/lib/registration/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { prepareEmailLog } from "@/lib/email/templates";
+import { createRegistrationSummaryPdf } from "@/lib/pdf/registration-summary";
 
 export type RegistrationState = {
   errors: string[];
   values: Record<string, string>;
+  verificationRequired?: boolean;
+  message?: string;
 };
 
 const fieldLabels: Record<string, string> = {
@@ -61,6 +65,62 @@ function dateValue(input: string) {
     return new Date();
   }
   return date;
+}
+
+function verificationIdentifier(email: string) {
+  return `registration:${email}`;
+}
+
+function hashVerificationCode(email: string, code: string) {
+  return createHash("sha256").update(`${email}:${code}`).digest("hex");
+}
+
+function generateVerificationCode() {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+async function sendRegistrationVerificationCode(email: string, name: string) {
+  const code = generateVerificationCode();
+  const identifier = verificationIdentifier(email);
+  const token = hashVerificationCode(email, code);
+  const expires = new Date(Date.now() + 1000 * 60 * 15);
+
+  await prisma.verificationToken.deleteMany({ where: { identifier } });
+  await prisma.verificationToken.create({
+    data: { identifier, token, expires }
+  });
+
+  await prepareEmailLog({
+    templateKey: "REGISTRATION_VERIFICATION_CODE",
+    recipient: email,
+    data: {
+      naam: name,
+      verification_code: code,
+      organisatie: "St. GBC Masjid Ghausia"
+    },
+    entityType: "RegistrationEmailVerification",
+    throwOnSendError: true
+  });
+}
+
+async function verifyRegistrationCode(email: string, code: string) {
+  const normalizedCode = code.trim();
+  if (!/^\d{6}$/.test(normalizedCode)) return false;
+
+  const identifier = verificationIdentifier(email);
+  const token = hashVerificationCode(email, normalizedCode);
+  const verification = await prisma.verificationToken.findFirst({
+    where: {
+      identifier,
+      token,
+      expires: { gt: new Date() }
+    }
+  });
+
+  if (!verification) return false;
+
+  await prisma.verificationToken.deleteMany({ where: { identifier } });
+  return true;
 }
 
 export async function submitRegistration(_previous: RegistrationState, formData: FormData): Promise<RegistrationState> {
@@ -131,12 +191,52 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     };
   }
 
+  const verificationCode = value(formData, "verificationCode");
+  if (!verificationCode) {
+    try {
+      await sendRegistrationVerificationCode(data.email, `${data.firstName} ${data.lastName}`.trim());
+    } catch {
+      return {
+        errors: ["De verificatiecode kon niet worden verzonden. Probeer het later opnieuw."],
+        values: submittedValues
+      };
+    }
+
+    return {
+      errors: [],
+      values: submittedValues,
+      verificationRequired: true,
+      message: `We hebben een 6-cijferige code gestuurd naar ${data.email}. Vul de code in om uw registratie af te ronden.`
+    };
+  }
+
+  const verified = await verifyRegistrationCode(data.email, verificationCode);
+  if (!verified) {
+    try {
+      await sendRegistrationVerificationCode(data.email, `${data.firstName} ${data.lastName}`.trim());
+    } catch {
+      return {
+        errors: ["De verificatiecode is ongeldig of verlopen. Een nieuwe code kon niet worden verzonden. Probeer het later opnieuw."],
+        values: submittedValues,
+        verificationRequired: true
+      };
+    }
+
+    return {
+      errors: ["De verificatiecode is ongeldig of verlopen."],
+      values: submittedValues,
+      verificationRequired: true,
+      message: `We hebben een nieuwe 6-cijferige code gestuurd naar ${data.email}.`
+    };
+  }
+
   const passwordHash = await hash(data.password, 12);
 
   const user = await prisma.user.create({
     data: {
       name: `${data.firstName} ${data.lastName}`.trim(),
       email: data.email,
+      emailVerified: new Date(),
       passwordHash,
       role: "DONOR",
       isActive: true,
@@ -198,6 +298,14 @@ export async function submitRegistration(_previous: RegistrationState, formData:
       submittedAt: new Date()
     }
   });
+  const registrationSummary = await prisma.registrationRequest.findUnique({
+    where: { id: registrationRequest.id },
+    include: {
+      requestedBy: true,
+      donorProfile: { include: { familyMembers: true } }
+    }
+  });
+  const registrationPdf = registrationSummary ? createRegistrationSummaryPdf(registrationSummary) : null;
 
   const templateData = {
     naam: `${data.firstName} ${data.lastName}`.trim(),
@@ -221,7 +329,15 @@ export async function submitRegistration(_previous: RegistrationState, formData:
       recipient: data.email,
       data: templateData,
       entityType: "RegistrationRequest",
-      entityId: registrationRequest.id
+      entityId: registrationRequest.id,
+      attachments: registrationPdf
+        ? [
+            {
+              filename: "inschrijfoverzicht-stgbc.pdf",
+              content: registrationPdf
+            }
+          ]
+        : undefined
     })
   ]);
 

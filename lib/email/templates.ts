@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_EMAIL_TEMPLATES, EMAIL_PLACEHOLDERS, type EmailTemplateKey } from "./defaults";
 
 type TemplateData = Record<string, string | number | Date | null | undefined>;
+type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+};
 
 function textToHtml(input: string) {
   return input
@@ -85,13 +89,17 @@ export async function prepareEmailLog({
   recipient,
   data,
   entityType,
-  entityId
+  entityId,
+  attachments,
+  throwOnSendError
 }: {
   templateKey: EmailTemplateKey;
   recipient: string;
   data: TemplateData;
   entityType?: string;
   entityId?: string;
+  attachments?: EmailAttachment[];
+  throwOnSendError?: boolean;
 }) {
   const rendered = await renderEmailTemplate(templateKey, data);
   const emailLog = await prisma.emailLog.create({
@@ -112,10 +120,14 @@ export async function prepareEmailLog({
       to: recipient,
       subject: rendered.subject,
       html: rendered.bodyHtml,
-      text: rendered.bodyText
+      text: rendered.bodyText,
+      attachments
     });
   } catch (error) {
     console.error("E-mail versturen mislukt", error);
+    if (throwOnSendError) {
+      throw error;
+    }
   }
 
   return emailLog;
@@ -125,12 +137,14 @@ async function sendEmail({
   to,
   subject,
   html,
-  text
+  text,
+  attachments
 }: {
   to: string;
   subject: string;
   html: string;
   text?: string | null;
+  attachments?: EmailAttachment[];
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL || "St. GBC <noreply@stgbc.masjidghausia.nl>";
@@ -151,7 +165,11 @@ async function sendEmail({
       to,
       subject,
       html,
-      text: text || undefined
+      text: text || undefined,
+      attachments: attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content.toString("base64")
+      }))
     })
   });
 
