@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { registrationSubmitSchema } from "@/lib/registration/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { prepareEmailLog } from "@/lib/email/templates";
-import { createRegistrationSummaryPdf } from "@/lib/pdf/registration-summary";
 
 export type RegistrationState = {
   errors: string[];
@@ -300,15 +299,6 @@ export async function submitRegistration(_previous: RegistrationState, formData:
       submittedAt: new Date()
     }
   });
-  const registrationSummary = await prisma.registrationRequest.findUnique({
-    where: { id: registrationRequest.id },
-    include: {
-      requestedBy: true,
-      donorProfile: { include: { familyMembers: true } }
-    }
-  });
-  const registrationPdf = registrationSummary ? await createRegistrationSummaryPdf(registrationSummary) : null;
-
   const templateData = {
     naam: `${data.firstName} ${data.lastName}`.trim(),
     voornaam: data.firstName,
@@ -318,30 +308,13 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     organisatie: "St. GBC Masjid Ghausia"
   };
 
-  await Promise.all([
-    prepareEmailLog({
-      templateKey: "REGISTRATION_RECEIVED",
-      recipient: data.email,
-      data: templateData,
-      entityType: "RegistrationRequest",
-      entityId: registrationRequest.id
-    }),
-    prepareEmailLog({
-      templateKey: "REGISTRATION_ANSWERS_COPY",
-      recipient: data.email,
-      data: templateData,
-      entityType: "RegistrationRequest",
-      entityId: registrationRequest.id,
-      attachments: registrationPdf
-        ? [
-            {
-              filename: "inschrijfoverzicht-stgbc.pdf",
-              content: registrationPdf
-            }
-          ]
-        : undefined
-    })
-  ]);
+  await prepareEmailLog({
+    templateKey: "REGISTRATION_RECEIVED",
+    recipient: data.email,
+    data: templateData,
+    entityType: "RegistrationRequest",
+    entityId: registrationRequest.id
+  });
 
   await writeAuditLog({
     actorId: user.id,

@@ -26,10 +26,26 @@ export function renderTemplateString(input: string, data: TemplateData) {
 
 export async function ensureDefaultEmailTemplates() {
   await Promise.all(
-    DEFAULT_EMAIL_TEMPLATES.map((template) =>
-      prisma.emailTemplate.upsert({
+    DEFAULT_EMAIL_TEMPLATES.map(async (template) => {
+      const existing = await prisma.emailTemplate.findUnique({ where: { key: template.key } });
+      const shouldRefreshBody =
+        (template.key === "REGISTRATION_APPROVED_PAYMENT_REQUIRED" && !existing?.bodyText?.includes("{{eenmalig_bedrag}}")) ||
+        (template.key === "REGISTRATION_ANSWERS_COPY" && !existing?.bodyText?.includes("{{lidnummer}}"));
+
+      return prisma.emailTemplate.upsert({
         where: { key: template.key },
-        update: {},
+        update: {
+          availablePlaceholders: [...EMAIL_PLACEHOLDERS],
+          ...(shouldRefreshBody
+            ? {
+                name: template.name,
+                subject: template.subject,
+                bodyText: template.bodyText,
+                bodyHtml: textToHtml(template.bodyText),
+                isSystem: true
+              }
+            : {})
+        },
         create: {
           key: template.key,
           name: template.name,
@@ -39,8 +55,8 @@ export async function ensureDefaultEmailTemplates() {
           availablePlaceholders: [...EMAIL_PLACEHOLDERS],
           isSystem: true
         }
-      })
-    )
+      });
+    })
   );
 }
 

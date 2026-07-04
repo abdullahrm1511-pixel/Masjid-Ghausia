@@ -10,6 +10,7 @@ import { prepareEmailLog } from "@/lib/email/templates";
 import { ensurePrimaryMembership } from "@/lib/membership";
 import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig, oneTimePaymentDeadline } from "@/lib/pricing";
 import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
+import { createRegistrationSummaryPdf } from "@/lib/pdf/registration-summary";
 
 async function requireAdmin() {
   const session = await auth();
@@ -17,6 +18,10 @@ async function requireAdmin() {
     throw new Error("Geen toegang");
   }
   return session.user.id;
+}
+
+function formatEuroCents(cents: number) {
+  return (cents / 100).toLocaleString("nl-NL", { style: "currency", currency: "EUR" });
 }
 
 export async function approveRegistration(formData: FormData) {
@@ -38,8 +43,8 @@ export async function approveRegistration(formData: FormData) {
   const submittedData = request.submittedData as { donationAmount?: number | string | null };
   const donationAmount = Number(String(submittedData.donationAmount ?? 0).replace(",", "."));
   const donationAmountCents = Number.isFinite(donationAmount) && donationAmount >= 5 ? Math.round(donationAmount * 100) : 0;
-  const annualAmountCents = calculateCurrentAnnualAmount(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
-  const oneTimeAmountCents = calculateTotalOneTimeContribution(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100;
+  const annualAmountCents = Math.round(calculateCurrentAnnualAmount(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100);
+  const oneTimeAmountCents = Math.round(calculateTotalOneTimeContribution(request.donorProfile, request.donorProfile.familyMembers, pricing, now) * 100);
   const hasCurrentAnnualObligation = request.donorProfile.paymentObligations.some(
     (item) =>
       item.obligationType === "ANNUAL" &&
@@ -143,19 +148,51 @@ export async function approveRegistration(formData: FormData) {
     message: `Registratie goedgekeurd met lidnummer ${registrationNumber}`
   });
 
+  const approvedRequest = {
+    ...request,
+    reviewedAt: now,
+    status: "APPROVED" as const,
+    donorProfile: {
+      ...request.donorProfile,
+      registrationNumber,
+      status: "INACTIVE" as const,
+      approvedAt: now
+    }
+  };
+  const registrationPdf = await createRegistrationSummaryPdf(approvedRequest);
+  const emailData = {
+    naam: `${request.donorProfile.firstName} ${request.donorProfile.lastName}`.trim(),
+    voornaam: request.donorProfile.firstName,
+    achternaam: request.donorProfile.lastName,
+    lidnummer: registrationNumber,
+    status: "INACTIVE",
+    bedrag: formatEuroCents(annualAmountCents + oneTimeAmountCents + donationAmountCents),
+    eenmalig_bedrag: formatEuroCents(oneTimeAmountCents),
+    jaarlijks_bedrag: formatEuroCents(annualAmountCents),
+    donatie_bedrag: formatEuroCents(donationAmountCents),
+    organisatie: "St. GBC Masjid Ghausia"
+  };
+
   await prepareEmailLog({
     templateKey: "REGISTRATION_APPROVED_PAYMENT_REQUIRED",
     recipient: request.requestedBy.email,
     entityType: "RegistrationRequest",
     entityId: id,
-    data: {
-      naam: `${request.donorProfile.firstName} ${request.donorProfile.lastName}`.trim(),
-      voornaam: request.donorProfile.firstName,
-      achternaam: request.donorProfile.lastName,
-      lidnummer: registrationNumber,
-      status: "INACTIVE",
-      organisatie: "St. GBC Masjid Ghausia"
-    }
+    data: emailData
+  });
+
+  await prepareEmailLog({
+    templateKey: "REGISTRATION_ANSWERS_COPY",
+    recipient: request.requestedBy.email,
+    entityType: "RegistrationRequest",
+    entityId: id,
+    data: emailData,
+    attachments: [
+      {
+        filename: "inschrijfoverzicht-stgbc.pdf",
+        content: registrationPdf
+      }
+    ]
   });
 
   redirect(`/admin/registrations/${id}`);

@@ -5,6 +5,9 @@ export const EMAIL_PLACEHOLDERS = [
   "lidnummer",
   "status",
   "bedrag",
+  "eenmalig_bedrag",
+  "jaarlijks_bedrag",
+  "donatie_bedrag",
   "betaaldatum",
   "reden",
   "correctiebericht",
@@ -91,6 +94,9 @@ St. GBC Masjid Ghausia`
 
 In de bijlage vindt u een PDF-kopie van uw ingevulde inschrijving.
 
+Uw lidnummer is:
+{{lidnummer}}
+
 Controleer uw gegevens goed. Als u later een wijziging wilt doorgeven, kunt u dit via het portaal aanvragen.
 
 Met vriendelijke groet,
@@ -106,6 +112,14 @@ Uw inschrijving is goedgekeurd.
 
 Uw lidnummer is:
 {{lidnummer}}
+
+Openstaande bedragen:
+Eenmalig bedrag: {{eenmalig_bedrag}}
+Jaarlijks bedrag: {{jaarlijks_bedrag}}
+Eenmalige donatie: {{donatie_bedrag}}
+Totaal: {{bedrag}}
+
+In de aparte bijlage vindt u een PDF-kopie van uw ingevulde inschrijving.
 
 Om volledig actief te worden, moet de eerste betaling nog door het bestuur worden bevestigd.
 

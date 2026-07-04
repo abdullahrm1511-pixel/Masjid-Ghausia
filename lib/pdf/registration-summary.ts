@@ -3,6 +3,7 @@ import path from "path";
 import type { DonorProfile, FamilyMember, RegistrationRequest, User } from "@prisma/client";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatIban } from "@/lib/iban";
+import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 
 type RegistrationWithDetails = RegistrationRequest & {
   requestedBy: User;
@@ -25,6 +26,11 @@ function formatMoney(value?: number | string | null) {
   const amount = Number(String(value ?? 0).replace(",", "."));
   if (!Number.isFinite(amount) || amount <= 0) return "";
   return amount.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatEuros(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fullName(person?: { firstName?: string | null; lastName?: string | null } | null) {
@@ -72,19 +78,26 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   }
 
   const submitted = request.submittedData as SubmittedRegistrationData;
+  const pricing = await getPricingConfig();
+  const calculationDate = donor.approvedAt ?? request.reviewedAt ?? request.submittedAt ?? request.createdAt;
   const partner = donor.familyMembers.find((member) => member.type === "PARTNER");
   const children = donor.familyMembers.filter((member) => member.type === "CHILD");
   const donation = formatMoney(submitted.donationAmount);
+  const oneTimeAmount = formatEuros(calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, calculationDate));
+  const annualAmount = formatEuros(calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, calculationDate));
   const today = formatDateOnly(request.submittedAt ?? request.createdAt);
   const applicantName = fullName(donor);
   const address = [donor.addressLine1, donor.addressLine2].filter(Boolean).join(", ");
   const postalCity = [donor.postalCode, donor.city].filter(Boolean).join(" ");
+  setText(form, "Een malig Donatie €", oneTimeAmount);
+  setText(form, "Jaarlijks donatie €", annualAmount);
+  setText(form, "Registratienummer", donor.registrationNumber);
 
-  setText(form, "Jaarlijks donatie €", donation);
   setText(form, "undefined", applicantName);
   setText(form, "undefined_2", address);
   setText(form, "Postcodeplaats", postalCity);
   setText(form, "undefined_3", donor.phone);
+  setText(form, "Email", request.requestedBy.email);
   setText(form, "Geboortedatum", formatDateOnly(donor.dateOfBirth));
   setText(form, "Geboorteplaats", donor.birthPlace);
   setText(form, "IBAN Rekening nr", formatIban(donor.iban));
@@ -108,6 +121,7 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   setText(form, "Adres", address);
   setText(form, "Post Code Woonplaats", postalCity);
   setText(form, "Tel nr", donor.phone);
+  setText(form, "Donatie Beddrag €", donation);
   setText(form, "BankGiro Nummer", formatIban(donor.iban));
   setText(form, "Naam Rekening houder", donor.accountHolderName);
 
@@ -138,12 +152,13 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   form.flatten();
 
   const pages = pdfDoc.getPages();
+  if (donor.gender) {
+    pages[1]?.drawText("X", { x: donor.gender === "MALE" ? 442 : 489, y: 543, size: 12, color: rgb(0.08, 0.1, 0.16) });
+  }
   if (donation) {
-    pages[0]?.drawText(donation, { x: 420, y: 722, size: 10, color: rgb(0.08, 0.1, 0.16) });
     pages[1]?.drawText(donation, { x: 165, y: 360, size: 10, color: rgb(0.08, 0.1, 0.16) });
   }
   pages[0]?.drawText(request.requestedBy.email, { x: 300, y: 569, size: 9, color: rgb(0.08, 0.1, 0.16) });
-  pages[1]?.drawText(request.requestedBy.email, { x: 105, y: 389, size: 10, color: rgb(0.08, 0.1, 0.16) });
 
   return Buffer.from(await pdfDoc.save());
 }
