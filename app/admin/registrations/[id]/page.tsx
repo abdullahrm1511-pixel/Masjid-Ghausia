@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { formatDateWithAge } from "@/lib/display";
-import { renderEmailTemplate } from "@/lib/email/templates";
 import { formatIban } from "@/lib/iban";
 import { prisma } from "@/lib/prisma";
 import { approveRegistration, rejectRegistration, requestCorrection } from "./actions";
@@ -16,7 +15,10 @@ export default async function RegistrationDetailPage({ params }: { params: Promi
     include: {
       requestedBy: true,
       donorProfile: {
-        include: { familyMembers: true }
+        include: {
+          familyMembers: true,
+          changeRequests: { orderBy: { submittedAt: "desc" }, take: 5 }
+        }
       }
     }
   });
@@ -33,12 +35,6 @@ export default async function RegistrationDetailPage({ params }: { params: Promi
     legalResidence?: boolean;
     termsAccepted?: boolean;
   };
-  const answersEmailPreview = await renderEmailTemplate("REGISTRATION_ANSWERS_COPY", {
-    naam: `${donor.firstName} ${donor.lastName}`.trim(),
-    voornaam: donor.firstName,
-    achternaam: donor.lastName,
-    organisatie: "St. GBC Masjid Ghausia"
-  });
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -92,13 +88,31 @@ export default async function RegistrationDetailPage({ params }: { params: Promi
         </div>
       </section>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900">Preview kopie inschrijving e-mail</h2>
-        <p className="mt-4 text-sm font-semibold text-slate-700">Onderwerp</p>
-        <p className="mt-1 rounded-md bg-slate-50 p-3">{answersEmailPreview.subject}</p>
-        <p className="mt-4 text-sm font-semibold text-slate-700">Body</p>
-        <pre className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm">{answersEmailPreview.bodyText}</pre>
-      </section>
+      {(request.reviewNotes || request.donorMessage || request.rejectionReason) ? (
+        <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-amber-950">Correctie / beoordeling</h2>
+          <div className="mt-4 grid gap-3 text-sm">
+            {request.donorMessage ? <p><strong>Bericht aan donateur:</strong> {request.donorMessage}</p> : null}
+            {request.reviewNotes ? <p><strong>Interne notitie:</strong> {request.reviewNotes}</p> : null}
+            {request.rejectionReason ? <p><strong>Afwijsreden:</strong> {request.rejectionReason}</p> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {donor.changeRequests.length ? (
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Reacties / wijzigingsverzoeken van deze persoon</h2>
+          <div className="mt-4 grid gap-3">
+            {donor.changeRequests.map((change) => (
+              <Link className="rounded-md border border-slate-200 bg-slate-50 p-3 hover:border-[#1483d6]/40" href={`/admin/change-requests/${change.id}`} key={change.id}>
+                <p className="font-semibold text-slate-950">{change.changeType} - {change.status}</p>
+                <p className="mt-1 text-sm text-slate-600">Ingediend op {change.submittedAt.toLocaleDateString("nl-NL")}</p>
+                {change.donorNote ? <p className="mt-2 text-sm text-slate-700">Toelichting: {change.donorNote}</p> : null}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold text-slate-900">Afwijzen of correctie vragen</h2>

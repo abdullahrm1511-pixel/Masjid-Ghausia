@@ -5,48 +5,52 @@ export const dynamic = "force-dynamic";
 
 export default async function EmailLogPage() {
   const logs = await prisma.emailLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
+  const groupedLogs = Array.from(
+    logs.reduce((map, log) => {
+      const items = map.get(log.recipient) ?? [];
+      items.push(log);
+      map.set(log.recipient, items);
+      return map;
+    }, new Map<string, typeof logs>())
+  ).map(([recipient, items]) => ({ recipient, items }));
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-3xl font-bold text-slate-900">E-maillog</h1>
-      <p className="mt-2 text-slate-700">Voorbereide e-mails. Er wordt nog niets automatisch verzonden.</p>
-      <div className="mt-8 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[950px] text-left text-sm">
-          <thead className="bg-slate-50 text-slate-700">
-            <tr>
-              <th className="p-3">Datum</th>
-              <th className="p-3">Ontvanger</th>
-              <th className="p-3">Template</th>
-              <th className="p-3">Onderwerp</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Preview</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((log) => (
-              <tr className="border-t border-slate-200 align-top" key={log.id}>
-                <td className="p-3">{formatDate(log.createdAt)}</td>
-                <td className="p-3">{log.recipient}</td>
-                <td className="p-3 font-mono text-xs">{log.templateKey}</td>
-                <td className="p-3 font-semibold">{log.subject}</td>
-                <td className="p-3">{log.status}</td>
-                <td className="p-3">
-                  <details>
-                    <summary className="cursor-pointer font-semibold text-[#0f5f9f]">Open</summary>
-                    <pre className="mt-2 max-w-xl whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-xs">{log.bodyText || log.bodyHtml}</pre>
-                  </details>
-                </td>
-              </tr>
-            ))}
-            {!logs.length ? (
-              <tr>
-                <td className="p-6 text-center text-slate-600" colSpan={6}>
-                  Nog geen voorbereide e-mails.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+      <p className="mt-2 text-slate-700">Alle voorbereide e-mails gegroepeerd per persoon. Er wordt nog niets automatisch verzonden.</p>
+
+      <div className="mt-8 grid gap-4">
+        {groupedLogs.map(({ recipient, items }) => (
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={recipient}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{recipient}</h2>
+                <p className="mt-1 text-sm text-slate-600">{items.length} e-mail{items.length === 1 ? "" : "s"} voorbereid</p>
+              </div>
+              <p className="rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">Laatste: {formatDate(items[0]?.createdAt)}</p>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {items.map((log) => (
+                <details className="rounded-md border border-slate-200 bg-slate-50 p-3" key={log.id}>
+                  <summary className="cursor-pointer font-semibold text-[#0f5f9f]">
+                    {formatDate(log.createdAt)} - {log.subject}
+                  </summary>
+                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+                    <div><dt className="font-semibold text-slate-600">Template</dt><dd className="font-mono text-xs">{log.templateKey}</dd></div>
+                    <div><dt className="font-semibold text-slate-600">Status</dt><dd>{log.status}</dd></div>
+                    <div><dt className="font-semibold text-slate-600">Onderwerp</dt><dd>{log.subject}</dd></div>
+                  </dl>
+                  <pre className="mt-3 whitespace-pre-wrap rounded-md bg-white p-3 text-xs text-slate-700">{log.bodyText || log.bodyHtml}</pre>
+                </details>
+              ))}
+            </div>
+          </section>
+        ))}
+        {!groupedLogs.length ? (
+          <section className="rounded-lg border border-slate-200 bg-white p-6 text-center text-slate-600 shadow-sm">
+            Nog geen voorbereide e-mails.
+          </section>
+        ) : null}
       </div>
     </main>
   );

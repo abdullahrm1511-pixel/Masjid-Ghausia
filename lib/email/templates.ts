@@ -94,7 +94,7 @@ export async function prepareEmailLog({
   entityId?: string;
 }) {
   const rendered = await renderEmailTemplate(templateKey, data);
-  return prisma.emailLog.create({
+  const emailLog = await prisma.emailLog.create({
     data: {
       templateKey,
       recipient,
@@ -106,4 +106,57 @@ export async function prepareEmailLog({
       entityId
     }
   });
+
+  try {
+    await sendEmail({
+      to: recipient,
+      subject: rendered.subject,
+      html: rendered.bodyHtml,
+      text: rendered.bodyText
+    });
+  } catch (error) {
+    console.error("E-mail versturen mislukt", error);
+  }
+
+  return emailLog;
+}
+
+async function sendEmail({
+  to,
+  subject,
+  html,
+  text
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string | null;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL || "St. GBC <noreply@stgbc.masjidghausia.nl>";
+
+  if (!apiKey) {
+    console.warn("RESEND_API_KEY ontbreekt; e-mail is alleen gelogd.");
+    return;
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject,
+      html,
+      text: text || undefined
+    })
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(`E-mail versturen mislukt: ${message}`);
+  }
 }
