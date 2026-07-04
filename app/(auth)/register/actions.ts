@@ -15,6 +15,9 @@ export type RegistrationState = {
   message?: string;
 };
 
+const MAX_ID_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_ID_FILE_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
+
 const fieldLabels: Record<string, string> = {
   firstName: "Voornaam",
   lastName: "Achternaam",
@@ -34,6 +37,7 @@ const fieldLabels: Record<string, string> = {
   partner: "Partner",
   children: "Kinderen",
   donationAmount: "Donatie",
+  identityDocument: "ID uploaden",
   healthDeclaration: "Gezondheidsverklaring",
   legalResidence: "Verblijf in Nederland",
   termsAccepted: "Voorwaarden en privacy"
@@ -51,6 +55,20 @@ function valuesFromFormData(formData: FormData) {
     }
   }
   return values;
+}
+
+function identityDocumentFromFormData(formData: FormData) {
+  const file = formData.get("identityDocument");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Fout ID uploaden: Upload een kopie van uw ID" };
+  }
+  if (file.size > MAX_ID_FILE_SIZE) {
+    return { error: "Fout ID uploaden: Het bestand mag maximaal 5 MB zijn" };
+  }
+  if (!ALLOWED_ID_FILE_TYPES.has(file.type)) {
+    return { error: "Fout ID uploaden: Upload een PDF, JPG of PNG bestand" };
+  }
+  return { file };
 }
 
 function formatIssue(path: PropertyKey[], message: string) {
@@ -211,6 +229,15 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     };
   }
 
+  const identityDocument = identityDocumentFromFormData(formData);
+  if (identityDocument.error || !identityDocument.file) {
+    return {
+      errors: [identityDocument.error ?? "Fout ID uploaden: Upload een kopie van uw ID"],
+      values: submittedValues,
+      verificationRequired: true
+    };
+  }
+
   const verified = await verifyRegistrationCode(data.email, verificationCode);
   if (!verified) {
     try {
@@ -232,6 +259,7 @@ export async function submitRegistration(_previous: RegistrationState, formData:
   }
 
   const passwordHash = await hash(data.password, 12);
+  const identityDocumentBuffer = Buffer.from(await identityDocument.file.arrayBuffer());
 
   const user = await prisma.user.create({
     data: {
@@ -260,6 +288,14 @@ export async function submitRegistration(_previous: RegistrationState, formData:
           pakistanContactName: data.pakistanContactName || null,
           pakistanContactPhone: data.pakistanContactPhone || null,
           funeralWishes: data.funeralWishes || null,
+          identityDocument: {
+            create: {
+              filename: identityDocument.file.name || "id-document",
+              contentType: identityDocument.file.type,
+              fileSize: identityDocument.file.size,
+              data: identityDocumentBuffer
+            }
+          },
           familyMembers: {
             create: [
               ...(data.partner

@@ -41,6 +41,7 @@ export default async function DonorDetailPage({
     where: { id },
     include: {
       user: true,
+      identityDocument: { select: { filename: true, uploadedAt: true } },
       familyMembers: { orderBy: [{ type: "asc" }, { dateOfBirth: "asc" }] },
       paymentObligations: { orderBy: { createdAt: "desc" } },
       changeRequests: { orderBy: { createdAt: "desc" }, take: 8 },
@@ -148,6 +149,18 @@ export default async function DonorDetailPage({
                     <div><dt className="font-semibold text-slate-600">E-mail</dt><dd>{displayEmail(donor.user.email)}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Telefoon</dt><dd>{donor.phone || "-"}</dd></div>
                     <div>
+                      <dt className="font-semibold text-slate-600">ID-document</dt>
+                      <dd>
+                        {donor.identityDocument ? (
+                          <Link className="font-semibold text-[#0f5f9f]" href={`/admin/donors/${donor.id}/identity-document`} target="_blank">
+                            Openen
+                          </Link>
+                        ) : (
+                          "-"
+                        )}
+                      </dd>
+                    </div>
+                    <div>
                       <dt className="font-semibold text-slate-600">Adres</dt>
                       <dd>{donor.addressLine1 || "-"}, {donor.postalCode || "-"} {donor.city || ""}</dd>
                     </div>
@@ -214,6 +227,18 @@ export default async function DonorDetailPage({
                   <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDateWithAge(donor.dateOfBirth)}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Geboorteplaats</dt><dd>{donor.birthPlace || "-"}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Geslacht</dt><dd>{donor.gender ?? "-"}</dd></div>
+                  <div>
+                    <dt className="font-semibold text-slate-600">ID-document</dt>
+                    <dd>
+                      {donor.identityDocument ? (
+                        <Link className="font-semibold text-[#0f5f9f]" href={`/admin/donors/${donor.id}/identity-document`} target="_blank">
+                          Openen
+                        </Link>
+                      ) : (
+                        "-"
+                      )}
+                    </dd>
+                  </div>
                   <div><dt className="font-semibold text-slate-600">Actief sinds</dt><dd>{formatDate(donor.activeSince)}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Inactief sinds</dt><dd>{formatDate(donor.inactiveSince)}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Overleden sinds</dt><dd>{formatDate(donor.deceasedAt)}</dd></div>

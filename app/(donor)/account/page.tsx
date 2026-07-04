@@ -21,7 +21,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
   const profile = await prisma.donorProfile.findUnique({
     where: { userId: session.user.id },
-    include: { user: true, familyMembers: { orderBy: [{ type: "asc" }, { dateOfBirth: "asc" }] } }
+    include: {
+      user: true,
+      identityDocument: { select: { filename: true, uploadedAt: true } },
+      familyMembers: { orderBy: [{ type: "asc" }, { dateOfBirth: "asc" }] }
+    }
   });
 
   if (!profile) {
@@ -47,6 +51,16 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <p><strong>Rekeninghouder:</strong> {profile.accountHolderName}</p>
         <p><strong>Contact Pakistan:</strong> {profile.pakistanContactName || "-"}</p>
         <p><strong>Telefoon Pakistan:</strong> {profile.pakistanContactPhone || "-"}</p>
+        <p>
+          <strong>ID-document:</strong>{" "}
+          {profile.identityDocument ? (
+            <a className="font-semibold text-[#0f5f9f]" href="/account/identity-document" target="_blank" rel="noreferrer">
+              Openen
+            </a>
+          ) : (
+            "-"
+          )}
+        </p>
         <p className="sm:col-span-2"><strong>Uitvaartwensen:</strong> {profile.funeralWishes || "-"}</p>
       </section>
 

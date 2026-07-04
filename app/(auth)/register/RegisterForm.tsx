@@ -58,7 +58,7 @@ export function RegisterForm({ error }: { error?: string }) {
   const [step, setStep] = useState(0);
   const [privacyScrolled, setPrivacyScrolled] = useState(false);
   const childCount = children.length ? Math.max(...children) + 1 : 0;
-  const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "Bevestiging"];
+  const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "ID Uploaden", "Bevestiging"];
   const field = (name: string) => state.values[name] ?? "";
   const formKey = JSON.stringify(state.values);
 
@@ -81,8 +81,8 @@ export function RegisterForm({ error }: { error?: string }) {
     );
     setChildren(nextChildren);
     setPrivacyScrolled(state.values.termsAccepted === "on");
-    setStep(state.verificationRequired ? 4 : 0);
-  }, [state.values, state.verificationRequired]);
+    setStep(state.verificationRequired ? steps.length - 1 : 0);
+  }, [state.values, state.verificationRequired, steps.length]);
 
   const maritalStatus = hasPartner === "yes" ? "MARRIED" : "SINGLE";
 
@@ -185,6 +185,24 @@ export function RegisterForm({ error }: { error?: string }) {
       </section>
 
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 4 ? "" : "hidden"}`}>
+        <h2 className="text-xl font-bold text-slate-900">ID Uploaden</h2>
+        <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
+          <label>
+            Kopie ID
+            <input accept="application/pdf,image/jpeg,image/png" name="identityDocument" type="file" />
+          </label>
+          <p className="text-sm font-semibold text-slate-600">
+            Upload een PDF, JPG of PNG van maximaal 5 MB. Dit document is alleen zichtbaar voor bevoegde beheerders en uzelf.
+          </p>
+          {state.verificationRequired ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+              Selecteer het ID-bestand opnieuw voordat u de verificatiecode indient.
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 5 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Bevestiging</h2>
         <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
           <h3 className="font-bold text-slate-900">Donatie</h3>

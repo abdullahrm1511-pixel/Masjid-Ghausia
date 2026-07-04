@@ -211,6 +211,7 @@ model DonorProfile {
   registrationRequests RegistrationRequest[]
   changeRequests       ChangeRequest[]
   paymentObligations   PaymentObligation[]
+  identityDocument     IdentityDocument?
   statusHistory        DonorStatusHistory[]
   familyStatusHistory  FamilyMemberStatusHistory[]
   previousAdultChildTransitions AdultChildTransition[] @relation("AdultTransitionPreviousDonor")
@@ -222,6 +223,21 @@ model DonorProfile {
   @@index([currentMembershipId])
   @@index([status])
   @@index([iban])
+}
+
+model IdentityDocument {
+  id             String   @id @default(cuid())
+  donorProfileId String   @unique
+  filename       String
+  contentType    String
+  fileSize       Int
+  data           Bytes
+  uploadedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  donorProfile DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([donorProfileId])
 }
 
 model DonorStatusHistory {
