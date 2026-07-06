@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { submitRegistration, type RegistrationState } from "./actions";
 import { SubmitButton } from "@/components/donor/SubmitButton";
 
@@ -50,10 +50,97 @@ const privacyText = [
 const ID_IMAGE_TARGET_BYTES = 900 * 1024;
 const ID_IMAGE_MAX_SIDE = 1600;
 const ID_IMAGE_MIN_SIDE = 1100;
+const commonEmailDomains = ["gmail.com", "hotmail.com", "outlook.com", "icloud.com", "live.nl", "hotmail.nl", "yahoo.com"];
+const emailTypoDomains: Record<string, string> = {
+  "gmail.con": "gmail.com",
+  "gmail.co": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmial.com": "gmail.com",
+  "hotmai.com": "hotmail.com",
+  "hotmail.con": "hotmail.com",
+  "hotmial.com": "hotmail.com",
+  "outlook.con": "outlook.com",
+  "icloud.con": "icloud.com"
+};
+type FieldFeedback = { status: "error" | "warning"; message: string; suggestion?: string };
+type FieldRules = {
+  required?: boolean;
+  lettersOnly?: boolean;
+  email?: boolean;
+  phone?: boolean;
+  postcode?: boolean;
+  password?: boolean;
+  confirmPassword?: boolean;
+};
 
 function readableFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
+function sanitizeLetters(value: string) {
+  return Array.from(value).filter((character) => /[\p{L}\s'.-]/u.test(character)).join("");
+}
+
+function formatPostalCode(value: string) {
+  const cleaned = value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 6);
+  if (cleaned.length <= 4) return cleaned;
+  return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+}
+
+function emailSuggestion(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  const [local, domain = ""] = trimmed.split("@");
+  if (!local || !trimmed.includes("@")) return "";
+
+  const typo = emailTypoDomains[domain];
+  if (typo) return `${local}@${typo}`;
+
+  if (domain && !domain.includes(".") && domain.length >= 1) {
+    const match = commonEmailDomains.find((item) => item.startsWith(domain));
+    return match ? `${local}@${match}` : "";
+  }
+
+  return "";
+}
+
+function validateFieldValue(value: string, rules: FieldRules, form?: HTMLFormElement | null): FieldFeedback | null {
+  const trimmed = value.trim();
+
+  if (rules.required && !trimmed) {
+    return { status: "error", message: "Dit veld is verplicht" };
+  }
+  if (!trimmed) return null;
+
+  if (rules.lettersOnly && !/^[\p{L}\s'.-]+$/u.test(trimmed)) {
+    return { status: "warning", message: "Gebruik alleen letters" };
+  }
+  if (rules.phone && !/^06\d{8}$/.test(trimmed)) {
+    return { status: "warning", message: "Gebruik formaat 06xxxxxxxx" };
+  }
+  if (rules.postcode && !/^\d{4}\s?[A-Z]{2}$/.test(trimmed.toUpperCase())) {
+    return { status: "warning", message: "Gebruik formaat 1234 AB" };
+  }
+  if (rules.email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return { status: "error", message: "Vul een geldig e-mailadres in" };
+    }
+    const suggestion = emailSuggestion(trimmed);
+    if (suggestion && suggestion !== trimmed.toLowerCase()) {
+      return { status: "warning", message: `Bedoelt u ${suggestion}? Druk op Enter om aan te vullen.`, suggestion };
+    }
+  }
+  if (rules.password && trimmed.length < 8) {
+    return { status: "warning", message: "Gebruik minimaal 8 tekens" };
+  }
+  if (rules.confirmPassword) {
+    const password = String(new FormData(form ?? undefined).get("password") ?? "");
+    if (password && trimmed !== password) {
+      return { status: "warning", message: "Wachtwoorden komen niet overeen" };
+    }
+  }
+
+  return null;
 }
 
 async function loadImage(file: File) {
@@ -134,6 +221,8 @@ export function RegisterForm({ error }: { error?: string }) {
   const [privacyScrolled, setPrivacyScrolled] = useState(false);
   const [identityFileMessage, setIdentityFileMessage] = useState("");
   const [identityProcessing, setIdentityProcessing] = useState(false);
+  const [fieldFeedback, setFieldFeedback] = useState<Record<string, FieldFeedback | null>>({});
+  const [showPassword, setShowPassword] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const skipCompressionRef = useRef(false);
   const childCount = children.length ? Math.max(...children) + 1 : 0;
@@ -166,6 +255,60 @@ export function RegisterForm({ error }: { error?: string }) {
   }, [state.values, state.verificationRequired, steps.length]);
 
   const maritalStatus = hasPartner === "yes" ? "MARRIED" : "SINGLE";
+
+  function setFieldState(name: string, value: string, rules: FieldRules) {
+    setFieldFeedback((current) => ({
+      ...current,
+      [name]: validateFieldValue(value, rules, formRef.current)
+    }));
+  }
+
+  function inputClass(name: string) {
+    const feedback = fieldFeedback[name];
+    if (feedback?.status === "error") return "border-red-500 bg-red-50 focus:border-red-600";
+    if (feedback?.status === "warning") return "border-amber-500 bg-amber-50 focus:border-amber-600";
+    return "";
+  }
+
+  function feedbackMessage(name: string) {
+    const feedback = fieldFeedback[name];
+    if (!feedback) return null;
+    const color = feedback.status === "error" ? "text-red-700" : "text-amber-700";
+    return <p className={`text-xs font-semibold ${color}`}>{feedback.message}</p>;
+  }
+
+  function validatedInput(name: string, rules: FieldRules = {}) {
+    return {
+      name,
+      defaultValue: field(name),
+      className: inputClass(name),
+      onBlur: (event: FormEvent<HTMLInputElement>) => setFieldState(name, event.currentTarget.value, rules),
+      onInput: (event: FormEvent<HTMLInputElement>) => {
+        const input = event.currentTarget;
+        if (rules.lettersOnly) {
+          const sanitized = sanitizeLetters(input.value);
+          if (sanitized !== input.value) input.value = sanitized;
+        }
+        if (rules.postcode) {
+          input.value = formatPostalCode(input.value);
+        }
+        if (rules.phone) {
+          input.value = input.value.replace(/\D/g, "").slice(0, 10);
+        }
+        setFieldState(name, input.value, rules);
+      }
+    };
+  }
+
+  function applyEmailSuggestion(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    const input = event.currentTarget;
+    const suggestion = fieldFeedback.email?.suggestion || emailSuggestion(input.value);
+    if (!suggestion) return;
+    event.preventDefault();
+    input.value = suggestion;
+    setFieldState("email", suggestion, { required: true, email: true });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     if (skipCompressionRef.current) {
@@ -227,21 +370,63 @@ export function RegisterForm({ error }: { error?: string }) {
       </div>
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 0 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Hoofddonateur</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label>Voornaam<input name="firstName" pattern={namePattern} defaultValue={field("firstName")} required /></label>
-          <label>Achternaam<input name="lastName" pattern={namePattern} defaultValue={field("lastName")} required /></label>
-          <label>Geslacht<select name="gender" defaultValue={field("gender") || "MALE"} required><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
-          <label>Geboortedatum<input name="dateOfBirth" type="date" max={today} defaultValue={field("dateOfBirth")} required /></label>
-          <label>Geboorteplaats<input name="birthPlace" defaultValue={field("birthPlace")} required /></label>
-          <label>Telefoon<input name="phone" inputMode="numeric" pattern="06[0-9]{8}" maxLength={10} placeholder="0612345678" defaultValue={field("phone")} required /></label>
-          <label>E-mailadres<input name="email" type="email" defaultValue={field("email")} required /></label>
-          <label>Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
-          <label>Postcode<input name="postalCode" defaultValue={field("postalCode")} required /></label>
-          <label>Woonplaats<input name="city" defaultValue={field("city")} required /></label>
-          <label>IBAN<input name="iban" placeholder="NL79 ABNA 0543 4484 28" defaultValue={field("iban")} required /></label>
-          <label>Naam rekeninghouder<input name="accountHolderName" defaultValue={field("accountHolderName")} required /></label>
-          <label>Wachtwoord<input name="password" type="password" defaultValue={field("password")} required minLength={8} /></label>
-          <label>Bevestig wachtwoord<input name="confirmPassword" type="password" defaultValue={field("confirmPassword")} required minLength={8} /></label>
+        <div className="grid gap-5">
+          <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
+            <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Persoonlijke gegevens</h3>
+            <label>Voornaam<input {...validatedInput("firstName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("firstName")}</label>
+            <label>Achternaam<input {...validatedInput("lastName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("lastName")}</label>
+            <label>Geslacht<select name="gender" defaultValue={field("gender") || "MALE"} required><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
+            <label>Geboortedatum<input name="dateOfBirth" type="date" max={today} defaultValue={field("dateOfBirth")} required /></label>
+            <label>Geboorteplaats<input {...validatedInput("birthPlace", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("birthPlace")}</label>
+          </div>
+
+          <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
+            <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Contactgegevens</h3>
+            <label>Telefoon<input {...validatedInput("phone", { required: true, phone: true })} inputMode="numeric" pattern="06[0-9]{8}" maxLength={10} placeholder="0612345678" required />{feedbackMessage("phone")}</label>
+            <label>
+              E-mailadres
+              <input {...validatedInput("email", { required: true, email: true })} autoComplete="email" list="email-domain-suggestions" onKeyDown={applyEmailSuggestion} type="email" required />
+              {feedbackMessage("email")}
+            </label>
+            <datalist id="email-domain-suggestions">
+              {commonEmailDomains.map((domain) => (
+                <option key={domain} value={field("email").includes("@") ? `${field("email").split("@")[0]}@${domain}` : domain} />
+              ))}
+            </datalist>
+          </div>
+
+          <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
+            <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Woongegevens en betaling</h3>
+            <label>Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
+            <label>Postcode<input {...validatedInput("postalCode", { required: true, postcode: true })} inputMode="text" maxLength={7} placeholder="3061 AB" required />{feedbackMessage("postalCode")}</label>
+            <label>Woonplaats<input {...validatedInput("city", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("city")}</label>
+            <label>IBAN<input name="iban" placeholder="NL79 ABNA 0543 4484 28" defaultValue={field("iban")} required /></label>
+            <label>Naam rekeninghouder<input {...validatedInput("accountHolderName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("accountHolderName")}</label>
+          </div>
+
+          <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
+            <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Beveiliging</h3>
+            <label>
+              Wachtwoord
+              <span className="grid grid-cols-[1fr_auto] gap-2">
+                <input {...validatedInput("password", { required: true, password: true })} type={showPassword ? "text" : "password"} required minLength={8} />
+                <button className="rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700" onClick={() => setShowPassword((value) => !value)} type="button">
+                  {showPassword ? "Verberg" : "Toon"}
+                </button>
+              </span>
+              {feedbackMessage("password")}
+            </label>
+            <label>
+              Bevestig wachtwoord
+              <span className="grid grid-cols-[1fr_auto] gap-2">
+                <input {...validatedInput("confirmPassword", { required: true, confirmPassword: true })} type={showPassword ? "text" : "password"} required minLength={8} />
+                <button className="rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700" onClick={() => setShowPassword((value) => !value)} type="button">
+                  {showPassword ? "Verberg" : "Toon"}
+                </button>
+              </span>
+              {feedbackMessage("confirmPassword")}
+            </label>
+          </div>
         </div>
       </section>
 
@@ -250,11 +435,11 @@ export function RegisterForm({ error }: { error?: string }) {
         <label>Heeft u een partner?<select name="hasPartner" value={hasPartner} onChange={(event) => setHasPartner(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
         {hasPartner === "yes" ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            <label>Voornaam<input name="partner.firstName" pattern={namePattern} defaultValue={field("partner.firstName")} /></label>
-            <label>Achternaam<input name="partner.lastName" pattern={namePattern} defaultValue={field("partner.lastName")} /></label>
+            <label>Voornaam<input {...validatedInput("partner.firstName", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("partner.firstName")}</label>
+            <label>Achternaam<input {...validatedInput("partner.lastName", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("partner.lastName")}</label>
             <label>Geslacht<select name="partner.gender" defaultValue={field("partner.gender") || "MALE"}><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
             <label>Geboortedatum<input name="partner.dateOfBirth" type="date" max={today} defaultValue={field("partner.dateOfBirth")} /></label>
-            <label>Geboorteplaats<input name="partner.birthPlace" defaultValue={field("partner.birthPlace")} /></label>
+            <label>Geboorteplaats<input {...validatedInput("partner.birthPlace", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("partner.birthPlace")}</label>
           </div>
         ) : null}
       </section>
@@ -273,11 +458,11 @@ export function RegisterForm({ error }: { error?: string }) {
                     Verwijderen
                   </button>
                 </div>
-                <label>Voornaam<input name={`child.${index}.firstName`} pattern={namePattern} defaultValue={field(`child.${index}.firstName`)} /></label>
-                <label>Achternaam<input name={`child.${index}.lastName`} pattern={namePattern} defaultValue={field(`child.${index}.lastName`)} /></label>
+                <label>Voornaam<input {...validatedInput(`child.${index}.firstName`, { lettersOnly: true })} pattern={namePattern} />{feedbackMessage(`child.${index}.firstName`)}</label>
+                <label>Achternaam<input {...validatedInput(`child.${index}.lastName`, { lettersOnly: true })} pattern={namePattern} />{feedbackMessage(`child.${index}.lastName`)}</label>
                 <label>Geslacht<select name={`child.${index}.gender`} defaultValue={field(`child.${index}.gender`) || "MALE"}><option value="MALE">Jongen</option><option value="FEMALE">Meisje</option></select></label>
                 <label>Geboortedatum<input name={`child.${index}.dateOfBirth`} type="date" max={today} defaultValue={field(`child.${index}.dateOfBirth`)} /></label>
-                <label>Geboorteplaats<input name={`child.${index}.birthPlace`} defaultValue={field(`child.${index}.birthPlace`)} /></label>
+                <label>Geboorteplaats<input {...validatedInput(`child.${index}.birthPlace`, { lettersOnly: true })} pattern={namePattern} />{feedbackMessage(`child.${index}.birthPlace`)}</label>
               </div>
             ))}
             <button className="w-full rounded-md border border-[#0f766e] px-4 py-2 font-semibold text-[#115e59] hover:bg-emerald-50 sm:w-fit" type="button" onClick={() => setChildren((items) => [...items, childCount])}>
@@ -290,7 +475,7 @@ export function RegisterForm({ error }: { error?: string }) {
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 3 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Contactpersoon Pakistan</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label>Contactpersoon Pakistan<input name="pakistanContactName" pattern={namePattern} defaultValue={field("pakistanContactName")} /></label>
+          <label>Contactpersoon Pakistan<input {...validatedInput("pakistanContactName", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("pakistanContactName")}</label>
           <label>Telefoon Pakistan<input name="pakistanContactPhone" inputMode="numeric" pattern="[0-9]*" defaultValue={field("pakistanContactPhone")} /></label>
         </div>
         <label>Uitvaartwensen<textarea name="funeralWishes" rows={4} defaultValue={field("funeralWishes")} /></label>

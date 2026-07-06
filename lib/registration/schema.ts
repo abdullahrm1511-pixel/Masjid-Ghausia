@@ -3,9 +3,12 @@ import { isValidIban, normalizeIban } from "@/lib/iban";
 
 const requiredText = z.string().trim().min(1, "Dit veld is verplicht");
 const optionalText = z.string().trim().optional().or(z.literal(""));
-const nameText = requiredText.regex(/^[\p{L}\s]+$/u, "Gebruik alleen letters");
-const optionalNameText = optionalText.refine((value) => !value || /^[\p{L}\s]+$/u.test(value), "Gebruik alleen letters");
+const nameText = requiredText.regex(/^[\p{L}\s'.-]+$/u, "Gebruik alleen letters");
+const optionalNameText = optionalText.refine((value) => !value || /^[\p{L}\s'.-]+$/u.test(value), "Gebruik alleen letters");
 const dutchMobilePhone = requiredText.regex(/^06\d{8}$/, "Vul een geldig telefoonnummer in: 06 gevolgd door 8 cijfers");
+const dutchPostalCode = requiredText
+  .transform((value) => value.toUpperCase().replace(/\s+/g, ""))
+  .refine((value) => /^\d{4}[A-Z]{2}$/.test(value), "Vul een geldige postcode in, bijvoorbeeld 3061 AB");
 const optionalDigits = optionalText.refine((value) => !value || /^\d+$/.test(value), "Gebruik alleen cijfers");
 const optionalAmount = z
   .string()
@@ -23,7 +26,7 @@ export const familyMemberSchema = z.object({
   lastName: nameText,
   gender: z.enum(["MALE", "FEMALE"]),
   dateOfBirth: requiredText,
-  birthPlace: optionalText
+  birthPlace: optionalNameText
 });
 
 export const registrationBaseSchema = z.object({
@@ -32,14 +35,14 @@ export const registrationBaseSchema = z.object({
   gender: z.enum(["MALE", "FEMALE"]),
   addressLine1: requiredText,
   addressLine2: optionalText,
-  postalCode: requiredText,
-  city: requiredText,
+  postalCode: dutchPostalCode,
+  city: nameText,
   phone: dutchMobilePhone,
   email: z.string().trim().email("Vul een geldig e-mailadres in"),
   dateOfBirth: requiredText,
-  birthPlace: requiredText,
+  birthPlace: nameText,
   iban: requiredText.transform(normalizeIban),
-  accountHolderName: requiredText,
+  accountHolderName: nameText,
   maritalStatus: z.enum(["SINGLE", "MARRIED", "WIDOWED", "DIVORCED"]),
   password: z.string().min(8, "Gebruik minimaal 8 tekens"),
   confirmPassword: z.string().min(8, "Bevestig het wachtwoord"),
