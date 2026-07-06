@@ -72,16 +72,16 @@ export default async function DashboardPage() {
   const totalDue = Math.max(annualRequired + oneTimeRequired + penaltyRequired - totalPaid, 0);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Mijn portaal</p>
+    <main className="donor-dashboard mx-auto max-w-6xl px-4 py-8">
+      <section className="donor-dashboard-hero rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="donor-eyebrow">Mijn portaal</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-950">Dashboard</h1>
             <p className="mt-2 text-sm text-slate-600">Uw gegevens en betalingen bij St. GBC Masjid Ghausia.</p>
           </div>
           {profile.registrationNumber ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="donor-member-badge rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
               <p className="text-xs font-bold uppercase text-slate-500">Lidnummer</p>
               <p className="mt-1 text-2xl font-black text-[#0f5f9f]">{profile.registrationNumber}</p>
             </div>

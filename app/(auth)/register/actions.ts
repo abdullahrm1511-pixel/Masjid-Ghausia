@@ -15,7 +15,7 @@ export type RegistrationState = {
   message?: string;
 };
 
-const MAX_ID_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_ID_FILE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_ID_FILE_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
 const fieldLabels: Record<string, string> = {
@@ -63,7 +63,7 @@ function identityDocumentFromFormData(formData: FormData) {
     return { error: "Fout ID uploaden: Upload een kopie van uw ID" };
   }
   if (file.size > MAX_ID_FILE_SIZE) {
-    return { error: "Fout ID uploaden: Het bestand mag maximaal 5 MB zijn" };
+    return { error: "Fout ID uploaden: Het bestand mag maximaal 2 MB zijn" };
   }
   if (!ALLOWED_ID_FILE_TYPES.has(file.type)) {
     return { error: "Fout ID uploaden: Upload een PDF, JPG of PNG bestand" };

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth";
 import { isAdminRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { SubmitButton } from "@/components/donor/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -52,10 +53,11 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 py-12">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Masjid Ghausia</p>
+    <main className="donor-auth-page px-4 py-12">
+      <section className="donor-auth-card">
+      <p className="donor-eyebrow">Masjid Ghausia</p>
       <h1 className="mt-2 text-3xl font-black text-slate-950">Inloggen</h1>
+      <p className="mt-2 text-sm leading-6 text-slate-600">Log in om uw gegevens, lidnummer en betalingen te bekijken.</p>
       {params.registered === "1" ? (
         <div className="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-900">
           Uw registratie is succesvol ontvangen. U kunt inloggen zodra uw account is goedgekeurd door het bestuur.
@@ -75,9 +77,7 @@ export default async function LoginPage({
           Wachtwoord
           <input name="password" type="password" autoComplete="current-password" required />
         </label>
-        <button className="rounded-lg bg-[#1483d6] px-4 py-3 font-semibold text-white shadow-sm hover:bg-[#0f5f9f]" type="submit">
-          Inloggen
-        </button>
+        <SubmitButton className="w-full" pendingLabel="Inloggen...">Inloggen</SubmitButton>
       </form>
       </section>
     </main>

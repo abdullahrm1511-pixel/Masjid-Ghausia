@@ -15,26 +15,49 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="mx-auto grid min-h-[calc(100vh-73px)] max-w-6xl content-center px-4 py-12">
-      <section className="max-w-2xl rounded-xl border border-slate-200 bg-white p-7 shadow-sm">
-        <div className="mb-5 flex items-center gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#1483d6]">
-            <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={64} src="/masjid-ghausia-logo.png" width={64} />
-          </span>
-          <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">St. GBC Masjid Ghausia</p>
+    <main className="donor-home px-4">
+      <section className="donor-hero">
+        <div>
+          <div className="mb-6 flex items-center gap-4">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/15 p-1 ring-1 ring-white/25">
+              <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={64} src="/masjid-ghausia-logo.png" width={64} priority />
+            </span>
+            <div>
+              <p className="donor-eyebrow">St. GBC Masjid Ghausia</p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">Rotterdam</p>
+            </div>
+          </div>
+          <h1 className="text-4xl font-black leading-tight text-slate-950 sm:text-5xl">Donateursportaal</h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
+            Registreer, bekijk uw gegevens en volg de status van uw lidmaatschap op een rustige en veilige plek.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link className="donor-primary-link" href="/login">
+              Inloggen
+            </Link>
+            <Link className="donor-secondary-link" href="/register">
+              Nieuwe inschrijving
+            </Link>
+          </div>
         </div>
-        <h1 className="text-4xl font-black text-slate-950 sm:text-5xl">Donateursportaal</h1>
-        <p className="mt-5 text-lg leading-8 text-slate-700">
-          Welkom bij het donateursportaal van St. GBC.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link className="rounded-lg bg-[#1483d6] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#0f5f9f]" href="/login">
-            Inloggen
-          </Link>
-          <Link className="rounded-lg border border-slate-300 px-5 py-3 font-semibold text-slate-800 hover:bg-slate-50" href="/register">
-            Nieuwe inschrijving
-          </Link>
-        </div>
+
+        <aside className="donor-hero-panel">
+          <h2 className="text-2xl font-black text-slate-950">Snel geregeld</h2>
+          <div className="mt-5 grid gap-3">
+            <div className="donor-feature-row">
+              <span>1</span>
+              <p>Uw aanvraag en PDF-kopie blijven overzichtelijk bij elkaar.</p>
+            </div>
+            <div className="donor-feature-row">
+              <span>2</span>
+              <p>Na goedkeuring ziet u uw lidnummer en betalingen direct terug.</p>
+            </div>
+            <div className="donor-feature-row">
+              <span>3</span>
+              <p>Wijzigingen kunt u later vanuit uw profiel aanvragen.</p>
+            </div>
+          </div>
+        </aside>
       </section>
     </main>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { submitRegistration, type RegistrationState } from "./actions";
+import { SubmitButton } from "@/components/donor/SubmitButton";
 
 const privacyText = [
   {
@@ -46,6 +47,80 @@ const privacyText = [
   }
 ];
 
+const ID_IMAGE_TARGET_BYTES = 900 * 1024;
+const ID_IMAGE_MAX_SIDE = 1600;
+const ID_IMAGE_MIN_SIDE = 1100;
+
+function readableFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
+async function loadImage(file: File) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = url;
+    await image.decode();
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Kon afbeelding niet verkleinen"));
+      },
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+async function compressIdentityImage(file: File) {
+  if (!file.type.startsWith("image/")) return file;
+
+  const image = await loadImage(file);
+  let maxSide = ID_IMAGE_MAX_SIDE;
+  let quality = 0.76;
+  let bestBlob: Blob | null = null;
+
+  while (maxSide >= ID_IMAGE_MIN_SIDE) {
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+
+    if (!context) throw new Error("Kon afbeelding niet verwerken");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    while (quality >= 0.58) {
+      const blob = await canvasToBlob(canvas, quality);
+      bestBlob = blob;
+      if (blob.size <= ID_IMAGE_TARGET_BYTES) {
+        return new File([blob], "id-document.jpg", { type: "image/jpeg", lastModified: Date.now() });
+      }
+      quality -= 0.08;
+    }
+
+    maxSide -= 200;
+    quality = 0.72;
+  }
+
+  if (!bestBlob) return file;
+  return new File([bestBlob], "id-document.jpg", { type: "image/jpeg", lastModified: Date.now() });
+}
+
 export function RegisterForm({ error }: { error?: string }) {
   const [state, formAction] = useActionState<RegistrationState, FormData>(submitRegistration, {
     errors: error ? [error] : [],
@@ -57,6 +132,10 @@ export function RegisterForm({ error }: { error?: string }) {
   const [children, setChildren] = useState<number[]>([]);
   const [step, setStep] = useState(0);
   const [privacyScrolled, setPrivacyScrolled] = useState(false);
+  const [identityFileMessage, setIdentityFileMessage] = useState("");
+  const [identityProcessing, setIdentityProcessing] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const skipCompressionRef = useRef(false);
   const childCount = children.length ? Math.max(...children) + 1 : 0;
   const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "ID Uploaden", "Bevestiging"];
   const field = (name: string) => state.values[name] ?? "";
@@ -88,8 +167,39 @@ export function RegisterForm({ error }: { error?: string }) {
 
   const maritalStatus = hasPartner === "yes" ? "MARRIED" : "SINGLE";
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (skipCompressionRef.current) {
+      skipCompressionRef.current = false;
+      return;
+    }
+
+    const input = event.currentTarget.elements.namedItem("identityDocument") as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+
+    event.preventDefault();
+    setIdentityProcessing(true);
+    setIdentityFileMessage("Foto wordt verkleind...");
+
+    try {
+      const compressed = await compressIdentityImage(file);
+      const transfer = new DataTransfer();
+      transfer.items.add(compressed);
+      input.files = transfer.files;
+      setIdentityFileMessage(`Foto verkleind van ${readableFileSize(file.size)} naar ${readableFileSize(compressed.size)}.`);
+      skipCompressionRef.current = true;
+      formRef.current?.requestSubmit();
+    } catch {
+      setIdentityFileMessage("Foto kon niet automatisch verkleind worden. Kies eventueel een duidelijkere of kleinere foto.");
+      skipCompressionRef.current = true;
+      formRef.current?.requestSubmit();
+    } finally {
+      setIdentityProcessing(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="grid gap-5 sm:gap-6" key={formKey} noValidate>
+    <form action={formAction} className="grid gap-5 sm:gap-6" key={formKey} noValidate onSubmit={handleSubmit} ref={formRef}>
       <input name="maritalStatus" type="hidden" value={maritalStatus} />
       {state.errors.length ? (
         <div className="grid gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
@@ -106,7 +216,7 @@ export function RegisterForm({ error }: { error?: string }) {
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         {steps.map((label, index) => (
           <button
-            className={`shrink-0 rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-[#1483d6] bg-[#1483d6] text-white" : "border-slate-300 bg-white text-slate-700"}`}
+            className={`shrink-0 rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-[#0f766e] bg-[#0f766e] text-white shadow-sm" : "border-slate-300 bg-white text-slate-700 hover:border-[#0f766e]/40 hover:bg-emerald-50"}`}
             key={label}
             onClick={() => setStep(index)}
             type="button"
@@ -170,7 +280,7 @@ export function RegisterForm({ error }: { error?: string }) {
                 <label>Geboorteplaats<input name={`child.${index}.birthPlace`} defaultValue={field(`child.${index}.birthPlace`)} /></label>
               </div>
             ))}
-            <button className="w-full rounded-md border border-[#1483d6] px-4 py-2 font-semibold text-[#0f5f9f] sm:w-fit" type="button" onClick={() => setChildren((items) => [...items, childCount])}>
+            <button className="w-full rounded-md border border-[#0f766e] px-4 py-2 font-semibold text-[#115e59] hover:bg-emerald-50 sm:w-fit" type="button" onClick={() => setChildren((items) => [...items, childCount])}>
               Kind toevoegen
             </button>
           </>
@@ -191,11 +301,20 @@ export function RegisterForm({ error }: { error?: string }) {
         <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
           <label>
             Kopie ID
-            <input accept="application/pdf,image/jpeg,image/png" name="identityDocument" type="file" />
+            <input
+              accept="image/*,application/pdf"
+              name="identityDocument"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                setIdentityFileMessage(file ? `${file.name} geselecteerd (${readableFileSize(file.size)}). Fotos worden automatisch verkleind bij indienen.` : "");
+              }}
+              type="file"
+            />
           </label>
           <p className="text-sm font-semibold text-slate-600">
-            Upload een PDF, JPG of PNG van maximaal 5 MB. Dit document is alleen zichtbaar voor bevoegde beheerders en uzelf.
+            Maak een foto met uw telefoon of kies een bestaande foto/PDF. Fotos worden automatisch zo klein mogelijk gemaakt terwijl ze leesbaar blijven. Maximale upload na verkleinen: 2 MB.
           </p>
+          {identityFileMessage ? <p className="rounded-md bg-white p-3 text-sm font-semibold text-slate-700">{identityFileMessage}</p> : null}
           {state.verificationRequired ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
               Selecteer het ID-bestand opnieuw voordat u de verificatiecode indient.
@@ -242,7 +361,7 @@ export function RegisterForm({ error }: { error?: string }) {
             </div>
           </div>
           <a
-            className="rounded-md border border-[#1483d6] bg-white px-4 py-3 text-sm font-bold text-[#0f5f9f] hover:bg-blue-50"
+            className="rounded-md border border-[#0f766e] bg-white px-4 py-3 text-sm font-bold text-[#115e59] hover:bg-emerald-50"
             href="/documents/reglement-stgbc-13-02-2026.pdf"
             rel="noreferrer"
             target="_blank"
@@ -260,7 +379,7 @@ export function RegisterForm({ error }: { error?: string }) {
           )}
         </div>
         {state.verificationRequired ? (
-          <div className="grid gap-2 rounded-md border border-[#1483d6]/25 bg-blue-50 p-4">
+          <div className="grid gap-2 rounded-md border border-[#0f766e]/25 bg-emerald-50 p-4">
             <label className="font-semibold text-slate-900">
               Verificatiecode uit uw e-mail
               <input
@@ -285,13 +404,13 @@ export function RegisterForm({ error }: { error?: string }) {
           Vorige
         </button>
         {step < steps.length - 1 ? (
-          <button className="rounded-md bg-[#1483d6] px-5 py-3 font-semibold text-white hover:bg-[#0f5f9f]" formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
+          <button className="rounded-md bg-[#0f766e] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#115e59]" formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
             Volgende
           </button>
         ) : (
-          <button className="rounded-md bg-[#1483d6] px-5 py-3 font-semibold text-white hover:bg-[#0f5f9f] disabled:bg-slate-300 disabled:text-slate-600" disabled={!privacyScrolled} type="submit">
-            {state.verificationRequired ? "Code controleren en indienen" : "Verificatiecode ontvangen"}
-          </button>
+          <SubmitButton className="px-5 py-3 disabled:bg-slate-300 disabled:text-slate-600" disabled={!privacyScrolled || identityProcessing} pendingLabel={state.verificationRequired ? "Code controleren..." : "Code versturen..."}>
+            {identityProcessing ? "Foto verkleinen..." : state.verificationRequired ? "Code controleren en indienen" : "Verificatiecode ontvangen"}
+          </SubmitButton>
         )}
       </div>
     </form>

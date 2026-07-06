@@ -5,6 +5,7 @@ import { formatDateWithAge } from "@/lib/display";
 import { formatIban } from "@/lib/iban";
 import { prisma } from "@/lib/prisma";
 import { submitChangeRequest } from "./actions";
+import { SubmitButton } from "@/components/donor/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +34,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
+    <main className="donor-account-page mx-auto max-w-5xl px-4 py-10">
       <BackButton fallbackHref="/dashboard" />
-      <h1 className="mt-5 text-3xl font-bold text-slate-900">Mijn account</h1>
+      <p className="donor-eyebrow mt-5">Profiel</p>
+      <h1 className="mt-2 text-3xl font-black text-slate-900">Mijn account</h1>
       {params.error ? <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{params.error}</div> : null}
 
       <section className="mt-8 grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
@@ -146,7 +148,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </section>
 
           <label>Toelichting<textarea name="donorNote" rows={3} /></label>
-          <button className="w-fit rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" type="submit">Wijziging indienen</button>
+          <SubmitButton className="w-fit" pendingLabel="Wijziging indienen...">Wijziging indienen</SubmitButton>
         </form>
       </section>
     </main>
