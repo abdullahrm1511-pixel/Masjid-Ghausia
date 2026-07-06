@@ -61,6 +61,8 @@ export function RegisterForm({ error }: { error?: string }) {
   const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "ID Uploaden", "Bevestiging"];
   const field = (name: string) => state.values[name] ?? "";
   const formKey = JSON.stringify(state.values);
+  const today = new Date().toISOString().slice(0, 10);
+  const namePattern = "[A-Za-zÀ-ÖØ-öø-ÿ\\s]+";
 
   useEffect(() => {
     if (!Object.keys(state.values).length) return;
@@ -116,12 +118,12 @@ export function RegisterForm({ error }: { error?: string }) {
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 0 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Hoofddonateur</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label>Voornaam<input name="firstName" defaultValue={field("firstName")} required /></label>
-          <label>Achternaam<input name="lastName" defaultValue={field("lastName")} required /></label>
+          <label>Voornaam<input name="firstName" pattern={namePattern} defaultValue={field("firstName")} required /></label>
+          <label>Achternaam<input name="lastName" pattern={namePattern} defaultValue={field("lastName")} required /></label>
           <label>Geslacht<select name="gender" defaultValue={field("gender") || "MALE"} required><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
-          <label>Geboortedatum<input name="dateOfBirth" type="date" defaultValue={field("dateOfBirth")} required /></label>
+          <label>Geboortedatum<input name="dateOfBirth" type="date" max={today} defaultValue={field("dateOfBirth")} required /></label>
           <label>Geboorteplaats<input name="birthPlace" defaultValue={field("birthPlace")} required /></label>
-          <label>Telefoon<input name="phone" defaultValue={field("phone")} required /></label>
+          <label>Telefoon<input name="phone" inputMode="numeric" pattern="06[0-9]{8}" maxLength={10} placeholder="0612345678" defaultValue={field("phone")} required /></label>
           <label>E-mailadres<input name="email" type="email" defaultValue={field("email")} required /></label>
           <label>Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
           <label>Postcode<input name="postalCode" defaultValue={field("postalCode")} required /></label>
@@ -138,10 +140,10 @@ export function RegisterForm({ error }: { error?: string }) {
         <label>Heeft u een partner?<select name="hasPartner" value={hasPartner} onChange={(event) => setHasPartner(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
         {hasPartner === "yes" ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            <label>Voornaam<input name="partner.firstName" defaultValue={field("partner.firstName")} /></label>
-            <label>Achternaam<input name="partner.lastName" defaultValue={field("partner.lastName")} /></label>
+            <label>Voornaam<input name="partner.firstName" pattern={namePattern} defaultValue={field("partner.firstName")} /></label>
+            <label>Achternaam<input name="partner.lastName" pattern={namePattern} defaultValue={field("partner.lastName")} /></label>
             <label>Geslacht<select name="partner.gender" defaultValue={field("partner.gender") || "MALE"}><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
-            <label>Geboortedatum<input name="partner.dateOfBirth" type="date" defaultValue={field("partner.dateOfBirth")} /></label>
+            <label>Geboortedatum<input name="partner.dateOfBirth" type="date" max={today} defaultValue={field("partner.dateOfBirth")} /></label>
             <label>Geboorteplaats<input name="partner.birthPlace" defaultValue={field("partner.birthPlace")} /></label>
           </div>
         ) : null}
@@ -161,10 +163,10 @@ export function RegisterForm({ error }: { error?: string }) {
                     Verwijderen
                   </button>
                 </div>
-                <label>Voornaam<input name={`child.${index}.firstName`} defaultValue={field(`child.${index}.firstName`)} /></label>
-                <label>Achternaam<input name={`child.${index}.lastName`} defaultValue={field(`child.${index}.lastName`)} /></label>
+                <label>Voornaam<input name={`child.${index}.firstName`} pattern={namePattern} defaultValue={field(`child.${index}.firstName`)} /></label>
+                <label>Achternaam<input name={`child.${index}.lastName`} pattern={namePattern} defaultValue={field(`child.${index}.lastName`)} /></label>
                 <label>Geslacht<select name={`child.${index}.gender`} defaultValue={field(`child.${index}.gender`) || "MALE"}><option value="MALE">Jongen</option><option value="FEMALE">Meisje</option></select></label>
-                <label>Geboortedatum<input name={`child.${index}.dateOfBirth`} type="date" defaultValue={field(`child.${index}.dateOfBirth`)} /></label>
+                <label>Geboortedatum<input name={`child.${index}.dateOfBirth`} type="date" max={today} defaultValue={field(`child.${index}.dateOfBirth`)} /></label>
                 <label>Geboorteplaats<input name={`child.${index}.birthPlace`} defaultValue={field(`child.${index}.birthPlace`)} /></label>
               </div>
             ))}
@@ -178,8 +180,8 @@ export function RegisterForm({ error }: { error?: string }) {
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 3 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Contactpersoon Pakistan</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label>Contactpersoon Pakistan<input name="pakistanContactName" defaultValue={field("pakistanContactName")} /></label>
-          <label>Telefoon Pakistan<input name="pakistanContactPhone" defaultValue={field("pakistanContactPhone")} /></label>
+          <label>Contactpersoon Pakistan<input name="pakistanContactName" pattern={namePattern} defaultValue={field("pakistanContactName")} /></label>
+          <label>Telefoon Pakistan<input name="pakistanContactPhone" inputMode="numeric" pattern="[0-9]*" defaultValue={field("pakistanContactPhone")} /></label>
         </div>
         <label>Uitvaartwensen<textarea name="funeralWishes" rows={4} defaultValue={field("funeralWishes")} /></label>
       </section>
