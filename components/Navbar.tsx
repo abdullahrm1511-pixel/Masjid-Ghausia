@@ -45,14 +45,14 @@ export function Navbar({ session }: { session: Session | null }) {
         </Link>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">
           {!role ? (
-            <>
+            <div className="public-auth-links flex shrink-0 gap-2">
               <Link className={navLink} href="/login">
                 Inloggen
               </Link>
               <Link className="rounded-md bg-white px-3 py-2 text-[#0f5f9f] hover:bg-[#f0c08d]" href="/register">
                 Inschrijven
               </Link>
-            </>
+            </div>
           ) : null}
           {donor ? (
             <>

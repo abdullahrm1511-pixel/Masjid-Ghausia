@@ -17,7 +17,7 @@ export default async function HomePage() {
   return (
     <main className="donor-home px-4">
       <section className="donor-hero">
-        <div>
+        <div className="donor-hero-copy">
           <div className="mb-6 flex items-center gap-4">
             <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/15 p-1 ring-1 ring-white/25">
               <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={64} src="/masjid-ghausia-logo.png" width={64} priority />

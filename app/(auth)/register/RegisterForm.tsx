@@ -122,12 +122,12 @@ function validateFieldValue(value: string, rules: FieldRules, form?: HTMLFormEle
     return { status: "warning", message: "Gebruik formaat 1234 AB" };
   }
   if (rules.email) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      return { status: "error", message: "Vul een geldig e-mailadres in" };
-    }
     const suggestion = emailSuggestion(trimmed);
     if (suggestion && suggestion !== trimmed.toLowerCase()) {
       return { status: "warning", message: `Bedoelt u ${suggestion}? Druk op Enter om aan te vullen.`, suggestion };
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return { status: "error", message: "Vul een geldig e-mailadres in" };
     }
   }
   if (rules.password && trimmed.length < 8) {
@@ -223,6 +223,7 @@ export function RegisterForm({ error }: { error?: string }) {
   const [identityProcessing, setIdentityProcessing] = useState(false);
   const [fieldFeedback, setFieldFeedback] = useState<Record<string, FieldFeedback | null>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [emailValue, setEmailValue] = useState(state.values.email ?? "");
   const formRef = useRef<HTMLFormElement>(null);
   const skipCompressionRef = useRef(false);
   const childCount = children.length ? Math.max(...children) + 1 : 0;
@@ -251,6 +252,7 @@ export function RegisterForm({ error }: { error?: string }) {
     );
     setChildren(nextChildren);
     setPrivacyScrolled(state.values.termsAccepted === "on");
+    setEmailValue(state.values.email ?? "");
     setStep(state.verificationRequired ? steps.length - 1 : 0);
   }, [state.values, state.verificationRequired, steps.length]);
 
@@ -303,10 +305,11 @@ export function RegisterForm({ error }: { error?: string }) {
   function applyEmailSuggestion(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     const input = event.currentTarget;
-    const suggestion = fieldFeedback.email?.suggestion || emailSuggestion(input.value);
+    const suggestion = emailSuggestion(input.value);
     if (!suggestion) return;
     event.preventDefault();
     input.value = suggestion;
+    setEmailValue(suggestion);
     setFieldState("email", suggestion, { required: true, email: true });
   }
 
@@ -385,23 +388,46 @@ export function RegisterForm({ error }: { error?: string }) {
             <label>Telefoon<input {...validatedInput("phone", { required: true, phone: true })} inputMode="numeric" pattern="06[0-9]{8}" maxLength={10} placeholder="0612345678" required />{feedbackMessage("phone")}</label>
             <label>
               E-mailadres
-              <input {...validatedInput("email", { required: true, email: true })} autoComplete="email" list="email-domain-suggestions" onKeyDown={applyEmailSuggestion} type="email" required />
+              <input
+                {...validatedInput("email", { required: true, email: true })}
+                autoComplete="off"
+                onInput={(event) => {
+                  const input = event.currentTarget;
+                  setEmailValue(input.value);
+                  setFieldState("email", input.value, { required: true, email: true });
+                }}
+                onKeyDown={applyEmailSuggestion}
+                type="email"
+                required
+              />
+              {emailSuggestion(emailValue) ? (
+                <button
+                  className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-900 hover:bg-sky-100"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    const suggestion = emailSuggestion(emailValue);
+                    const input = formRef.current?.elements.namedItem("email") as HTMLInputElement | null;
+                    if (!suggestion || !input) return;
+                    input.value = suggestion;
+                    setEmailValue(suggestion);
+                    setFieldState("email", suggestion, { required: true, email: true });
+                  }}
+                  type="button"
+                >
+                  Suggestie: {emailSuggestion(emailValue)} <span className="font-normal">Enter of klik om over te nemen</span>
+                </button>
+              ) : null}
               {feedbackMessage("email")}
             </label>
-            <datalist id="email-domain-suggestions">
-              {commonEmailDomains.map((domain) => (
-                <option key={domain} value={field("email").includes("@") ? `${field("email").split("@")[0]}@${domain}` : domain} />
-              ))}
-            </datalist>
           </div>
 
           <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
             <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Woongegevens en betaling</h3>
-            <label>Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
+            <label className="sm:col-span-2">Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
             <label>Postcode<input {...validatedInput("postalCode", { required: true, postcode: true })} inputMode="text" maxLength={7} placeholder="3061 AB" required />{feedbackMessage("postalCode")}</label>
             <label>Woonplaats<input {...validatedInput("city", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("city")}</label>
-            <label>IBAN<input name="iban" placeholder="NL79 ABNA 0543 4484 28" defaultValue={field("iban")} required /></label>
             <label>Naam rekeninghouder<input {...validatedInput("accountHolderName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("accountHolderName")}</label>
+            <label>IBAN<input name="iban" placeholder="NL79 ABNA 0543 4484 28" defaultValue={field("iban")} required /></label>
           </div>
 
           <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
@@ -510,11 +536,22 @@ export function RegisterForm({ error }: { error?: string }) {
 
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 5 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Bevestiging</h2>
-        <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
-          <h3 className="font-bold text-slate-900">Donatie</h3>
+        <div className="grid gap-4 rounded-md border border-emerald-200 bg-emerald-50 p-4">
+          <div>
+            <h3 className="text-lg font-black text-slate-950">Donatie</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-700">Maandelijkse betaling naar moskee</p>
+          </div>
           <label>
-            Donatiebedrag
+            Maandelijks donatiebedrag
             <input name="donationAmount" type="number" min="0" step="0.01" placeholder="0,00" defaultValue={field("donationAmount")} />
+          </label>
+          <div className="rounded-md bg-white p-3 text-sm font-semibold text-slate-800">
+            <p>Rekeningnummer: NL72ABNA0808763342</p>
+            <p>Ten name van: Stichting Masjid Ghausia</p>
+          </div>
+          <label className="flex grid-cols-none flex-row items-start gap-3 rounded-md border border-emerald-200 bg-white p-3 font-medium text-emerald-950">
+            <input className="mt-1 w-auto" name="donationMandateAccepted" type="checkbox" defaultChecked={field("donationMandateAccepted") === "on"} />
+            <span>Ik bevestig de maandelijkse betaling naar de moskee op het opgegeven rekeningnummer.</span>
           </label>
         </div>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="healthDeclaration" type="checkbox" defaultChecked={field("healthDeclaration") === "on"} /> Gezondheidsverklaring bevestigd</label>

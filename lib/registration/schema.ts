@@ -54,6 +54,7 @@ export const registrationBaseSchema = z.object({
   pakistanContactPhone: optionalDigits,
   funeralWishes: optionalText,
   donationAmount: optionalAmount,
+  donationMandateAccepted: z.boolean().default(false),
   healthDeclaration: z.boolean().default(false),
   legalResidence: z.boolean().default(false),
   termsAccepted: z.boolean().default(false)
@@ -160,6 +161,13 @@ export const registrationSubmitSchema = registrationBaseSchema.superRefine((data
       code: z.ZodIssueCode.custom,
       path: ["children"],
       message: "Voeg minimaal een kind toe of kies Nee"
+    });
+  }
+  if (data.donationAmount > 0 && !data.donationMandateAccepted) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["donationMandateAccepted"],
+      message: "Bevestig de maandelijkse betaling naar de moskee"
     });
   }
   for (const field of ["healthDeclaration", "legalResidence", "termsAccepted"] as const) {

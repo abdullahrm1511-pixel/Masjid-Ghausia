@@ -259,6 +259,10 @@ button:disabled {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.donor-portal:has(.donor-home) .public-auth-links {
+  display: none;
+}
+
 .donor-home {
   display: grid;
   min-height: calc(100vh - 73px);
@@ -272,6 +276,14 @@ button:disabled {
   max-width: 72rem;
   margin-inline: auto;
   gap: 2rem;
+}
+
+.donor-hero-copy {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  padding-block: 1.5rem;
 }
 
 .donor-hero-panel,
@@ -388,10 +400,17 @@ button:disabled {
 @media (min-width: 900px) {
   .donor-hero {
     grid-template-columns: minmax(0, 1.08fr) minmax(22rem, 0.92fr);
-    align-items: center;
+    align-items: stretch;
+  }
+
+  .donor-hero-copy {
+    padding-block: 1.75rem;
   }
 
   .donor-hero-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     padding: 1.75rem;
   }
 }
@@ -409,6 +428,10 @@ button:disabled {
   .donor-auth-card,
   .donor-hero-panel {
     border-radius: 1.1rem;
+  }
+
+  .donor-hero-copy {
+    padding-block: 0;
   }
 }
 

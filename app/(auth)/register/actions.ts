@@ -37,6 +37,7 @@ const fieldLabels: Record<string, string> = {
   partner: "Partner",
   children: "Kinderen",
   donationAmount: "Donatie",
+  donationMandateAccepted: "Maandelijkse betaling naar moskee",
   identityDocument: "ID uploaden",
   healthDeclaration: "Gezondheidsverklaring",
   legalResidence: "Verblijf in Nederland",
@@ -189,6 +190,7 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     pakistanContactPhone: value(formData, "pakistanContactPhone"),
     funeralWishes: value(formData, "funeralWishes"),
     donationAmount: value(formData, "donationAmount"),
+    donationMandateAccepted: formData.get("donationMandateAccepted") === "on",
     healthDeclaration: formData.get("healthDeclaration") === "on",
     legalResidence: formData.get("legalResidence") === "on",
     termsAccepted: formData.get("termsAccepted") === "on"
