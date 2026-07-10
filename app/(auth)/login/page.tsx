@@ -1,4 +1,5 @@
 import { AuthError } from "next-auth";
+import { compare } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/lib/auth";
 import { isAdminRole } from "@/lib/permissions";
@@ -10,39 +11,82 @@ export const dynamic = "force-dynamic";
 async function loginAction(formData: FormData) {
   "use server";
 
-  const email = String(formData.get("email") ?? "").toLowerCase();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
 
-  try {
-    await signIn("credentials", {
-      email,
-      password: String(formData.get("password") ?? ""),
-      redirect: false
-    });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      redirect("/login?error=1");
-    }
-    throw error;
+  if (!email || !password) {
+    redirect("/login?error=empty");
   }
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { role: true }
+    select: { id: true, role: true, isActive: true, passwordHash: true }
   });
 
-  if (isAdminRole(user?.role)) {
+  if (!user) {
+    redirect(`/login?error=email&email=${encodeURIComponent(email)}`);
+  }
+
+  if (!user.passwordHash) {
+    redirect(`/login?error=no-password&email=${encodeURIComponent(email)}`);
+  }
+
+  if (!user.isActive) {
+    redirect(`/login?error=inactive&email=${encodeURIComponent(email)}`);
+  }
+
+  const passwordMatches = await compare(password, user.passwordHash);
+  if (!passwordMatches) {
+    redirect(`/login?error=password&email=${encodeURIComponent(email)}`);
+  }
+
+  try {
+    await signIn("credentials", {
+      email,
+      password,
+      redirect: false
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      redirect(`/login?error=general&email=${encodeURIComponent(email)}`);
+    }
+    throw error;
+  }
+
+  if (isAdminRole(user.role)) {
     redirect("/admin");
   }
   redirect("/dashboard");
 }
 
+function loginErrorMessage(error?: string) {
+  switch (error) {
+    case "empty":
+      return "Vul uw e-mailadres en wachtwoord in.";
+    case "email":
+      return "Dit e-mailadres staat niet in ons systeem. Controleer het adres of registreer opnieuw.";
+    case "no-password":
+      return "Voor dit account is nog geen wachtwoord ingesteld. Vraag een nieuw wachtwoord aan.";
+    case "inactive":
+      return "Dit account is nog niet actief. Wacht op goedkeuring van het bestuur.";
+    case "password":
+      return "Het wachtwoord is onjuist. Probeer opnieuw of gebruik wachtwoord vergeten.";
+    case "general":
+    case "1":
+      return "Inloggen is niet gelukt. Controleer uw gegevens.";
+    default:
+      return null;
+  }
+}
+
 export default async function LoginPage({
   searchParams
 }: {
-  searchParams: Promise<{ registered?: string; error?: string }>;
+  searchParams: Promise<{ registered?: string; error?: string; email?: string }>;
 }) {
   const params = await searchParams;
   const session = await auth();
+  const errorMessage = loginErrorMessage(params.error);
 
   if (isAdminRole(session?.user.role)) {
     redirect("/admin");
@@ -63,15 +107,15 @@ export default async function LoginPage({
           Uw registratie is succesvol ontvangen. U kunt inloggen zodra uw account is goedgekeurd door het bestuur.
         </div>
       ) : null}
-      {params.error === "1" ? (
+      {errorMessage ? (
         <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
-          Inloggen is niet gelukt. Controleer uw gegevens.
+          {errorMessage}
         </div>
       ) : null}
       <form action={loginAction} className="mt-8 grid gap-4">
         <label>
           E-mailadres
-          <input name="email" type="email" autoComplete="email" required />
+          <input name="email" type="email" autoComplete="email" defaultValue={params.email ?? ""} required />
         </label>
         <label>
           Wachtwoord
