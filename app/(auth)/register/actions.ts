@@ -212,6 +212,15 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     };
   }
 
+  const identityDocument = identityDocumentFromFormData(formData);
+  if (identityDocument.error || !identityDocument.file) {
+    return {
+      errors: [identityDocument.error ?? "Fout ID uploaden: Upload een kopie van uw ID"],
+      values: submittedValues,
+      verificationRequired: true
+    };
+  }
+
   const verificationCode = value(formData, "verificationCode");
   if (!verificationCode) {
     try {
@@ -228,15 +237,6 @@ export async function submitRegistration(_previous: RegistrationState, formData:
       values: submittedValues,
       verificationRequired: true,
       message: `We hebben een 6-cijferige code gestuurd naar ${data.email}. Vul de code in om uw registratie af te ronden.`
-    };
-  }
-
-  const identityDocument = identityDocumentFromFormData(formData);
-  if (identityDocument.error || !identityDocument.file) {
-    return {
-      errors: [identityDocument.error ?? "Fout ID uploaden: Upload een kopie van uw ID"],
-      values: submittedValues,
-      verificationRequired: true
     };
   }
 

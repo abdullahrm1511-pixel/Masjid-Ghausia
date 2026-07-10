@@ -225,11 +225,11 @@ export function RegisterForm({ error }: { error?: string }) {
   const [showPassword, setShowPassword] = useState(false);
   const [emailValue, setEmailValue] = useState(state.values.email ?? "");
   const formRef = useRef<HTMLFormElement>(null);
+  const identityDocumentRef = useRef<File | null>(null);
   const skipCompressionRef = useRef(false);
   const childCount = children.length ? Math.max(...children) + 1 : 0;
   const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "ID Uploaden", "Bevestiging"];
   const field = (name: string) => state.values[name] ?? "";
-  const formKey = JSON.stringify(state.values);
   const today = new Date().toISOString().slice(0, 10);
   const namePattern = "[A-Za-zÀ-ÖØ-öø-ÿ\\s]+";
 
@@ -320,7 +320,13 @@ export function RegisterForm({ error }: { error?: string }) {
     }
 
     const input = event.currentTarget.elements.namedItem("identityDocument") as HTMLInputElement | null;
-    const file = input?.files?.[0];
+    if (input && !input.files?.length && identityDocumentRef.current) {
+      const transfer = new DataTransfer();
+      transfer.items.add(identityDocumentRef.current);
+      input.files = transfer.files;
+    }
+
+    const file = input?.files?.[0] ?? identityDocumentRef.current;
     if (!file || !file.type.startsWith("image/")) return;
 
     event.preventDefault();
@@ -331,7 +337,8 @@ export function RegisterForm({ error }: { error?: string }) {
       const compressed = await compressIdentityImage(file);
       const transfer = new DataTransfer();
       transfer.items.add(compressed);
-      input.files = transfer.files;
+      identityDocumentRef.current = compressed;
+      if (input) input.files = transfer.files;
       setIdentityFileMessage(`Foto verkleind van ${readableFileSize(file.size)} naar ${readableFileSize(compressed.size)}.`);
       skipCompressionRef.current = true;
       formRef.current?.requestSubmit();
@@ -345,7 +352,7 @@ export function RegisterForm({ error }: { error?: string }) {
   }
 
   return (
-    <form action={formAction} className="grid gap-5 sm:gap-6" key={formKey} noValidate onSubmit={handleSubmit} ref={formRef}>
+    <form action={formAction} className="grid gap-5 sm:gap-6" noValidate onSubmit={handleSubmit} ref={formRef}>
       <input name="maritalStatus" type="hidden" value={maritalStatus} />
       {state.errors.length ? (
         <div className="grid gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
@@ -517,6 +524,7 @@ export function RegisterForm({ error }: { error?: string }) {
               name="identityDocument"
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
+                identityDocumentRef.current = file ?? null;
                 setIdentityFileMessage(file ? `${file.name} geselecteerd (${readableFileSize(file.size)}). Fotos worden automatisch verkleind bij indienen.` : "");
               }}
               type="file"
@@ -528,7 +536,7 @@ export function RegisterForm({ error }: { error?: string }) {
           {identityFileMessage ? <p className="rounded-md bg-white p-3 text-sm font-semibold text-slate-700">{identityFileMessage}</p> : null}
           {state.verificationRequired ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-              Selecteer het ID-bestand opnieuw voordat u de verificatiecode indient.
+              Uw ID-bestand blijft bewaard in deze pagina. Laat deze pagina open en vul de verificatiecode in.
             </p>
           ) : null}
         </div>
@@ -537,21 +545,23 @@ export function RegisterForm({ error }: { error?: string }) {
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 5 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Bevestiging</h2>
         <div className="grid gap-4 rounded-md border border-emerald-200 bg-emerald-50 p-4">
-          <div>
-            <h3 className="text-lg font-black text-slate-950">Donatie</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-700">Maandelijkse betaling naar moskee</p>
-          </div>
-          <label>
-            Maandelijks donatiebedrag
-            <input name="donationAmount" type="number" min="0" step="0.01" placeholder="0,00" defaultValue={field("donationAmount")} />
+          <label className="flex grid-cols-none flex-row items-start gap-3 font-medium text-slate-950">
+            <input className="mt-1 w-auto" name="donationMandateAccepted" type="checkbox" defaultChecked={field("donationMandateAccepted") === "on"} />
+            <span>
+              <strong className="text-lg font-black">Donatie</strong>
+              <span className="font-semibold"> - Maandelijkse betaling naar moskee</span>
+              <span className="mt-1 block text-sm font-semibold text-slate-700">
+                Ik bevestig de maandelijkse betaling naar de moskee op het opgegeven rekeningnummer.
+              </span>
+            </span>
           </label>
           <div className="rounded-md bg-white p-3 text-sm font-semibold text-slate-800">
             <p>Rekeningnummer: NL72ABNA0808763342</p>
             <p>Ten name van: Stichting Masjid Ghausia</p>
           </div>
-          <label className="flex grid-cols-none flex-row items-start gap-3 rounded-md border border-emerald-200 bg-white p-3 font-medium text-emerald-950">
-            <input className="mt-1 w-auto" name="donationMandateAccepted" type="checkbox" defaultChecked={field("donationMandateAccepted") === "on"} />
-            <span>Ik bevestig de maandelijkse betaling naar de moskee op het opgegeven rekeningnummer.</span>
+          <label>
+            Maandelijks donatiebedrag
+            <input name="donationAmount" type="number" min="0" step="0.01" placeholder="0,00" defaultValue={field("donationAmount")} />
           </label>
         </div>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="healthDeclaration" type="checkbox" defaultChecked={field("healthDeclaration") === "on"} /> Gezondheidsverklaring bevestigd</label>
