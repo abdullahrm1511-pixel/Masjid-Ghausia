@@ -17,6 +17,8 @@ type SubmittedRegistrationData = {
   termsAccepted?: boolean;
 };
 
+const NOT_APPLICABLE = "(n.v.t.)";
+
 function formatDateOnly(date?: Date | null) {
   if (!date) return "";
   return date.toLocaleDateString("nl-NL");
@@ -38,14 +40,61 @@ function fullName(person?: { firstName?: string | null; lastName?: string | null
 }
 
 function setText(form: ReturnType<PDFDocument["getForm"]>, name: string, value?: string | null, fontSize = 10) {
-  if (!value) return;
+  const text = value?.trim() || NOT_APPLICABLE;
   try {
     const field = form.getTextField(name);
-    field.setText(value);
+    field.setText(text);
     field.setFontSize(fontSize);
   } catch {
     // The source PDF has a few unnamed/legacy fields. Missing fields should not block PDF generation.
   }
+}
+
+function setRadio(form: ReturnType<PDFDocument["getForm"]>, name: string, value?: string | null) {
+  if (!value) return;
+  try {
+    form.getRadioGroup(name).select(value);
+  } catch {
+    // The source PDF uses legacy radio names. Missing fields should not block PDF generation.
+  }
+}
+
+function removeField(form: ReturnType<PDFDocument["getForm"]>, name: string) {
+  try {
+    form.removeField(form.getField(name));
+  } catch {
+    // Some template versions may not contain this field.
+  }
+}
+
+function genderRadioValue(gender?: string | null) {
+  if (gender === "MALE") return "Yes";
+  if (gender === "FEMALE") return "No";
+  return null;
+}
+
+function pageTwoGenderValue(gender?: string | null) {
+  if (gender === "MALE") return "0";
+  if (gender === "FEMALE") return "1";
+  return null;
+}
+
+function civilStatusValue(status?: string | null) {
+  if (status === "MARRIED") return "1";
+  if (status === "SINGLE") return "2";
+  if (status === "DIVORCED") return "3";
+  if (status === "WIDOWED") return "4";
+  return null;
+}
+
+function drawPageTwoGenderMark(page: ReturnType<PDFDocument["addPage"]> | undefined, gender?: string | null) {
+  if (!page || !gender) return;
+  page.drawText("X", {
+    x: gender === "MALE" ? 439 : 485,
+    y: 548,
+    size: 11,
+    color: rgb(0.08, 0.1, 0.16)
+  });
 }
 
 function drawWrappedText(page: ReturnType<PDFDocument["addPage"]>, text: string, x: number, y: number, maxWidth: number, size = 10) {
@@ -89,6 +138,12 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   const applicantName = fullName(donor);
   const address = [donor.addressLine1, donor.addressLine2].filter(Boolean).join(", ");
   const postalCity = [donor.postalCode, donor.city].filter(Boolean).join(" ");
+  removeField(form, "Button1");
+  setRadio(form, "Radio Button1", "1");
+  setRadio(form, "Radio Button2", pageTwoGenderValue(donor.gender));
+  setRadio(form, "Primery", genderRadioValue(donor.gender));
+  setRadio(form, "Partner", genderRadioValue(partner?.gender));
+  setRadio(form, "Burgelijkstaat", civilStatusValue(donor.maritalStatus));
   setText(form, "Een malig Donatie €", oneTimeAmount);
   setText(form, "Jaarlijks donatie €", annualAmount);
   setText(form, "Registratienummer", donor.registrationNumber);
@@ -110,11 +165,14 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   setText(form, "Datum", today);
   setText(form, "Akkoord aanvrager", applicantName);
 
-  children.slice(0, 3).forEach((child, index) => {
+  [0, 1, 2].forEach((index) => {
+    const child = children[index];
     const nameField = ["undefined_5", "undefined_6", "undefined_7"][index];
     const dateField = ["Geboortedatum_3", "Geboortedatum_4", "Geboortedatum_5"][index];
+    const genderField = ["Kind1", "Kind2", "Kind3"][index];
     setText(form, nameField, fullName(child), 9);
-    setText(form, dateField, formatDateOnly(child.dateOfBirth), 9);
+    setText(form, dateField, formatDateOnly(child?.dateOfBirth), 9);
+    setRadio(form, genderField, genderRadioValue(child?.gender));
   });
 
   setText(form, "Naam", applicantName);
@@ -138,7 +196,7 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
     children.slice(3).forEach((child, index) => {
       drawWrappedText(
         page,
-        `${index + 4}. ${fullName(child)} - geboren op ${formatDateOnly(child.dateOfBirth)} te ${child.birthPlace || "-"}`,
+        `${index + 4}. ${fullName(child) || NOT_APPLICABLE} - geboren op ${formatDateOnly(child.dateOfBirth) || NOT_APPLICABLE} te ${child.birthPlace || NOT_APPLICABLE}`,
         50,
         y,
         495,
@@ -150,15 +208,7 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
 
   form.updateFieldAppearances(font);
   form.flatten();
-
-  const pages = pdfDoc.getPages();
-  if (donor.gender) {
-    pages[1]?.drawText("X", { x: donor.gender === "MALE" ? 442 : 489, y: 543, size: 12, color: rgb(0.08, 0.1, 0.16) });
-  }
-  if (donation) {
-    pages[1]?.drawText(donation, { x: 165, y: 360, size: 10, color: rgb(0.08, 0.1, 0.16) });
-  }
-  pages[0]?.drawText(request.requestedBy.email, { x: 300, y: 569, size: 9, color: rgb(0.08, 0.1, 0.16) });
+  drawPageTwoGenderMark(pdfDoc.getPages()[1], donor.gender);
 
   return Buffer.from(await pdfDoc.save());
 }
