@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from "@/lib/display";
 import { renderEmailTemplate } from "@/lib/email/templates";
 import { formatIban } from "@/lib/iban";
 import { donorStatusBadgeClass, donorStatusLabel } from "@/lib/labels";
+import { isMosqueDonation, mosqueDonationSummary } from "@/lib/mosque-donation";
 import { prisma } from "@/lib/prisma";
 import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 import { activateDonorManually, markAnnualPaymentDue, registerBankPayment, resetRegisteredPayments } from "./actions";
@@ -46,6 +47,9 @@ export default async function FinancialPage({
 
   const paidItems = donor.paymentObligations.filter((item) => item.status === "PAID");
   const dueItems = donor.paymentObligations.filter((item) => item.status === "DUE" && item.amountCents > 0);
+  const mosqueDonation = mosqueDonationSummary(donor.paymentObligations);
+  const regularPaidItems = paidItems.filter((item) => !isMosqueDonation(item));
+  const regularDueItems = dueItems.filter((item) => !isMosqueDonation(item));
   const receivedTotal = paidItems.filter((item) => item.amountCents > 0).reduce((sum, item) => sum + item.amountCents, 0);
   const deductionTotal = Math.abs(paidItems.filter((item) => item.amountCents < 0).reduce((sum, item) => sum + item.amountCents, 0));
   const paidTotal = receivedTotal - deductionTotal;
@@ -58,11 +62,11 @@ export default async function FinancialPage({
   const expectedOneTimeTotal = donor.approvedAt
     ? calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, oneTimeChargeDate) * 100
     : 0;
-  const annualDueItems = dueItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
+  const annualDueItems = regularDueItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
   const registeredAnnualDueTotal = annualDueItems.reduce((sum, item) => sum + item.amountCents, 0);
-  const annualPaidItems = paidItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
+  const annualPaidItems = regularPaidItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
   const annualPaidTotal = annualPaidItems.reduce((sum, item) => sum + item.amountCents, 0);
-  const registrationAnnualPaidTotal = paidItems
+  const registrationAnnualPaidTotal = regularPaidItems
     .filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === approvalYear)
     .reduce((sum, item) => sum + item.amountCents, 0);
   const annualDueTotal = expectedAnnualTotal > 0 ? Math.max(expectedAnnualTotal - annualPaidTotal, 0) : registeredAnnualDueTotal;
@@ -71,15 +75,15 @@ export default async function FinancialPage({
   const paymentHistory = donor.paymentObligations
     .filter((item) => item.status === "PAID" && item.amountCents !== 0)
     .slice(0, 50);
-  const paidOneTimeTotal = paidItems
+  const paidOneTimeTotal = regularPaidItems
     .filter((item) => item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
   const registrationRemainingTotal =
     Math.max(expectedRegistrationAnnualTotal - registrationAnnualPaidTotal, 0) + Math.max(expectedOneTimeTotal - paidOneTimeTotal, 0);
-  const registeredOneTimeDueTotal = dueItems
+  const registeredOneTimeDueTotal = regularDueItems
     .filter((item) => item.obligationType === "ONE_TIME")
     .reduce((sum, item) => sum + item.amountCents, 0);
-  const extraReceivedTotal = Math.max(paidItems.filter((item) => item.obligationType === "MANUAL" && item.amountCents > 0).reduce((sum, item) => sum + item.amountCents, 0), 0);
+  const extraReceivedTotal = Math.max(regularPaidItems.filter((item) => item.obligationType === "MANUAL" && item.amountCents > 0).reduce((sum, item) => sum + item.amountCents, 0), 0);
 
   const oneTimeDueTotal = expectedOneTimeTotal > 0 ? Math.max(expectedOneTimeTotal - paidOneTimeTotal, 0) : registeredOneTimeDueTotal;
   const oneTimeTotal = expectedOneTimeTotal > 0 ? expectedOneTimeTotal : Math.max(paidOneTimeTotal + oneTimeDueTotal, 0);
@@ -90,7 +94,7 @@ export default async function FinancialPage({
   const penaltyTotal = 0;
   const remainingOneTime = oneTimeDueTotal;
   const displayedOneTimePaid = Math.max(0, Math.min(paidOneTimeTotal, oneTimeTotal));
-  const remainingTotal = annualDueTotal + oneTimeDueTotal;
+  const remainingTotal = annualDueTotal + oneTimeDueTotal + mosqueDonation.dueTotalCents;
   const creditTotal = remainingTotal === 0 ? Math.max(paidTotal - oneTimeTotal - annualTotal, 0) : 0;
   const canActivate = donor.status === "INACTIVE" && donor.approvedAt && expectedRegistrationAnnualTotal > 0 && registrationRemainingTotal === 0;
   const paymentPreview = latestPaid
@@ -146,7 +150,7 @@ export default async function FinancialPage({
                 </p>
               </div>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
                   <dt className="text-sm font-bold text-slate-600">Jaarlijks</dt>
                   <dd className={`mt-1 text-lg font-black ${annualIsPaid ? "text-slate-900" : annualTotal > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(annualTotal)}</dd>
@@ -175,6 +179,15 @@ export default async function FinancialPage({
                 <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
                   <dt className="text-sm font-bold text-slate-600">Boete</dt>
                   <dd className={`mt-1 text-lg font-black ${penaltyTotal > 0 && !annualIsPaid ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(penaltyTotal)}</dd>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                  <dt className="text-sm font-bold text-emerald-800">Moskee donatie</dt>
+                  <dd className={`mt-1 text-lg font-black ${mosqueDonation.dueTotalCents > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(mosqueDonation.monthlyAmountCents)}</dd>
+                  <p className="mt-1 text-xs text-slate-700">
+                    {mosqueDonation.hasDonation
+                      ? `Maandelijks. Open ${formatCurrency(mosqueDonation.dueTotalCents)}, betaald ${formatCurrency(mosqueDonation.paidTotalCents)}`
+                      : "Geen moskee donatie geregistreerd"}
+                  </p>
                 </div>
             </div>
           </div>
@@ -221,6 +234,7 @@ export default async function FinancialPage({
             <select name="obligationType" defaultValue="ANNUAL">
               <option value="ANNUAL">Jaarbetaling</option>
               <option value="ONE_TIME">Eenmalig</option>
+              <option value="MOSQUE_DONATION">Moskee donatie</option>
               <option value="MANUAL">Extra betaling</option>
             </select>
           </label>

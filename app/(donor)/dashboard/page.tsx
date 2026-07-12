@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatIban } from "@/lib/iban";
 import { formatCurrency, formatDate } from "@/lib/display";
+import { isMosqueDonation, mosqueDonationSummary } from "@/lib/mosque-donation";
 import { calculateDonorCharges, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
@@ -47,19 +48,21 @@ export default async function DashboardPage() {
   const latestRegistration = profile.registrationRequests[0];
   const latestChange = profile.changeRequests[0];
   const visibleMessage = latestRegistration?.donorMessage ?? latestChange?.donorMessage;
+  const mosqueDonation = mosqueDonationSummary(profile.paymentObligations);
+  const regularPayments = profile.paymentObligations.filter((item) => !isMosqueDonation(item));
   const totalPaid = profile.paymentObligations.filter((item) => item.status === "PAID").reduce((sum, item) => sum + item.amountCents, 0);
   const latestPaymentDate = profile.paymentObligations.find((item) => item.status === "PAID")?.paidAt;
   const pricing = await getPricingConfig();
   const mainCharge = calculateDonorCharges(profile, profile.familyMembers, pricing, { hasAnnualPayment: false })[0];
   const oneTimeTotal = calculateTotalOneTimeContribution(profile, profile.familyMembers, pricing, profile.approvedAt ?? new Date());
   const oneTimePaid = profile.paymentObligations
-    .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME")
+    .filter((item) => item.status === "PAID" && item.obligationType === "ONE_TIME" && !isMosqueDonation(item))
     .reduce((sum, item) => sum + item.amountCents, 0);
   const currentYear = new Date().getFullYear();
-  const annualPaid = profile.paymentObligations
+  const annualPaid = regularPayments
     .filter((item) => item.status === "PAID" && item.obligationType === "ANNUAL" && paymentYear(item) === currentYear)
     .reduce((sum, item) => sum + item.amountCents, 0);
-  const annualOpenRegistered = profile.paymentObligations
+  const annualOpenRegistered = regularPayments
     .filter((item) => item.status === "DUE" && item.obligationType === "ANNUAL" && paymentYear(item) === currentYear)
     .reduce((sum, item) => sum + item.amountCents, 0);
   const oneTimeRequired = profile.approvedAt ? oneTimeTotal * 100 : 0;
@@ -69,7 +72,7 @@ export default async function DashboardPage() {
     ? Math.max(annualRequired - annualPaid, 0)
     : Math.max(annualRequired - annualPaid, annualOpenRegistered, 0);
   const penaltyRequired = profile.approvedAt?.getFullYear() === currentYear ? 0 : (mainCharge?.penaltyContribution ?? 0) * 100;
-  const totalDue = Math.max(annualRequired + oneTimeRequired + penaltyRequired - totalPaid, 0);
+  const totalDue = Math.max(annualRemaining + oneTimeRemaining + mosqueDonation.dueTotalCents + penaltyRequired, 0);
 
   return (
     <main className="donor-dashboard mx-auto max-w-6xl px-4 py-8">
@@ -136,6 +139,27 @@ export default async function DashboardPage() {
           <p className="mt-3 text-sm font-bold text-slate-700">
             Na volledige betaling van de jaarlijkse bijdrage kan het account actief worden gezet.
           </p>
+        </section>
+      ) : null}
+
+      {mosqueDonation.hasDonation ? (
+        <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Maandelijkse moskee donatie</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-700">Deze donatie wordt apart bijgehouden naast de jaarlijkse bijdrage.</p>
+            </div>
+            <div className={`rounded-xl px-4 py-3 text-right ${mosqueDonation.dueTotalCents > 0 ? "bg-white text-red-800" : "bg-white text-teal-800"}`}>
+              <p className="text-xs font-bold uppercase">{mosqueDonation.dueTotalCents > 0 ? "Openstaand" : "Bijgewerkt"}</p>
+              <p className="mt-1 text-2xl font-black">{formatCurrency(mosqueDonation.dueTotalCents)}</p>
+            </div>
+          </div>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div><dt className="text-sm font-semibold text-slate-600">Maandelijks bedrag</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(mosqueDonation.monthlyAmountCents)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Betaald</dt><dd className="mt-1 font-bold text-slate-900">{formatCurrency(mosqueDonation.paidTotalCents)}</dd></div>
+            <div><dt className="text-sm font-semibold text-slate-600">Rekeningnummer</dt><dd className="mt-1 font-bold text-slate-900">NL72ABNA0808763342</dd></div>
+          </dl>
+          <p className="mt-3 text-sm font-bold text-slate-700">Ten name van: Stichting Masjid Ghausia</p>
         </section>
       ) : null}
 

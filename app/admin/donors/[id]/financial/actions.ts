@@ -330,13 +330,15 @@ export async function updatePaymentStatus(formData: FormData) {
 export async function registerBankPayment(formData: FormData) {
   const adminId = await requireAdmin();
   const donorId = String(formData.get("donorId") ?? "");
-  const obligationType = String(formData.get("obligationType") ?? "MANUAL") as "ONE_TIME" | "ANNUAL" | "MANUAL";
+  const paymentType = String(formData.get("obligationType") ?? "MANUAL");
+  const obligationType = (paymentType === "MOSQUE_DONATION" ? "MANUAL" : paymentType) as "ONE_TIME" | "ANNUAL" | "MANUAL";
+  const isMosqueDonationPayment = paymentType === "MOSQUE_DONATION";
   const amountInput = String(formData.get("amount") ?? "");
   const paidAtInput = String(formData.get("paidAt") ?? "");
   const adminNote = String(formData.get("adminNote") ?? "").trim();
   const path = `/admin/donors/${donorId}/financial`;
 
-  if (!["ONE_TIME", "ANNUAL", "MANUAL"].includes(obligationType)) redirect(`${path}?error=Kies+een+geldige+betalingssoort`);
+  if (!["ONE_TIME", "ANNUAL", "MANUAL", "MOSQUE_DONATION"].includes(paymentType)) redirect(`${path}?error=Kies+een+geldige+betalingssoort`);
   const amountCents = parseAmountCents(amountInput);
   if (!amountInput || amountCents === 0) redirect(`${path}?error=Vul+een+geldig+bedrag+in`);
 
@@ -355,15 +357,19 @@ export async function registerBankPayment(formData: FormData) {
       donorProfileId: donor.id,
       ...(membershipId ? { membershipId } : {}),
       updatedByAdminId: adminId,
-      lidnummer: donor.registrationNumber,
+      lidnummer: isMosqueDonationPayment ? `${donor.registrationNumber ?? "zonder-lidnummer"}-DONATIE` : donor.registrationNumber,
       obligationType,
       amountCents,
       status: "PAID",
       paymentMethod: "BANK_TRANSFER",
       paidAt,
       adminNote: adminNote || null,
-      source: amountCents < 0 ? "MANUAL_BANK_CORRECTION" : "MANUAL_BANK_TRANSFER",
-      notes: amountCents < 0 ? "Handmatige aftrek/correctie geregistreerd" : "Bankoverschrijving handmatig geregistreerd"
+      source: isMosqueDonationPayment ? "MOSQUE_DONATION_PAYMENT" : amountCents < 0 ? "MANUAL_BANK_CORRECTION" : "MANUAL_BANK_TRANSFER",
+      notes: isMosqueDonationPayment
+        ? "Maandelijkse moskee donatie handmatig geregistreerd"
+        : amountCents < 0
+          ? "Handmatige aftrek/correctie geregistreerd"
+          : "Bankoverschrijving handmatig geregistreerd"
     }
   });
 
@@ -373,7 +379,7 @@ export async function registerBankPayment(formData: FormData) {
     entityType: "PaymentObligation",
     entityId: payment.id,
     message: "Bankbetaling geregistreerd",
-    metadata: { donorId, obligationType, amountCents }
+    metadata: { donorId, paymentType, obligationType, amountCents }
   });
 
   if (obligationType === "ANNUAL") await reconcileAnnualRemainder(donor.id, paidAt.getFullYear());

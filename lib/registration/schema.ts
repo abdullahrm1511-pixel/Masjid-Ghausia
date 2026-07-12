@@ -5,11 +5,25 @@ const requiredText = z.string().trim().min(1, "Dit veld is verplicht");
 const optionalText = z.string().trim().optional().or(z.literal(""));
 const nameText = requiredText.regex(/^[\p{L}\s'.-]+$/u, "Gebruik alleen letters");
 const optionalNameText = optionalText.refine((value) => !value || /^[\p{L}\s'.-]+$/u.test(value), "Gebruik alleen letters");
+const fullNameText = nameText.refine(
+  (value) => (value.match(/\p{L}/gu) ?? []).length >= 2,
+  "Vul de volledige naam in, geen voorletter"
+);
+const optionalFullNameText = optionalNameText.refine(
+  (value) => !value || (value.match(/\p{L}/gu) ?? []).length >= 2,
+  "Vul de volledige naam in, geen voorletter"
+);
 const dutchMobilePhone = requiredText.regex(/^06\d{8}$/, "Vul een geldig telefoonnummer in: 06 gevolgd door 8 cijfers");
 const dutchPostalCode = requiredText
   .transform((value) => value.toUpperCase().replace(/\s+/g, ""))
   .refine((value) => /^\d{4}[A-Z]{2}$/.test(value), "Vul een geldige postcode in, bijvoorbeeld 3061 AB");
 const optionalDigits = optionalText.refine((value) => !value || /^\d+$/.test(value), "Gebruik alleen cijfers");
+const strongPassword = z
+  .string()
+  .min(8, "Gebruik minimaal 8 tekens")
+  .regex(/[A-Z]/, "Gebruik minimaal 1 hoofdletter")
+  .regex(/[a-z]/, "Gebruik minimaal 1 kleine letter")
+  .regex(/[^A-Za-z0-9]/, "Gebruik minimaal 1 speciaal teken");
 const optionalAmount = z
   .string()
   .trim()
@@ -22,16 +36,16 @@ const optionalAmount = z
 
 export const familyMemberSchema = z.object({
   type: z.enum(["PARTNER", "CHILD"]),
-  firstName: nameText,
-  lastName: nameText,
+  firstName: fullNameText,
+  lastName: fullNameText,
   gender: z.enum(["MALE", "FEMALE"]),
   dateOfBirth: requiredText,
   birthPlace: optionalNameText
 });
 
 export const registrationBaseSchema = z.object({
-  firstName: nameText,
-  lastName: nameText,
+  firstName: fullNameText,
+  lastName: fullNameText,
   gender: z.enum(["MALE", "FEMALE"]),
   addressLine1: requiredText,
   addressLine2: optionalText,
@@ -42,15 +56,15 @@ export const registrationBaseSchema = z.object({
   dateOfBirth: requiredText,
   birthPlace: nameText,
   iban: requiredText.transform(normalizeIban),
-  accountHolderName: nameText,
+  accountHolderName: fullNameText,
   maritalStatus: z.enum(["SINGLE", "MARRIED", "WIDOWED", "DIVORCED"]),
-  password: z.string().min(8, "Gebruik minimaal 8 tekens"),
+  password: strongPassword,
   confirmPassword: z.string().min(8, "Bevestig het wachtwoord"),
   hasPartner: z.enum(["yes", "no"]),
   partner: familyMemberSchema.optional(),
   hasChildren: z.enum(["yes", "no"]),
   children: z.array(familyMemberSchema).default([]),
-  pakistanContactName: optionalNameText,
+  pakistanContactName: optionalFullNameText,
   pakistanContactPhone: optionalDigits,
   funeralWishes: optionalText,
   donationAmount: optionalAmount,

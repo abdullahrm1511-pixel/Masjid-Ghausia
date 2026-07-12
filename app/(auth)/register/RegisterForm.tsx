@@ -66,6 +66,7 @@ type FieldFeedback = { status: "error" | "warning"; message: string; suggestion?
 type FieldRules = {
   required?: boolean;
   lettersOnly?: boolean;
+  fullName?: boolean;
   email?: boolean;
   phone?: boolean;
   postcode?: boolean;
@@ -115,6 +116,9 @@ function validateFieldValue(value: string, rules: FieldRules, form?: HTMLFormEle
   if (rules.lettersOnly && !/^[\p{L}\s'.-]+$/u.test(trimmed)) {
     return { status: "warning", message: "Gebruik alleen letters" };
   }
+  if (rules.fullName && (trimmed.match(/\p{L}/gu) ?? []).length < 2) {
+    return { status: "warning", message: "Vul de volledige naam in, geen voorletter" };
+  }
   if (rules.phone && !/^06\d{8}$/.test(trimmed)) {
     return { status: "warning", message: "Gebruik formaat 06xxxxxxxx" };
   }
@@ -130,8 +134,8 @@ function validateFieldValue(value: string, rules: FieldRules, form?: HTMLFormEle
       return { status: "error", message: "Vul een geldig e-mailadres in" };
     }
   }
-  if (rules.password && trimmed.length < 8) {
-    return { status: "warning", message: "Gebruik minimaal 8 tekens" };
+  if (rules.password && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/.test(trimmed)) {
+    return { status: "warning", message: "Minimaal 8 tekens, 1 hoofdletter, 1 kleine letter en 1 speciaal teken" };
   }
   if (rules.confirmPassword) {
     const password = String(new FormData(form ?? undefined).get("password") ?? "");
@@ -231,7 +235,7 @@ export function RegisterForm({ error }: { error?: string }) {
   const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "ID Uploaden", "Bevestiging"];
   const field = (name: string) => state.values[name] ?? "";
   const today = new Date().toISOString().slice(0, 10);
-  const namePattern = "[A-Za-zÀ-ÖØ-öø-ÿ\\s]+";
+  const namePattern = "[A-Za-zÀ-ÖØ-öø-ÿ\\s'.-]+";
 
   useEffect(() => {
     if (!Object.keys(state.values).length) return;
@@ -383,8 +387,8 @@ export function RegisterForm({ error }: { error?: string }) {
         <div className="grid gap-5">
           <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
             <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Persoonlijke gegevens</h3>
-            <label>Voornaam<input {...validatedInput("firstName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("firstName")}</label>
-            <label>Achternaam<input {...validatedInput("lastName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("lastName")}</label>
+            <label>Voornaam<input {...validatedInput("firstName", { required: true, lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} required />{feedbackMessage("firstName")}</label>
+            <label>Achternaam<input {...validatedInput("lastName", { required: true, lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} required />{feedbackMessage("lastName")}</label>
             <label>Geslacht<select name="gender" defaultValue={field("gender") || "MALE"} required><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
             <label>Geboortedatum<input name="dateOfBirth" type="date" max={today} defaultValue={field("dateOfBirth")} required /></label>
             <label>Geboorteplaats<input {...validatedInput("birthPlace", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("birthPlace")}</label>
@@ -433,7 +437,7 @@ export function RegisterForm({ error }: { error?: string }) {
             <label className="sm:col-span-2">Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
             <label>Postcode<input {...validatedInput("postalCode", { required: true, postcode: true })} inputMode="text" maxLength={7} placeholder="3061 AB" required />{feedbackMessage("postalCode")}</label>
             <label>Woonplaats<input {...validatedInput("city", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("city")}</label>
-            <label>Naam rekeninghouder<input {...validatedInput("accountHolderName", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("accountHolderName")}</label>
+            <label>Naam rekeninghouder<input {...validatedInput("accountHolderName", { required: true, lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} required />{feedbackMessage("accountHolderName")}</label>
             <label>IBAN<input name="iban" placeholder="NL79 ABNA 0543 4484 28" defaultValue={field("iban")} required /></label>
           </div>
 
@@ -468,8 +472,8 @@ export function RegisterForm({ error }: { error?: string }) {
         <label>Heeft u een partner?<select name="hasPartner" value={hasPartner} onChange={(event) => setHasPartner(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
         {hasPartner === "yes" ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            <label>Voornaam<input {...validatedInput("partner.firstName", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("partner.firstName")}</label>
-            <label>Achternaam<input {...validatedInput("partner.lastName", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("partner.lastName")}</label>
+            <label>Voornaam<input {...validatedInput("partner.firstName", { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage("partner.firstName")}</label>
+            <label>Achternaam<input {...validatedInput("partner.lastName", { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage("partner.lastName")}</label>
             <label>Geslacht<select name="partner.gender" defaultValue={field("partner.gender") || "MALE"}><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
             <label>Geboortedatum<input name="partner.dateOfBirth" type="date" max={today} defaultValue={field("partner.dateOfBirth")} /></label>
             <label>Geboorteplaats<input {...validatedInput("partner.birthPlace", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("partner.birthPlace")}</label>
@@ -491,8 +495,8 @@ export function RegisterForm({ error }: { error?: string }) {
                     Verwijderen
                   </button>
                 </div>
-                <label>Voornaam<input {...validatedInput(`child.${index}.firstName`, { lettersOnly: true })} pattern={namePattern} />{feedbackMessage(`child.${index}.firstName`)}</label>
-                <label>Achternaam<input {...validatedInput(`child.${index}.lastName`, { lettersOnly: true })} pattern={namePattern} />{feedbackMessage(`child.${index}.lastName`)}</label>
+                <label>Voornaam<input {...validatedInput(`child.${index}.firstName`, { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage(`child.${index}.firstName`)}</label>
+                <label>Achternaam<input {...validatedInput(`child.${index}.lastName`, { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage(`child.${index}.lastName`)}</label>
                 <label>Geslacht<select name={`child.${index}.gender`} defaultValue={field(`child.${index}.gender`) || "MALE"}><option value="MALE">Jongen</option><option value="FEMALE">Meisje</option></select></label>
                 <label>Geboortedatum<input name={`child.${index}.dateOfBirth`} type="date" max={today} defaultValue={field(`child.${index}.dateOfBirth`)} /></label>
                 <label>Geboorteplaats<input {...validatedInput(`child.${index}.birthPlace`, { lettersOnly: true })} pattern={namePattern} />{feedbackMessage(`child.${index}.birthPlace`)}</label>
@@ -508,7 +512,7 @@ export function RegisterForm({ error }: { error?: string }) {
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 3 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Contactpersoon Pakistan</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label>Contactpersoon Pakistan<input {...validatedInput("pakistanContactName", { lettersOnly: true })} pattern={namePattern} />{feedbackMessage("pakistanContactName")}</label>
+          <label>Contactpersoon Pakistan<input {...validatedInput("pakistanContactName", { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage("pakistanContactName")}</label>
           <label>Telefoon Pakistan<input name="pakistanContactPhone" inputMode="numeric" pattern="[0-9]*" defaultValue={field("pakistanContactPhone")} /></label>
         </div>
         <label>Uitvaartwensen<textarea name="funeralWishes" rows={4} defaultValue={field("funeralWishes")} /></label>
