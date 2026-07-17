@@ -19,12 +19,12 @@ export default async function AdminDashboardPage() {
     prisma.registrationRequest.count({ where: { status: "PENDING" } }),
     prisma.registrationRequest.count({ where: { status: "ACTION_REQUIRED" } }),
     prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "ACTION_REQUIRED" }] } }),
-    prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "ACTIVE", NOT: { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } } }] } }),
+    prisma.donorProfile.count({ where: { AND: [registeredDonorWhere, { status: "ACTIVE" }] } }),
     prisma.donorProfile.count({
       where: {
         AND: [
           registeredDonorWhere,
-          { OR: [{ status: "INACTIVE" }, { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }] }
+          { status: "INACTIVE" }
         ]
       }
     }),

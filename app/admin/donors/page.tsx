@@ -33,7 +33,7 @@ function getStatusWhere(status: StatusFilter | "INACTIVE_OR_PAYMENT_REQUIRED"): 
     };
   }
   if (status === "ACTIVE") {
-    return { status: "ACTIVE", NOT: { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } } };
+    return { status: "ACTIVE" };
   }
   if (status && Object.values(DonorStatus).includes(status as DonorStatus)) {
     return { status: status as DonorStatus };
