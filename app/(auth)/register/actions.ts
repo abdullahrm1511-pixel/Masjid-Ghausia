@@ -22,7 +22,7 @@ const fieldLabels: Record<string, string> = {
   firstName: "Voornaam",
   lastName: "Achternaam",
   gender: "Geslacht",
-  addressLine1: "Adres",
+  addressLine1: "Straat + huisnr",
   postalCode: "Postcode",
   city: "Woonplaats",
   phone: "Telefoon",
@@ -35,7 +35,7 @@ const fieldLabels: Record<string, string> = {
   password: "Wachtwoord",
   confirmPassword: "Wachtwoord bevestigen",
   partner: "Partner",
-  children: "Kinderen",
+  children: "Kinderen onder 18 jaar",
   donationAmount: "Donatie",
   donationMandateAccepted: "Maandelijkse betaling naar moskee",
   identityDocument: "ID uploaden",
@@ -58,18 +58,27 @@ function valuesFromFormData(formData: FormData) {
   return values;
 }
 
-function identityDocumentFromFormData(formData: FormData) {
-  const file = formData.get("identityDocument");
+function identityDocumentFromFormData(formData: FormData, key = "identityDocument", label = "uw ID") {
+  const file = formData.get(key);
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Fout ID uploaden: Upload een kopie van uw ID" };
+    return { error: `Fout ID uploaden: Upload een kopie van ${label}` };
   }
   if (file.size > MAX_ID_FILE_SIZE) {
-    return { error: "Fout ID uploaden: Het bestand mag maximaal 2 MB zijn" };
+    return { error: `Fout ID uploaden: ${label} mag maximaal 2 MB zijn` };
   }
   if (!ALLOWED_ID_FILE_TYPES.has(file.type)) {
-    return { error: "Fout ID uploaden: Upload een PDF, JPG of PNG bestand" };
+    return { error: `Fout ID uploaden: Upload voor ${label} een PDF, JPG of PNG bestand` };
   }
   return { file };
+}
+
+async function identityDocumentCreateData(file: File) {
+  return {
+    filename: file.name || "id-document",
+    contentType: file.type,
+    fileSize: file.size,
+    data: Buffer.from(await file.arrayBuffer())
+  };
 }
 
 function formatIssue(path: PropertyKey[], message: string) {
@@ -145,7 +154,8 @@ async function verifyRegistrationCode(email: string, code: string) {
 export async function submitRegistration(_previous: RegistrationState, formData: FormData): Promise<RegistrationState> {
   const submittedValues = valuesFromFormData(formData);
   const childrenCount = Number(formData.get("childrenCount") ?? 0);
-  const children = Array.from({ length: childrenCount }, (_, index) => ({
+  const childEntries = Array.from({ length: childrenCount }, (_, index) => ({
+    formIndex: index,
     type: "CHILD" as const,
     firstName: value(formData, `child.${index}.firstName`),
     lastName: value(formData, `child.${index}.lastName`),
@@ -153,6 +163,7 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     dateOfBirth: value(formData, `child.${index}.dateOfBirth`),
     birthPlace: value(formData, `child.${index}.birthPlace`)
   })).filter((child) => child.firstName || child.lastName);
+  const children = childEntries.map(({ formIndex: _formIndex, ...child }) => child);
 
   const hasPartner = value(formData, "hasPartner") as "yes" | "no";
   const parsed = registrationSubmitSchema.safeParse({
@@ -212,10 +223,33 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     };
   }
 
-  const identityDocument = identityDocumentFromFormData(formData);
+  const identityDocument = identityDocumentFromFormData(formData, "identityDocument", "de hoofddonateur");
   if (identityDocument.error || !identityDocument.file) {
     return {
       errors: [identityDocument.error ?? "Fout ID uploaden: Upload een kopie van uw ID"],
+      values: submittedValues,
+      verificationRequired: true
+    };
+  }
+  const partnerIdentityDocument = data.partner
+    ? identityDocumentFromFormData(formData, "partner.identityDocument", "de partner")
+    : null;
+  if (partnerIdentityDocument?.error || (data.partner && !partnerIdentityDocument?.file)) {
+    return {
+      errors: [partnerIdentityDocument?.error ?? "Fout ID uploaden: Upload een kopie van de partner"],
+      values: submittedValues,
+      verificationRequired: true
+    };
+  }
+  const childIdentityDocuments = childEntries.map((child, index) => ({
+    index,
+    label: `kind ${index + 1}`,
+    result: identityDocumentFromFormData(formData, `child.${child.formIndex}.identityDocument`, `kind ${index + 1}`)
+  }));
+  const childIdentityError = childIdentityDocuments.find((item) => item.result.error || !item.result.file);
+  if (childIdentityError) {
+    return {
+      errors: [childIdentityError.result.error ?? `Fout ID uploaden: Upload een kopie van ${childIdentityError.label}`],
       values: submittedValues,
       verificationRequired: true
     };
@@ -261,7 +295,12 @@ export async function submitRegistration(_previous: RegistrationState, formData:
   }
 
   const passwordHash = await hash(data.password, 12);
-  const identityDocumentBuffer = Buffer.from(await identityDocument.file.arrayBuffer());
+  const primaryIdentityDocumentData = await identityDocumentCreateData(identityDocument.file);
+  const partnerIdentityDocumentData =
+    partnerIdentityDocument?.file ? await identityDocumentCreateData(partnerIdentityDocument.file) : null;
+  const childIdentityDocumentData = await Promise.all(
+    childIdentityDocuments.map(async (item) => (item.result.file ? identityDocumentCreateData(item.result.file) : null))
+  );
 
   const user = await prisma.user.create({
     data: {
@@ -291,12 +330,7 @@ export async function submitRegistration(_previous: RegistrationState, formData:
           pakistanContactPhone: data.pakistanContactPhone || null,
           funeralWishes: data.funeralWishes || null,
           identityDocument: {
-            create: {
-              filename: identityDocument.file.name || "id-document",
-              contentType: identityDocument.file.type,
-              fileSize: identityDocument.file.size,
-              data: identityDocumentBuffer
-            }
+            create: primaryIdentityDocumentData
           },
           familyMembers: {
             create: [
@@ -308,17 +342,31 @@ export async function submitRegistration(_previous: RegistrationState, formData:
                       lastName: data.partner.lastName,
                       gender: data.partner.gender,
                       dateOfBirth: dateValue(data.partner.dateOfBirth),
-                      birthPlace: data.partner.birthPlace || null
+                      birthPlace: data.partner.birthPlace || null,
+                      ...(partnerIdentityDocumentData
+                        ? {
+                            identityDocument: {
+                              create: partnerIdentityDocumentData
+                            }
+                          }
+                        : {})
                     }
                   ]
                 : []),
-              ...data.children.map((child) => ({
+              ...data.children.map((child, index) => ({
                 type: "CHILD" as const,
                 firstName: child.firstName,
                 lastName: child.lastName,
                 gender: child.gender,
                 dateOfBirth: dateValue(child.dateOfBirth),
-                birthPlace: child.birthPlace || null
+                birthPlace: child.birthPlace || null,
+                ...(childIdentityDocumentData[index]
+                  ? {
+                      identityDocument: {
+                        create: childIdentityDocumentData[index]!
+                      }
+                    }
+                  : {})
               }))
             ]
           }

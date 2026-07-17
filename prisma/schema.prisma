@@ -227,7 +227,8 @@ model DonorProfile {
 
 model IdentityDocument {
   id             String   @id @default(cuid())
-  donorProfileId String   @unique
+  donorProfileId String?  @unique
+  familyMemberId String?  @unique
   filename       String
   contentType    String
   fileSize       Int
@@ -235,9 +236,11 @@ model IdentityDocument {
   uploadedAt     DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  donorProfile DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  donorProfile DonorProfile? @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  familyMember FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
 
   @@index([donorProfileId])
+  @@index([familyMemberId])
 }
 
 model DonorStatusHistory {
@@ -277,6 +280,7 @@ model FamilyMember {
   updatedAt      DateTime         @updatedAt
 
   donorProfile      DonorProfile                @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+  identityDocument  IdentityDocument?
   membershipMembers MembershipMember[]
   statusHistory     FamilyMemberStatusHistory[]
   adultTransition    AdultChildTransition?

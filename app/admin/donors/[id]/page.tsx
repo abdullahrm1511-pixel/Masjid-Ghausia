@@ -27,6 +27,12 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number][1];
 
+function readableFileSize(bytes?: number | null) {
+  if (!bytes) return "-";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
 export default async function DonorDetailPage({
   params,
   searchParams
@@ -41,8 +47,11 @@ export default async function DonorDetailPage({
     where: { id },
     include: {
       user: true,
-      identityDocument: { select: { filename: true, uploadedAt: true } },
-      familyMembers: { orderBy: [{ type: "asc" }, { dateOfBirth: "asc" }] },
+      identityDocument: { select: { filename: true, fileSize: true, uploadedAt: true } },
+      familyMembers: {
+        orderBy: [{ type: "asc" }, { dateOfBirth: "asc" }],
+        include: { identityDocument: { select: { filename: true, fileSize: true, uploadedAt: true } } }
+      },
       paymentObligations: { orderBy: { createdAt: "desc" } },
       changeRequests: { orderBy: { createdAt: "desc" }, take: 8 },
       statusHistory: { orderBy: { createdAt: "desc" }, take: 12, include: { changedBy: true } }
@@ -153,7 +162,7 @@ export default async function DonorDetailPage({
                       <dd>
                         {donor.identityDocument ? (
                           <Link className="font-semibold text-[#0f5f9f]" href={`/admin/donors/${donor.id}/identity-document`} target="_blank">
-                            Openen
+                            Openen ({readableFileSize(donor.identityDocument.fileSize)})
                           </Link>
                         ) : (
                           "-"
@@ -232,7 +241,7 @@ export default async function DonorDetailPage({
                     <dd>
                       {donor.identityDocument ? (
                         <Link className="font-semibold text-[#0f5f9f]" href={`/admin/donors/${donor.id}/identity-document`} target="_blank">
-                          Openen
+                          Openen ({readableFileSize(donor.identityDocument.fileSize)})
                         </Link>
                       ) : (
                         "-"
@@ -255,6 +264,18 @@ export default async function DonorDetailPage({
                     <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDateWithAge(partner.dateOfBirth)}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geboorteplaats</dt><dd>{partner.birthPlace || "-"}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geslacht</dt><dd>{partner.gender ?? "-"}</dd></div>
+                    <div>
+                      <dt className="font-semibold text-slate-600">ID-document</dt>
+                      <dd>
+                        {partner.identityDocument ? (
+                          <Link className="font-semibold text-[#0f5f9f]" href={`/admin/donors/${donor.id}/family-members/${partner.id}/identity-document`} target="_blank">
+                            Openen ({readableFileSize(partner.identityDocument.fileSize)})
+                          </Link>
+                        ) : (
+                          "-"
+                        )}
+                      </dd>
+                    </div>
                     <div><dt className="font-semibold text-slate-600">Status</dt><dd>{familyMemberStatusLabel(partner.status)}</dd></div>
                   </dl>
                 </article>
@@ -268,6 +289,18 @@ export default async function DonorDetailPage({
                     <div><dt className="font-semibold text-slate-600">Geboortedatum</dt><dd>{formatDateWithAge(child.dateOfBirth)}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geboorteplaats</dt><dd>{child.birthPlace || "-"}</dd></div>
                     <div><dt className="font-semibold text-slate-600">Geslacht</dt><dd>{child.gender ?? "-"}</dd></div>
+                    <div>
+                      <dt className="font-semibold text-slate-600">ID-document</dt>
+                      <dd>
+                        {child.identityDocument ? (
+                          <Link className="font-semibold text-[#0f5f9f]" href={`/admin/donors/${donor.id}/family-members/${child.id}/identity-document`} target="_blank">
+                            Openen ({readableFileSize(child.identityDocument.fileSize)})
+                          </Link>
+                        ) : (
+                          "-"
+                        )}
+                      </dd>
+                    </div>
                     <div><dt className="font-semibold text-slate-600">Status</dt><dd>{familyMemberStatusLabel(child.status)}</dd></div>
                   </dl>
                 </article>

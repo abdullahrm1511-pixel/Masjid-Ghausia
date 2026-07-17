@@ -106,7 +106,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
           <section className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
             <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Adres en betaling</h3>
-            <label>Adresregel 1<input name="addressLine1" defaultValue={profile.addressLine1} required /></label>
+            <label>Straat + huisnr<input name="addressLine1" defaultValue={profile.addressLine1} required /></label>
             <label>Adresregel 2<input name="addressLine2" defaultValue={profile.addressLine2 ?? ""} /></label>
             <label>Postcode<input name="postalCode" defaultValue={profile.postalCode} required /></label>
             <label>Woonplaats<input name="city" defaultValue={profile.city} required /></label>

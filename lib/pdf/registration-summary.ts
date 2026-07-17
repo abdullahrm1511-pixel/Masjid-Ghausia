@@ -152,7 +152,7 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   setText(form, "undefined_2", address);
   setText(form, "Postcodeplaats", postalCity);
   setText(form, "undefined_3", donor.phone);
-  setText(form, "Email", request.requestedBy.email);
+  setText(form, "Email", request.requestedBy.email, 9);
   setText(form, "Geboortedatum", formatDateOnly(donor.dateOfBirth));
   setText(form, "Geboorteplaats", donor.birthPlace);
   setText(form, "IBAN Rekening nr", formatIban(donor.iban));

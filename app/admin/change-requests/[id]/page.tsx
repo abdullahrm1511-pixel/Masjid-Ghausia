@@ -14,7 +14,7 @@ const labels: Record<string, string> = {
   "profile.phone": "Telefoon",
   "profile.email": "E-mail",
   "profile.maritalStatus": "Burgerlijke staat",
-  "profile.addressLine1": "Adres",
+  "profile.addressLine1": "Straat + huisnr",
   "profile.addressLine2": "Adresregel 2",
   "profile.postalCode": "Postcode",
   "profile.city": "Woonplaats",

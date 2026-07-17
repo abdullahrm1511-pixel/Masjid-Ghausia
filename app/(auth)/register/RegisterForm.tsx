@@ -89,6 +89,15 @@ function formatPostalCode(value: string) {
   return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
 }
 
+function formatIbanInput(value: string) {
+  return value
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, "")
+    .replace(/(.{4})/g, "$1 ")
+    .trim()
+    .slice(0, 34);
+}
+
 function emailSuggestion(value: string) {
   const trimmed = value.trim().toLowerCase();
   const [local, domain = ""] = trimmed.split("@");
@@ -223,17 +232,19 @@ export function RegisterForm({ error }: { error?: string }) {
   const [children, setChildren] = useState<number[]>([]);
   const [step, setStep] = useState(0);
   const [privacyScrolled, setPrivacyScrolled] = useState(false);
-  const [identityFileMessage, setIdentityFileMessage] = useState("");
+  const [identityFileMessages, setIdentityFileMessages] = useState<Record<string, string>>({});
   const [identityProcessing, setIdentityProcessing] = useState(false);
   const [fieldFeedback, setFieldFeedback] = useState<Record<string, FieldFeedback | null>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [emailValue, setEmailValue] = useState(state.values.email ?? "");
+  const [formSnapshot, setFormSnapshot] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
-  const identityDocumentRef = useRef<File | null>(null);
+  const identityDocumentRefs = useRef<Record<string, File | null>>({});
   const skipCompressionRef = useRef(false);
   const childCount = children.length ? Math.max(...children) + 1 : 0;
   const steps = ["Hoofddonateur", "Partner", "Kinderen", "Contact", "ID Uploaden", "Bevestiging"];
   const field = (name: string) => state.values[name] ?? "";
+  const liveField = (name: string) => formSnapshot[name] ?? field(name);
   const today = new Date().toISOString().slice(0, 10);
   const namePattern = "[A-Za-zÀ-ÖØ-öø-ÿ\\s'.-]+";
 
@@ -301,9 +312,61 @@ export function RegisterForm({ error }: { error?: string }) {
         if (rules.phone) {
           input.value = input.value.replace(/\D/g, "").slice(0, 10);
         }
+        setFormSnapshot((current) => ({ ...current, [name]: input.value }));
         setFieldState(name, input.value, rules);
       }
     };
+  }
+
+  function snapshotFormValues() {
+    if (!formRef.current) return;
+    const values: Record<string, string> = {};
+    for (const [key, input] of new FormData(formRef.current).entries()) {
+      if (typeof input === "string") values[key] = input;
+    }
+    setFormSnapshot(values);
+  }
+
+  function personIdentityUploads() {
+    const primaryName = [liveField("firstName"), liveField("lastName")].filter(Boolean).join(" ");
+    const uploads = [
+      {
+        key: "identityDocument",
+        title: `ID uploaden van ${primaryName || "hoofddonateur"}`,
+        description: "Hoofddonateur"
+      }
+    ];
+
+    if (hasPartner === "yes") {
+      const partnerName = [liveField("partner.firstName"), liveField("partner.lastName")].filter(Boolean).join(" ");
+      uploads.push({
+        key: "partner.identityDocument",
+        title: `ID uploaden van ${partnerName || "partner"}`,
+        description: "Partner"
+      });
+    }
+
+    if (hasChildren === "yes") {
+      children.forEach((index, position) => {
+        const childName = [liveField(`child.${index}.firstName`), liveField(`child.${index}.lastName`)].filter(Boolean).join(" ");
+        uploads.push({
+          key: `child.${index}.identityDocument`,
+          title: `ID uploaden van ${childName || `kind ${position + 1}`}`,
+          description: `Kind ${position + 1}`
+        });
+      });
+    }
+
+    return uploads;
+  }
+
+  function cacheIdentityInput(input: HTMLInputElement) {
+    const key = input.name;
+    const cached = identityDocumentRefs.current[key];
+    if (input.files?.length || !cached) return;
+    const transfer = new DataTransfer();
+    transfer.items.add(cached);
+    input.files = transfer.files;
   }
 
   function applyEmailSuggestion(event: KeyboardEvent<HTMLInputElement>) {
@@ -323,31 +386,43 @@ export function RegisterForm({ error }: { error?: string }) {
       return;
     }
 
-    const input = event.currentTarget.elements.namedItem("identityDocument") as HTMLInputElement | null;
-    if (input && !input.files?.length && identityDocumentRef.current) {
-      const transfer = new DataTransfer();
-      transfer.items.add(identityDocumentRef.current);
-      input.files = transfer.files;
-    }
+    const inputs = Array.from(event.currentTarget.querySelectorAll<HTMLInputElement>('input[type="file"][data-identity-upload="true"]'));
+    inputs.forEach(cacheIdentityInput);
+    const imageInputs = inputs
+      .map((input) => ({ input, file: input.files?.[0] ?? identityDocumentRefs.current[input.name] ?? null }))
+      .filter((item): item is { input: HTMLInputElement; file: File } => Boolean(item.file?.type.startsWith("image/")));
 
-    const file = input?.files?.[0] ?? identityDocumentRef.current;
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!imageInputs.length) return;
 
     event.preventDefault();
     setIdentityProcessing(true);
-    setIdentityFileMessage("Foto wordt verkleind...");
+    setIdentityFileMessages((current) => {
+      const next = { ...current };
+      imageInputs.forEach(({ input }) => {
+        next[input.name] = "Foto wordt verkleind...";
+      });
+      return next;
+    });
 
     try {
-      const compressed = await compressIdentityImage(file);
-      const transfer = new DataTransfer();
-      transfer.items.add(compressed);
-      identityDocumentRef.current = compressed;
-      if (input) input.files = transfer.files;
-      setIdentityFileMessage(`Foto verkleind van ${readableFileSize(file.size)} naar ${readableFileSize(compressed.size)}.`);
+      for (const { input, file } of imageInputs) {
+        const compressed = await compressIdentityImage(file);
+        const transfer = new DataTransfer();
+        transfer.items.add(compressed);
+        input.files = transfer.files;
+        identityDocumentRefs.current[input.name] = compressed;
+        setIdentityFileMessages((current) => ({
+          ...current,
+          [input.name]: `Foto verkleind van ${readableFileSize(file.size)} naar ${readableFileSize(compressed.size)}.`
+        }));
+      }
       skipCompressionRef.current = true;
       formRef.current?.requestSubmit();
     } catch {
-      setIdentityFileMessage("Foto kon niet automatisch verkleind worden. Kies eventueel een duidelijkere of kleinere foto.");
+      setIdentityFileMessages((current) => ({
+        ...current,
+        identityDocument: "Een foto kon niet automatisch verkleind worden. Kies eventueel een duidelijkere of kleinere foto."
+      }));
       skipCompressionRef.current = true;
       formRef.current?.requestSubmit();
     } finally {
@@ -375,7 +450,10 @@ export function RegisterForm({ error }: { error?: string }) {
           <button
             className={`shrink-0 rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-[#0f766e] bg-[#0f766e] text-white shadow-sm" : "border-slate-300 bg-white text-slate-700 hover:border-[#0f766e]/40 hover:bg-emerald-50"}`}
             key={label}
-            onClick={() => setStep(index)}
+            onClick={() => {
+              snapshotFormValues();
+              setStep(index);
+            }}
             type="button"
           >
             <span className="sm:hidden">{index + 1}. </span>{label}
@@ -434,11 +512,22 @@ export function RegisterForm({ error }: { error?: string }) {
 
           <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
             <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Woongegevens en betaling</h3>
-            <label className="sm:col-span-2">Adres<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
+            <label className="sm:col-span-2">Straat + huisnr<input name="addressLine1" defaultValue={field("addressLine1")} required /></label>
             <label>Postcode<input {...validatedInput("postalCode", { required: true, postcode: true })} inputMode="text" maxLength={7} placeholder="3061 AB" required />{feedbackMessage("postalCode")}</label>
             <label>Woonplaats<input {...validatedInput("city", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("city")}</label>
             <label>Naam rekeninghouder<input {...validatedInput("accountHolderName", { required: true, lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} required />{feedbackMessage("accountHolderName")}</label>
-            <label>IBAN<input name="iban" placeholder="NL79 ABNA 0543 4484 28" defaultValue={field("iban")} required /></label>
+            <label>
+              IBAN
+              <input
+                name="iban"
+                onInput={(event) => {
+                  event.currentTarget.value = formatIbanInput(event.currentTarget.value);
+                }}
+                placeholder="NL79 ABNA 0543 4484 28"
+                defaultValue={formatIbanInput(field("iban"))}
+                required
+              />
+            </label>
           </div>
 
           <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
@@ -482,8 +571,8 @@ export function RegisterForm({ error }: { error?: string }) {
       </section>
 
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 2 ? "" : "hidden"}`}>
-        <h2 className="text-xl font-bold text-slate-900">Kinderen</h2>
-        <label>Heeft u kinderen?<select name="hasChildren" value={hasChildren} onChange={(event) => setHasChildren(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
+        <h2 className="text-xl font-bold text-slate-900">Kinderen onder 18 jaar</h2>
+        <label>Heeft u kinderen onder 18 jaar?<select name="hasChildren" value={hasChildren} onChange={(event) => setHasChildren(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
         <input type="hidden" name="childrenCount" value={childCount} />
         {hasChildren === "yes" ? (
           <>
@@ -520,27 +609,43 @@ export function RegisterForm({ error }: { error?: string }) {
 
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 4 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">ID Uploaden</h2>
-        <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4">
-          <label>
-            Kopie ID
-            <input
-              accept="image/*,application/pdf"
-              name="identityDocument"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                identityDocumentRef.current = file ?? null;
-                setIdentityFileMessage(file ? `${file.name} geselecteerd (${readableFileSize(file.size)}). Fotos worden automatisch verkleind bij indienen.` : "");
-              }}
-              type="file"
-            />
-          </label>
-          <p className="text-sm font-semibold text-slate-600">
-            Maak een foto met uw telefoon of kies een bestaande foto/PDF. Fotos worden automatisch zo klein mogelijk gemaakt terwijl ze leesbaar blijven. Maximale upload na verkleinen: 2 MB.
-          </p>
-          {identityFileMessage ? <p className="rounded-md bg-white p-3 text-sm font-semibold text-slate-700">{identityFileMessage}</p> : null}
+        <p className="text-sm font-semibold text-slate-600">
+          Upload per persoon een kopie ID. Maak een foto met uw telefoon of kies een bestaande foto/PDF. Fotos worden automatisch zo klein mogelijk gemaakt terwijl ze leesbaar blijven. Maximale upload na verkleinen: 2 MB per persoon.
+        </p>
+        <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-950">
+          ID kan zijn: Paspoort, ID-kaart, Rijbewijs of Geboortekaart.
+        </p>
+        <div className="grid gap-3">
+          {personIdentityUploads().map((upload) => (
+            <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4" key={upload.key}>
+              <div>
+                <p className="font-black text-slate-950">{upload.title}</p>
+                <p className="text-sm font-semibold text-slate-600">{upload.description}</p>
+              </div>
+              <label>
+                Document uploaden
+                <input
+                  accept="image/*,application/pdf"
+                  data-identity-upload="true"
+                  name={upload.key}
+                  onChange={(event) => {
+                    const input = event.currentTarget;
+                    const file = input.files?.[0];
+                    identityDocumentRefs.current[input.name] = file ?? null;
+                    setIdentityFileMessages((current) => ({
+                      ...current,
+                      [input.name]: file ? `${file.name} geselecteerd (${readableFileSize(file.size)}). Fotos worden automatisch verkleind bij indienen.` : ""
+                    }));
+                  }}
+                  type="file"
+                />
+              </label>
+              {identityFileMessages[upload.key] ? <p className="rounded-md bg-white p-3 text-sm font-semibold text-slate-700">{identityFileMessages[upload.key]}</p> : null}
+            </div>
+          ))}
           {state.verificationRequired ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-              Uw ID-bestand blijft bewaard in deze pagina. Laat deze pagina open en vul de verificatiecode in.
+              Uw ID-bestanden blijven bewaard in deze pagina. Laat deze pagina open en vul de verificatiecode in.
             </p>
           ) : null}
         </div>
@@ -571,12 +676,12 @@ export function RegisterForm({ error }: { error?: string }) {
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="healthDeclaration" type="checkbox" defaultChecked={field("healthDeclaration") === "on"} /> Gezondheidsverklaring bevestigd</label>
         <label className="flex grid-cols-none flex-row items-center gap-3 font-medium"><input className="w-auto" name="legalResidence" type="checkbox" defaultChecked={field("legalResidence") === "on"} /> Verblijf in Nederland bevestigd</label>
         <div className="grid gap-3">
-          <div>
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
             <h3 className="font-bold text-slate-900">Privacy en voorwaarden lezen</h3>
-            <p className="mt-1 text-sm text-slate-600">Scroll helemaal naar beneden. Daarna kunt u akkoord geven.</p>
+            <p className="mt-1 text-sm font-semibold text-slate-700">Lees deze tekst goed door. Scroll helemaal naar beneden, daarna kunt u akkoord geven.</p>
           </div>
           <div
-            className="max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700"
+            className="max-h-72 overflow-y-auto rounded-md border-2 border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-sm leading-6 text-slate-800 shadow-inner"
             onScroll={(event) => {
               const element = event.currentTarget;
               const atBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 8;
@@ -636,11 +741,11 @@ export function RegisterForm({ error }: { error?: string }) {
       </section>
 
       <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-3 border-t border-slate-200 bg-[#f6f8fb]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:flex-wrap sm:justify-between sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-        <button className="rounded-md border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-800" disabled={step === 0} formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.max(0, value - 1)); }} type="button">
+        <button className="rounded-md border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-800" disabled={step === 0} formNoValidate onClick={(event) => { event.preventDefault(); snapshotFormValues(); setStep((value) => Math.max(0, value - 1)); }} type="button">
           Vorige
         </button>
         {step < steps.length - 1 ? (
-          <button className="rounded-md bg-[#0f766e] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#115e59]" formNoValidate onClick={(event) => { event.preventDefault(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
+          <button className="rounded-md bg-[#0f766e] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#115e59]" formNoValidate onClick={(event) => { event.preventDefault(); snapshotFormValues(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
             Volgende
           </button>
         ) : (
