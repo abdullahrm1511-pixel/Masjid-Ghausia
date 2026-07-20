@@ -100,17 +100,22 @@ export function jsonLd(data: Record<string, unknown> | Record<string, unknown>[]
 export function organizationJsonLd() {
   return {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": ["Organization", "NGO"],
     "@id": `${siteUrl}/#organization`,
     name: organizationName,
     alternateName: ["Masjid Ghausia", "GBC", "St. GBC"],
     url: siteUrl,
     logo: absoluteUrl("/masjid-ghausia-logo.png"),
+    telephone: "+31 10 484 5149",
     address: {
       "@type": "PostalAddress",
+      streetAddress: "Boudewijnstraat 57",
+      postalCode: "3073 ZA",
       addressLocality: "Rotterdam",
+      addressRegion: "Zuid-Holland",
       addressCountry: "NL"
-    }
+    },
+    sameAs: ["https://masjidghausia.nl/"]
   };
 }
 

@@ -3,7 +3,11 @@ import { absoluteUrl } from "@/lib/seo";
 
 const publicRoutes = [
   { path: "/", priority: 1 },
+  { path: "/doneren", priority: 0.95 },
   { path: "/register", priority: 0.9 },
+  { path: "/over-masjid-ghausia", priority: 0.8 },
+  { path: "/stgbc", priority: 0.8 },
+  { path: "/contact", priority: 0.7 },
   { path: "/login", priority: 0.6 },
   { path: "/forgot-password", priority: 0.3 }
 ] as const;
