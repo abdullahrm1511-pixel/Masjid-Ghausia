@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://gbc.masjidghausia.nl";
+export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://stgbc.masjidghausia.nl";
 
 export const siteName = "Masjid Ghausia Donateursportaal";
 export const organizationName = "St. GBC Masjid Ghausia";
