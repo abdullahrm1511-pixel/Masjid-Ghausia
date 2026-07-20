@@ -1,21 +1,39 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { isAdminRole } from "@/lib/permissions";
+import { roleHomePath } from "@/lib/routes";
+import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@/lib/seo";
+
+const homeSeo = {
+  title: "Donateursportaal Masjid Ghausia Rotterdam",
+  description: "Welkom bij het St. GBC Masjid Ghausia donateursportaal voor registratie, inloggen en doneren in Rotterdam.",
+  path: "/",
+  keywords: ["GBC donateursportaal", "moskee donateursportaal", "St. GBC Rotterdam"]
+};
+
+export function generateMetadata(): Metadata {
+  return createPublicMetadata(homeSeo);
+}
 
 export default async function HomePage() {
   const session = await auth();
+  const homePath = roleHomePath(session?.user.role);
 
-  if (isAdminRole(session?.user.role)) {
-    redirect("/admin");
-  }
-  if (session?.user.role === "DONOR") {
-    redirect("/dashboard");
+  if (homePath !== "/") {
+    redirect(homePath);
   }
 
   return (
     <main className="donor-home px-4">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLd([
+          webPageJsonLd(homeSeo),
+          breadcrumbJsonLd([{ name: "Donateursportaal", path: "/" }])
+        ])}
+      />
       <section className="donor-hero">
         <div className="donor-hero-copy">
           <div className="mb-6 flex items-center gap-4">
@@ -29,7 +47,7 @@ export default async function HomePage() {
           </div>
           <h1 className="text-4xl font-black leading-tight text-slate-950 sm:text-5xl">Donateursportaal</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-700">
-            Registreer, bekijk uw gegevens en volg de status van uw lidmaatschap op een rustige en veilige plek.
+            Registreer als donateur van Masjid Ghausia Rotterdam, bekijk uw gegevens en volg de status van uw lidmaatschap op een rustige en veilige plek.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link className="donor-primary-link" href="/login">
@@ -57,6 +75,9 @@ export default async function HomePage() {
               <p>Wijzigingen kunt u later vanuit uw profiel aanvragen.</p>
             </div>
           </div>
+          <p className="mt-5 text-sm font-semibold leading-6 text-slate-600">
+            Wilt u doneren aan Masjid Ghausia of uw donateursgegevens beheren? Start met een nieuwe inschrijving of log in op uw bestaande account.
+          </p>
         </aside>
       </section>
     </main>

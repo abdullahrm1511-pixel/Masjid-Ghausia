@@ -1,5 +1,9 @@
+import type { Metadata } from "next";
 import { resetPassword } from "./actions";
 import { SubmitButton } from "@/components/donor/SubmitButton";
+import { privateMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = privateMetadata;
 
 export default async function ResetPasswordPage({
   params,

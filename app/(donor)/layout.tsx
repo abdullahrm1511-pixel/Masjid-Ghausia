@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { isAdminRole } from "@/lib/permissions";
 import { roleHomePath } from "@/lib/routes";
 import { privateMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = privateMetadata;
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function DonorLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
   if (!session?.user.id) {
     redirect("/login");
   }
 
-  if (!isAdminRole(session.user.role)) {
+  if (session.user.role !== "DONOR") {
     redirect(roleHomePath(session.user.role));
   }
 

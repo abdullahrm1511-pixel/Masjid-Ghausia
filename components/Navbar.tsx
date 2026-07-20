@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "@/lib/auth";
 import { canManageDonors, isAdminRole } from "@/lib/permissions";
+import { roleHomePath } from "@/lib/routes";
 import type { Session } from "next-auth";
 
 export function Navbar({ session }: { session: Session | null }) {
@@ -9,6 +10,7 @@ export function Navbar({ session }: { session: Session | null }) {
   const admin = isAdminRole(role);
   const donorAdmin = canManageDonors(role);
   const donor = role === "DONOR";
+  const homeHref = roleHomePath(role);
   const donorLinks = [
     ["Alle donateurs", "/admin/donors"],
     ["Actieve donateurs", "/admin/donors?status=ACTIVE"],
@@ -34,7 +36,7 @@ export function Navbar({ session }: { session: Session | null }) {
   return (
     <header className="sticky top-0 z-30 border-b border-[#0f5f9f] bg-[#1483d6] shadow-sm">
       <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-3 lg:flex lg:items-center lg:justify-between">
-        <Link href="/" className="flex min-w-0 items-center gap-3 leading-tight">
+        <Link href={homeHref} className="flex min-w-0 items-center gap-3 leading-tight">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-transparent">
             <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={48} src="/masjid-ghausia-logo.png" width={48} />
           </span>
@@ -128,7 +130,7 @@ export function Navbar({ session }: { session: Session | null }) {
             <form
               action={async () => {
                 "use server";
-                await signOut({ redirectTo: "/" });
+                await signOut({ redirectTo: "/login?loggedOut=1" });
               }}
             >
               <button className={navLink} type="submit">
