@@ -49,14 +49,27 @@ export async function createPaymentCorrection(formData: FormData) {
   });
   if (!donor) redirect(`${path}?error=Lidnummer+niet+gevonden`);
 
-  const typeMap: Record<string, { obligationType: "ANNUAL" | "ONE_TIME" | "MANUAL"; status: "DUE" | "PAID"; sign: 1 | -1; label: string }> = {
-    annual_due: { obligationType: "ANNUAL", status: "DUE", sign: 1, label: "Jaarbetaling open gezet" },
-    one_time_due: { obligationType: "ONE_TIME", status: "DUE", sign: 1, label: "Eenmalige betaling open gezet" },
-    manual_due: { obligationType: "MANUAL", status: "DUE", sign: 1, label: "Handmatige schuld toegevoegd" },
-    annual_paid: { obligationType: "ANNUAL", status: "PAID", sign: 1, label: "Jaarbetaling ontvangen toegevoegd" },
-    one_time_paid: { obligationType: "ONE_TIME", status: "PAID", sign: 1, label: "Eenmalige betaling ontvangen toegevoegd" },
-    manual_paid: { obligationType: "MANUAL", status: "PAID", sign: 1, label: "Extra betaling ontvangen toegevoegd" },
-    credit_correction: { obligationType: "MANUAL", status: "PAID", sign: -1, label: "Aftrek/correctie toegevoegd" }
+  const typeMap: Record<
+    string,
+    {
+      obligationType: "ANNUAL" | "ONE_TIME" | "MANUAL";
+      status: "DUE" | "PAID";
+      sign: 1 | -1;
+      label: string;
+      source: string;
+      donation?: boolean;
+    }
+  > = {
+    annual_due: { obligationType: "ANNUAL", status: "DUE", sign: 1, label: "Jaarbetaling open gezet", source: "ADMIN_PAYMENT_CORRECTION" },
+    one_time_due: { obligationType: "ONE_TIME", status: "DUE", sign: 1, label: "Eenmalige betaling open gezet", source: "ADMIN_PAYMENT_CORRECTION" },
+    manual_due: { obligationType: "MANUAL", status: "DUE", sign: 1, label: "Handmatige schuld toegevoegd", source: "ADMIN_PAYMENT_CORRECTION" },
+    mosque_donation_due: { obligationType: "MANUAL", status: "DUE", sign: 1, label: "Moskee donatie open gezet", source: "MOSQUE_DONATION_DUE", donation: true },
+    annual_paid: { obligationType: "ANNUAL", status: "PAID", sign: 1, label: "Jaarbetaling ontvangen toegevoegd", source: "ADMIN_PAYMENT_CORRECTION" },
+    one_time_paid: { obligationType: "ONE_TIME", status: "PAID", sign: 1, label: "Eenmalige betaling ontvangen toegevoegd", source: "ADMIN_PAYMENT_CORRECTION" },
+    manual_paid: { obligationType: "MANUAL", status: "PAID", sign: 1, label: "Extra betaling ontvangen toegevoegd", source: "ADMIN_PAYMENT_CORRECTION" },
+    mosque_donation_paid: { obligationType: "MANUAL", status: "PAID", sign: 1, label: "Moskee donatie ontvangen toegevoegd", source: "MOSQUE_DONATION_PAYMENT", donation: true },
+    credit_correction: { obligationType: "MANUAL", status: "PAID", sign: -1, label: "Aftrek/correctie toegevoegd", source: "ADMIN_PAYMENT_CORRECTION" },
+    mosque_donation_credit: { obligationType: "MANUAL", status: "PAID", sign: -1, label: "Moskee donatie aftrek/correctie toegevoegd", source: "MOSQUE_DONATION_CORRECTION", donation: true }
   };
 
   const selected = typeMap[correctionType];
@@ -70,16 +83,16 @@ export async function createPaymentCorrection(formData: FormData) {
       donorProfileId: donor.id,
       ...(membershipId ? { membershipId } : {}),
       updatedByAdminId: adminId,
-      lidnummer: donor.registrationNumber,
+      lidnummer: selected.donation ? `${donor.registrationNumber ?? lidnummer}-DONATIE` : donor.registrationNumber,
       obligationType: selected.obligationType,
       status: selected.status,
       amountCents,
       dueDate: selected.status === "DUE" ? now : null,
       paidAt: selected.status === "PAID" ? now : null,
       paymentMethod: selected.status === "PAID" && amountCents > 0 ? "BANK_TRANSFER" : null,
-      source: "ADMIN_PAYMENT_CORRECTION",
+      source: selected.source,
       adminNote: adminNote || null,
-      notes: selected.label
+      notes: selected.donation ? `${selected.label}\nMaandelijkse moskee donatie` : selected.label
     }
   });
 

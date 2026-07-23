@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatIban, normalizeIban } from "@/lib/iban";
 import { formatCurrency } from "@/lib/display";
 import { donorStatusBadgeClass, donorStatusLabel } from "@/lib/labels";
+import { isMosqueDonation } from "@/lib/mosque-donation";
 import { isNearlyEighteen } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ function getStatusWhere(status: StatusFilter | "INACTIVE_OR_PAYMENT_REQUIRED"): 
     return {
       OR: [
         { status: "INACTIVE" },
-        { paymentObligations: { some: { status: "DUE", obligationType: "ANNUAL" } } }
+        { paymentObligations: { some: { status: "DUE", amountCents: { gt: 0 } } } }
       ]
     };
   }
@@ -133,13 +134,28 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
           </thead>
           <tbody>
             {donors.map((donor) => {
-              const dueItems = donor.paymentObligations.filter((item) => item.status === "DUE");
+              const dueItems = donor.paymentObligations.filter((item) => item.status === "DUE" && item.amountCents > 0);
+              const regularDueItems = dueItems.filter((item) => !isMosqueDonation(item));
+              const donationDueItems = dueItems.filter(isMosqueDonation);
               const paidTotal = donor.paymentObligations
                 .filter((item) => item.status === "PAID")
                 .reduce((sum, item) => sum + item.amountCents, 0);
+              const regularDueTotal = regularDueItems.reduce((sum, item) => sum + item.amountCents, 0);
+              const donationDueTotal = donationDueItems.reduce((sum, item) => sum + item.amountCents, 0);
+              const annualDueTotal = regularDueItems.filter((item) => item.obligationType === "ANNUAL").reduce((sum, item) => sum + item.amountCents, 0);
+              const oneTimeDueTotal = regularDueItems.filter((item) => item.obligationType === "ONE_TIME").reduce((sum, item) => sum + item.amountCents, 0);
+              const manualDueTotal = regularDueItems.filter((item) => item.obligationType === "MANUAL").reduce((sum, item) => sum + item.amountCents, 0);
               const hasNearlyAdultChild = donor.familyMembers.some((member) => member.type === "CHILD" && member.isActive && isNearlyEighteen(member.dateOfBirth));
               const primaryContact = donor.familyMembers.find((member) => member.relationship === "Primaire contactpersoon" && member.status === "ACTIVE_DEPENDENT");
               const displayName = primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : `${donor.firstName} ${donor.lastName}`;
+              const statusSignals = [
+                { label: donorStatusLabel(donor.status), className: donorStatusBadgeClass(donor.status) },
+                ...(annualDueTotal > 0 ? [{ label: `Jaar open ${formatCurrency(annualDueTotal)}`, className: "border border-red-200 bg-red-50 text-red-800" }] : []),
+                ...(oneTimeDueTotal > 0 ? [{ label: `Eenmalig open ${formatCurrency(oneTimeDueTotal)}`, className: "border border-orange-200 bg-orange-50 text-orange-800" }] : []),
+                ...(manualDueTotal > 0 ? [{ label: `Extra open ${formatCurrency(manualDueTotal)}`, className: "border border-amber-200 bg-amber-50 text-amber-800" }] : []),
+                ...(donationDueTotal > 0 ? [{ label: `Moskee donatie open ${formatCurrency(donationDueTotal)}`, className: "border border-emerald-200 bg-emerald-50 text-emerald-800" }] : []),
+                ...(hasNearlyAdultChild ? [{ label: "Kind bijna 18", className: "border border-amber-200 bg-amber-50 text-amber-800" }] : [])
+              ];
               return (
                 <tr className="border-t border-slate-200 align-top hover:bg-sky-50/40" key={donor.id}>
                   <td className="p-3 font-semibold">{donor.registrationNumber ?? "-"}</td>
@@ -148,21 +164,32 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
                     <div className="mt-2 flex flex-wrap gap-1">
                       {primaryContact ? <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-bold text-teal-800">Primair contact</span> : null}
                       {primaryContact ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">Oorspronkelijk: {donor.firstName} {donor.lastName}</span> : null}
-                      {hasNearlyAdultChild ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">Kind bijna 18</span> : null}
-                      {dueItems.some((item) => item.obligationType === "ANNUAL") ? <span className="rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-800">Jaarbetaling open</span> : null}
                     </div>
                   </td>
                   <td className="p-3">{formatIban(donor.iban)}</td>
                   <td className="p-3">
-                    <span className={`rounded-md px-2 py-1 text-xs font-bold ${donorStatusBadgeClass(donor.status)}`}>
-                      {donorStatusLabel(donor.status)}
-                    </span>
+                    <div className="flex max-w-72 flex-wrap gap-1">
+                      {statusSignals.map((signal) => (
+                        <span className={`rounded-md px-2 py-1 text-xs font-bold ${signal.className}`} key={signal.label}>
+                          {signal.label}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="p-3">
                     {dueItems.length ? (
-                      <span className="rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-800">
-                        {formatCurrency(dueItems.reduce((sum, item) => sum + item.amountCents, 0))} open
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {regularDueTotal > 0 ? (
+                          <span className="rounded-md bg-red-50 px-2 py-1 text-xs font-bold text-red-800">
+                            {formatCurrency(regularDueTotal)} open
+                          </span>
+                        ) : null}
+                        {donationDueTotal > 0 ? (
+                          <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">
+                            {formatCurrency(donationDueTotal)} moskee
+                          </span>
+                        ) : null}
+                      </div>
                     ) : donor.paymentObligations.length ? (
                       <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-bold text-[#0f5f9f]">
                         {formatCurrency(paidTotal)} ontvangen

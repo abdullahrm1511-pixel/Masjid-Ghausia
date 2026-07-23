@@ -49,10 +49,13 @@ export default async function PaymentCorrectionsPage({
             <option value="annual_due">Schuld toevoegen: jaarbetaling open</option>
             <option value="one_time_due">Schuld toevoegen: eenmalige betaling open</option>
             <option value="manual_due">Schuld toevoegen: handmatig open bedrag</option>
+            <option value="mosque_donation_due">Schuld toevoegen: moskee donatie open</option>
             <option value="annual_paid">Betaling toevoegen: jaarbetaling ontvangen</option>
             <option value="one_time_paid">Betaling toevoegen: eenmalige betaling ontvangen</option>
             <option value="manual_paid">Betaling toevoegen: extra betaling ontvangen</option>
+            <option value="mosque_donation_paid">Betaling toevoegen: moskee donatie ontvangen</option>
             <option value="credit_correction">Aftrek/correctie toevoegen</option>
+            <option value="mosque_donation_credit">Aftrek/correctie: moskee donatie</option>
           </select>
         </label>
 

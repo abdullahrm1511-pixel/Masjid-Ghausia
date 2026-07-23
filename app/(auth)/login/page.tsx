@@ -7,6 +7,7 @@ import { auth, signIn } from "@/lib/auth";
 import { isAdminRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { SubmitButton } from "@/components/donor/SubmitButton";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { roleHomePath } from "@/lib/routes";
 import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@/lib/seo";
 
@@ -154,7 +155,7 @@ export default async function LoginPage({
         </label>
         <label>
           Wachtwoord
-          <input name="password" type="password" autoComplete="current-password" required />
+          <PasswordInput name="password" autoComplete="current-password" required />
         </label>
         <SubmitButton className="w-full" pendingLabel="Inloggen...">Inloggen</SubmitButton>
       </form>

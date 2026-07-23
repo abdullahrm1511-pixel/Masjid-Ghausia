@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { resetPassword } from "./actions";
 import { SubmitButton } from "@/components/donor/SubmitButton";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { privateMetadata } from "@/lib/seo";
 import { prisma } from "@/lib/prisma";
 import { hashResetToken } from "@/lib/password-reset/tokens";
@@ -43,10 +44,10 @@ export default async function ResetPasswordPage({
           <input name="token" type="hidden" value={token} />
           <label>
             Nieuw wachtwoord
-            <input name="password" type="password" minLength={8} required />
+            <PasswordInput name="password" minLength={8} required />
             <span className="text-xs font-semibold text-slate-500">Minimaal 8 tekens, 1 hoofdletter, 1 kleine letter en 1 speciaal teken.</span>
           </label>
-          <label>Bevestig wachtwoord<input name="confirmPassword" type="password" minLength={8} required /></label>
+          <label>Bevestig wachtwoord<PasswordInput name="confirmPassword" minLength={8} required /></label>
           <SubmitButton className="w-full" pendingLabel="Opslaan...">Wachtwoord opslaan</SubmitButton>
         </form>
       ) : null}

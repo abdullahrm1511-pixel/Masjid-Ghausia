@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { submitRegistration, type RegistrationState } from "./actions";
 import { SubmitButton } from "@/components/donor/SubmitButton";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 
 const privacyText = [
   {
@@ -235,7 +236,6 @@ export function RegisterForm({ error }: { error?: string }) {
   const [identityFileMessages, setIdentityFileMessages] = useState<Record<string, string>>({});
   const [identityProcessing, setIdentityProcessing] = useState(false);
   const [fieldFeedback, setFieldFeedback] = useState<Record<string, FieldFeedback | null>>({});
-  const [showPassword, setShowPassword] = useState(false);
   const [emailValue, setEmailValue] = useState(state.values.email ?? "");
   const [formSnapshot, setFormSnapshot] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
@@ -566,22 +566,12 @@ export function RegisterForm({ error }: { error?: string }) {
             <h3 className="text-lg font-bold text-slate-900 sm:col-span-2">Beveiliging</h3>
             <label>
               Wachtwoord
-              <span className="grid grid-cols-[1fr_auto] gap-2">
-                <input {...validatedInput("password", { required: true, password: true })} type={showPassword ? "text" : "password"} required minLength={8} />
-                <button className="rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700" onClick={() => setShowPassword((value) => !value)} type="button">
-                  {showPassword ? "Verberg" : "Toon"}
-                </button>
-              </span>
+              <PasswordInput {...validatedInput("password", { required: true, password: true })} required minLength={8} />
               {feedbackMessage("password")}
             </label>
             <label>
               Bevestig wachtwoord
-              <span className="grid grid-cols-[1fr_auto] gap-2">
-                <input {...validatedInput("confirmPassword", { required: true, confirmPassword: true })} type={showPassword ? "text" : "password"} required minLength={8} />
-                <button className="rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700" onClick={() => setShowPassword((value) => !value)} type="button">
-                  {showPassword ? "Verberg" : "Toon"}
-                </button>
-              </span>
+              <PasswordInput {...validatedInput("confirmPassword", { required: true, confirmPassword: true })} required minLength={8} />
               {feedbackMessage("confirmPassword")}
             </label>
           </div>
