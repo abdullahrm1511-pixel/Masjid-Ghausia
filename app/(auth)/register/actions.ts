@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { registrationSubmitSchema } from "@/lib/registration/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { prepareEmailLog } from "@/lib/email/templates";
+import { notifyAdmins } from "@/lib/admin-notifications";
 
 export type RegistrationState = {
   errors: string[];
@@ -400,6 +401,13 @@ export async function submitRegistration(_previous: RegistrationState, formData:
     data: templateData,
     entityType: "RegistrationRequest",
     entityId: registrationRequest.id
+  });
+
+  await notifyAdmins({
+    status: `Nieuwe registratie van ${data.firstName} ${data.lastName}`,
+    entityType: "RegistrationRequest",
+    entityId: registrationRequest.id,
+    loginPath: `/admin/registrations/${registrationRequest.id}`
   });
 
   await writeAuditLog({

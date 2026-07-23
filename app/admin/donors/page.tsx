@@ -12,6 +12,7 @@ const statusFilters = [
   ["Alle donateurs", ""],
   ["Actieve donateurs", "ACTIVE"],
   ["Inactief", "INACTIVE"],
+  ["Open betaling", "INACTIVE_OR_PAYMENT_REQUIRED"],
   ["Actie vereist", "ACTION_REQUIRED"],
   ["Afgewezen", "REJECTED"],
   ["Overleden", "DECEASED"]
@@ -45,8 +46,7 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const q = firstParam(params.q).trim();
   const rawStatus = firstParam(params.status);
-  const normalizedRawStatus = rawStatus === "INACTIVE_OR_PAYMENT_REQUIRED" ? "INACTIVE" : rawStatus;
-  const selectedStatus = statusFilters.some(([, value]) => value === normalizedRawStatus) ? (normalizedRawStatus as StatusFilter) : "";
+  const selectedStatus = statusFilters.some(([, value]) => value === rawStatus) ? (rawStatus as StatusFilter) : "";
   const selectedLabel = statusFilters.find(([, value]) => value === selectedStatus)?.[0] ?? "Alle donateurs";
   const normalizedIban = normalizeIban(q);
   const typedStatus = Object.values(DonorStatus).find((item) => item === q.toUpperCase());
@@ -58,8 +58,13 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
           { registrationNumber: { contains: q, mode: "insensitive" } },
           { firstName: { contains: q, mode: "insensitive" } },
           { lastName: { contains: q, mode: "insensitive" } },
+          { phone: { contains: q, mode: "insensitive" } },
+          { postalCode: { contains: q, mode: "insensitive" } },
+          { city: { contains: q, mode: "insensitive" } },
+          { user: { email: { contains: q, mode: "insensitive" } } },
           { familyMembers: { some: { firstName: { contains: q, mode: "insensitive" } } } },
           { familyMembers: { some: { lastName: { contains: q, mode: "insensitive" } } } },
+          { familyMembers: { some: { relationship: { contains: q, mode: "insensitive" } } } },
           { iban: { contains: normalizedIban, mode: "insensitive" } },
           ...(typedStatus ? [{ status: typedStatus }] : [])
         ]
@@ -94,7 +99,7 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
       </div>
       <form className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
         {selectedStatus ? <input name="status" type="hidden" value={selectedStatus} /> : null}
-        <input name="q" defaultValue={q} placeholder="Zoek op lidnummer, naam of IBAN" />
+        <input name="q" defaultValue={q} placeholder="Zoek op lidnummer, naam, e-mail, telefoon, postcode, woonplaats of IBAN" />
         <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f]" type="submit">Zoeken</button>
       </form>
       </section>

@@ -33,6 +33,7 @@ export type EmailTemplateKey =
   | "CHANGE_REQUEST_REJECTED"
   | "PAYMENT_CONFIRMED"
   | "PAYMENT_REMINDER"
+  | "ADMIN_NOTIFICATION"
   | "PASSWORD_RESET";
 
 export type DefaultEmailTemplate = {
@@ -236,6 +237,23 @@ Openstaand bedrag:
 {{bedrag}}
 
 Neem contact op met het bestuur als u hierover vragen heeft.
+
+Met vriendelijke groet,
+St. GBC Masjid Ghausia`
+  },
+  {
+    key: "ADMIN_NOTIFICATION",
+    name: "Admin notificatie",
+    subject: "Nieuwe actie in het St. GBC adminportaal",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Er staat een nieuwe actie klaar in het adminportaal.
+
+Status:
+{{status}}
+
+Open het portaal:
+{{loginlink}}
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`

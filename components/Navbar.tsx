@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "@/lib/auth";
-import { canManageDonors, isAdminRole } from "@/lib/permissions";
+import { canManageDonors, canManageSettings, isAdminRole } from "@/lib/permissions";
 import { roleHomePath } from "@/lib/routes";
 import { absoluteUrl } from "@/lib/seo";
 import type { Session } from "next-auth";
@@ -10,6 +10,7 @@ export function Navbar({ session }: { session: Session | null }) {
   const role = session?.user?.role;
   const admin = isAdminRole(role);
   const donorAdmin = canManageDonors(role);
+  const settingsAdmin = canManageSettings(role);
   const donor = role === "DONOR";
   const homeHref = roleHomePath(role);
   const donorLinks = [
@@ -28,7 +29,8 @@ export function Navbar({ session }: { session: Session | null }) {
   const settingsLinks = [
     ["Prijsinstellingen", "/admin/settings/pricing"],
     ["Import", "/admin/import"],
-    ["Export", "/admin/export"]
+    ["Export", "/admin/export"],
+    ...(settingsAdmin ? ([["Auditlog", "/admin/audit-log"]] as const) : [])
   ] as const;
   const dropdownClass =
     "invisible absolute right-0 top-full z-20 min-w-60 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";

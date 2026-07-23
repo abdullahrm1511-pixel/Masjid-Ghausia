@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeIban, isValidIban } from "@/lib/iban";
 import { writeAuditLog } from "@/lib/audit";
 import { prepareEmailLog } from "@/lib/email/templates";
+import { notifyAdmins } from "@/lib/admin-notifications";
 
 function value(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -154,6 +155,13 @@ export async function submitChangeRequest(formData: FormData) {
       lidnummer: profile.registrationNumber ?? "",
       organisatie: "St. GBC Masjid Ghausia"
     }
+  });
+
+  await notifyAdmins({
+    status: `Nieuw wijzigingsverzoek van ${profile.firstName} ${profile.lastName}`,
+    entityType: "ChangeRequest",
+    entityId: changeRequest.id,
+    loginPath: `/admin/change-requests/${changeRequest.id}`
   });
 
   redirect("/dashboard");
