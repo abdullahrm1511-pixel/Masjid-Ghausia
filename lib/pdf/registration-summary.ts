@@ -67,16 +67,10 @@ function removeField(form: ReturnType<PDFDocument["getForm"]>, name: string) {
   }
 }
 
-function genderRadioValue(gender?: string | null) {
-  if (gender === "MALE") return "Yes";
-  if (gender === "FEMALE") return "No";
-  return null;
-}
-
-function pageTwoGenderValue(gender?: string | null) {
-  if (gender === "MALE") return "0";
-  if (gender === "FEMALE") return "1";
-  return null;
+function genderText(gender?: string | null) {
+  if (gender === "MALE") return "Male";
+  if (gender === "FEMALE") return "Female";
+  return NOT_APPLICABLE;
 }
 
 function civilStatusValue(status?: string | null) {
@@ -87,12 +81,22 @@ function civilStatusValue(status?: string | null) {
   return null;
 }
 
-function drawPageTwoGenderMark(page: ReturnType<PDFDocument["addPage"]> | undefined, gender?: string | null) {
+function drawGenderText(page: ReturnType<PDFDocument["addPage"]> | undefined, gender: string | null | undefined, x: number, y: number, size = 9) {
+  if (!page) return;
+  page.drawText(genderText(gender), {
+    x,
+    y,
+    size,
+    color: rgb(0.08, 0.1, 0.16)
+  });
+}
+
+function drawPageTwoGenderText(page: ReturnType<PDFDocument["addPage"]> | undefined, gender?: string | null) {
   if (!page || !gender) return;
-  page.drawText("X", {
-    x: gender === "MALE" ? 439 : 485,
+  page.drawText(genderText(gender), {
+    x: 434,
     y: 548,
-    size: 11,
+    size: 9,
     color: rgb(0.08, 0.1, 0.16)
   });
 }
@@ -140,9 +144,6 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
   const postalCity = [donor.postalCode, donor.city].filter(Boolean).join(" ");
   removeField(form, "Button1");
   setRadio(form, "Radio Button1", "1");
-  setRadio(form, "Radio Button2", pageTwoGenderValue(donor.gender));
-  setRadio(form, "Primery", genderRadioValue(donor.gender));
-  setRadio(form, "Partner", genderRadioValue(partner?.gender));
   setRadio(form, "Burgelijkstaat", civilStatusValue(donor.maritalStatus));
   setText(form, "Een malig Donatie €", oneTimeAmount);
   setText(form, "Jaarlijks donatie €", annualAmount);
@@ -169,10 +170,8 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
     const child = children[index];
     const nameField = ["undefined_5", "undefined_6", "undefined_7"][index];
     const dateField = ["Geboortedatum_3", "Geboortedatum_4", "Geboortedatum_5"][index];
-    const genderField = ["Kind1", "Kind2", "Kind3"][index];
     setText(form, nameField, fullName(child), 9);
     setText(form, dateField, formatDateOnly(child?.dateOfBirth), 9);
-    setRadio(form, genderField, genderRadioValue(child?.gender));
   });
 
   setText(form, "Naam", applicantName);
@@ -208,7 +207,13 @@ export async function createRegistrationSummaryPdf(request: RegistrationWithDeta
 
   form.updateFieldAppearances(font);
   form.flatten();
-  drawPageTwoGenderMark(pdfDoc.getPages()[1], donor.gender);
+  const firstPage = pdfDoc.getPages()[0];
+  drawGenderText(firstPage, donor.gender, 494, 641);
+  drawGenderText(firstPage, partner?.gender, 494, 452);
+  children.slice(0, 3).forEach((child, index) => {
+    drawGenderText(firstPage, child.gender, 494, [389, 364, 339][index]);
+  });
+  drawPageTwoGenderText(pdfDoc.getPages()[1], donor.gender);
 
   return Buffer.from(await pdfDoc.save());
 }

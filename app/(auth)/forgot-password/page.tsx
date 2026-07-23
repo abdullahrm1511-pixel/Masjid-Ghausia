@@ -21,7 +21,7 @@ export function generateMetadata(): Metadata {
 export default async function ForgotPasswordPage({
   searchParams
 }: {
-  searchParams: Promise<{ sent?: string; devToken?: string }>;
+  searchParams: Promise<{ sent?: string }>;
 }) {
   const params = await searchParams;
   const session = await auth();
@@ -48,13 +48,12 @@ export default async function ForgotPasswordPage({
       <p className="mt-2 text-sm leading-6 text-slate-600">Vul uw e-mailadres in om een nieuw wachtwoord aan te maken.</p>
       {params.sent === "1" ? (
         <div className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-900">
-          Als het e-mailadres bestaat, is er een resetlink voorbereid.
-          {params.devToken ? <p className="mt-2 break-all">Lokale resetlink: /reset-password/{params.devToken}</p> : null}
+          Als het e-mailadres bestaat, ontvangt u binnen enkele minuten een e-mail met een veilige resetlink.
         </div>
       ) : null}
       <form action={requestPasswordReset} className="mt-8 grid gap-4">
         <label>E-mailadres<input name="email" type="email" required /></label>
-        <SubmitButton className="w-full" pendingLabel="Versturen...">Reset voorbereiden</SubmitButton>
+        <SubmitButton className="w-full" pendingLabel="E-mail versturen...">Resetlink per e-mail ontvangen</SubmitButton>
       </form>
       <Link className="mt-5 inline-flex text-sm font-semibold text-[#0f5f9f] hover:underline" href="/login">
         Terug naar inloggen

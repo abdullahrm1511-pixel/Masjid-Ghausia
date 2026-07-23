@@ -97,7 +97,7 @@ function loginErrorMessage(error?: string) {
 export default async function LoginPage({
   searchParams
 }: {
-  searchParams: Promise<{ registered?: string; loggedOut?: string; error?: string; email?: string }>;
+  searchParams: Promise<{ registered?: string; loggedOut?: string; reset?: string; error?: string; email?: string }>;
 }) {
   const params = await searchParams;
   const session = await auth();
@@ -135,6 +135,11 @@ export default async function LoginPage({
       {params.loggedOut === "1" ? (
         <div className="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-900">
           U bent veilig uitgelogd.
+        </div>
+      ) : null}
+      {params.reset === "1" ? (
+        <div className="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-900">
+          Uw wachtwoord is aangepast. U kunt nu inloggen met uw nieuwe wachtwoord.
         </div>
       ) : null}
       {errorMessage ? (

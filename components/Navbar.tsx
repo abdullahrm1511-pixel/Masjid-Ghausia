@@ -3,6 +3,7 @@ import Image from "next/image";
 import { signOut } from "@/lib/auth";
 import { canManageDonors, isAdminRole } from "@/lib/permissions";
 import { roleHomePath } from "@/lib/routes";
+import { absoluteUrl } from "@/lib/seo";
 import type { Session } from "next-auth";
 
 export function Navbar({ session }: { session: Session | null }) {
@@ -143,7 +144,7 @@ export function Navbar({ session }: { session: Session | null }) {
             <form
               action={async () => {
                 "use server";
-                await signOut({ redirectTo: "/login?loggedOut=1" });
+                await signOut({ redirectTo: absoluteUrl("/login?loggedOut=1") });
               }}
             >
               <button className={navLink} type="submit">

@@ -227,8 +227,8 @@ export function RegisterForm({ error }: { error?: string }) {
     values: {},
     verificationRequired: false
   });
-  const [hasPartner, setHasPartner] = useState("no");
   const [hasChildren, setHasChildren] = useState("no");
+  const [maritalStatus, setMaritalStatus] = useState(state.values.maritalStatus || "SINGLE");
   const [children, setChildren] = useState<number[]>([]);
   const [step, setStep] = useState(0);
   const [privacyScrolled, setPrivacyScrolled] = useState(false);
@@ -253,7 +253,8 @@ export function RegisterForm({ error }: { error?: string }) {
 
     const nextHasPartner = state.values.hasPartner || "no";
     const nextHasChildren = state.values.hasChildren || "no";
-    setHasPartner(nextHasPartner);
+    const nextMaritalStatus = state.values.maritalStatus || (nextHasPartner === "yes" ? "MARRIED" : "SINGLE");
+    setMaritalStatus(nextMaritalStatus);
     setHasChildren(nextHasChildren);
 
     const count = Number(state.values.childrenCount ?? 0);
@@ -271,7 +272,18 @@ export function RegisterForm({ error }: { error?: string }) {
     setStep(state.verificationRequired ? steps.length - 1 : 0);
   }, [state.values, state.verificationRequired, steps.length]);
 
-  const maritalStatus = hasPartner === "yes" ? "MARRIED" : "SINGLE";
+  const married = maritalStatus === "MARRIED";
+  const visibleStepIndexes = steps.map((_, index) => index).filter((index) => married || index !== 1);
+
+  function nextStepIndex(current: number) {
+    if (current === 0 && !married) return 2;
+    return Math.min(steps.length - 1, current + 1);
+  }
+
+  function previousStepIndex(current: number) {
+    if (current === 2 && !married) return 0;
+    return Math.max(0, current - 1);
+  }
 
   function setFieldState(name: string, value: string, rules: FieldRules) {
     setFieldFeedback((current) => ({
@@ -337,7 +349,7 @@ export function RegisterForm({ error }: { error?: string }) {
       }
     ];
 
-    if (hasPartner === "yes") {
+    if (married) {
       const partnerName = [liveField("partner.firstName"), liveField("partner.lastName")].filter(Boolean).join(" ");
       uploads.push({
         key: "partner.identityDocument",
@@ -433,6 +445,7 @@ export function RegisterForm({ error }: { error?: string }) {
   return (
     <form action={formAction} className="grid gap-5 sm:gap-6" noValidate onSubmit={handleSubmit} ref={formRef}>
       <input name="maritalStatus" type="hidden" value={maritalStatus} />
+      <input name="hasPartner" type="hidden" value={married ? "yes" : "no"} />
       {state.errors.length ? (
         <div className="grid gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
           {state.errors.map((message) => (
@@ -446,17 +459,17 @@ export function RegisterForm({ error }: { error?: string }) {
         </div>
       ) : null}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-        {steps.map((label, index) => (
+        {visibleStepIndexes.map((index) => (
           <button
             className={`shrink-0 rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-[#0f766e] bg-[#0f766e] text-white shadow-sm" : "border-slate-300 bg-white text-slate-700 hover:border-[#0f766e]/40 hover:bg-emerald-50"}`}
-            key={label}
+            key={steps[index]}
             onClick={() => {
               snapshotFormValues();
               setStep(index);
             }}
             type="button"
           >
-            <span className="sm:hidden">{index + 1}. </span>{label}
+            <span className="sm:hidden">{visibleStepIndexes.indexOf(index) + 1}. </span>{steps[index]}
           </button>
         ))}
       </div>
@@ -470,6 +483,25 @@ export function RegisterForm({ error }: { error?: string }) {
             <label>Geslacht<select name="gender" defaultValue={field("gender") || "MALE"} required><option value="MALE">Man</option><option value="FEMALE">Vrouw</option></select></label>
             <label>Geboortedatum<input name="dateOfBirth" type="date" max={today} defaultValue={field("dateOfBirth")} required /></label>
             <label>Geboorteplaats<input {...validatedInput("birthPlace", { required: true, lettersOnly: true })} pattern={namePattern} required />{feedbackMessage("birthPlace")}</label>
+            <label>
+              Burgerlijke staat
+              <select
+                value={maritalStatus}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setMaritalStatus(nextValue);
+                  if (step === 1 && nextValue !== "MARRIED") {
+                    setStep(2);
+                  }
+                }}
+                required
+              >
+                <option value="SINGLE">Ongehuwd</option>
+                <option value="MARRIED">Gehuwd</option>
+                <option value="DIVORCED">Gescheiden</option>
+                <option value="WIDOWED">Weduwe/weduwnaar</option>
+              </select>
+            </label>
           </div>
 
           <div className="grid gap-4 rounded-md bg-slate-50 p-4 sm:grid-cols-2">
@@ -558,8 +590,10 @@ export function RegisterForm({ error }: { error?: string }) {
 
       <section className={`grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${step === 1 ? "" : "hidden"}`}>
         <h2 className="text-xl font-bold text-slate-900">Partner</h2>
-        <label>Heeft u een partner?<select name="hasPartner" value={hasPartner} onChange={(event) => setHasPartner(event.target.value)}><option value="no">Nee</option><option value="yes">Ja</option></select></label>
-        {hasPartner === "yes" ? (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-950">
+          U heeft bij burgerlijke staat Gehuwd gekozen. Vul hieronder de partnergegevens in.
+        </p>
+        {married ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <label>Voornaam<input {...validatedInput("partner.firstName", { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage("partner.firstName")}</label>
             <label>Achternaam<input {...validatedInput("partner.lastName", { lettersOnly: true, fullName: true })} pattern={namePattern} minLength={2} />{feedbackMessage("partner.lastName")}</label>
@@ -741,11 +775,11 @@ export function RegisterForm({ error }: { error?: string }) {
       </section>
 
       <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-3 border-t border-slate-200 bg-[#f6f8fb]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex sm:flex-wrap sm:justify-between sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-        <button className="rounded-md border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-800" disabled={step === 0} formNoValidate onClick={(event) => { event.preventDefault(); snapshotFormValues(); setStep((value) => Math.max(0, value - 1)); }} type="button">
+        <button className="rounded-md border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-800" disabled={step === 0} formNoValidate onClick={(event) => { event.preventDefault(); snapshotFormValues(); setStep((value) => previousStepIndex(value)); }} type="button">
           Vorige
         </button>
         {step < steps.length - 1 ? (
-          <button className="rounded-md bg-[#0f766e] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#115e59]" formNoValidate onClick={(event) => { event.preventDefault(); snapshotFormValues(); setStep((value) => Math.min(steps.length - 1, value + 1)); }} type="button">
+          <button className="rounded-md bg-[#0f766e] px-5 py-3 font-semibold text-white shadow-sm hover:bg-[#115e59]" formNoValidate onClick={(event) => { event.preventDefault(); snapshotFormValues(); setStep((value) => nextStepIndex(value)); }} type="button">
             Volgende
           </button>
         ) : (

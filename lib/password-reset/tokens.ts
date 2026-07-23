@@ -10,6 +10,15 @@ export async function createPasswordResetToken(userId: string) {
   const tokenHash = hashResetToken(token);
   const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
 
+  await prisma.passwordResetToken.updateMany({
+    where: {
+      userId,
+      usedAt: null,
+      expiresAt: { gt: new Date() }
+    },
+    data: { usedAt: new Date() }
+  });
+
   await prisma.passwordResetToken.create({
     data: { userId, tokenHash, expiresAt }
   });

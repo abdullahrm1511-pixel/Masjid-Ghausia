@@ -5,13 +5,21 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { hashResetToken } from "@/lib/password-reset/tokens";
 
+function validPassword(password: string) {
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+}
+
 export async function resetPassword(formData: FormData) {
   const token = String(formData.get("token") ?? "");
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (password.length < 8 || password !== confirmPassword) {
-    redirect(`/reset-password/${token}?error=Controleer het wachtwoord`);
+  if (!validPassword(password)) {
+    redirect(`/reset-password/${token}?error=Gebruik minimaal 8 tekens, 1 hoofdletter, 1 kleine letter en 1 speciaal teken`);
+  }
+
+  if (password !== confirmPassword) {
+    redirect(`/reset-password/${token}?error=Wachtwoorden komen niet overeen`);
   }
 
   const record = await prisma.passwordResetToken.findUnique({
@@ -33,5 +41,5 @@ export async function resetPassword(formData: FormData) {
     })
   ]);
 
-  redirect("/login");
+  redirect("/login?reset=1");
 }
