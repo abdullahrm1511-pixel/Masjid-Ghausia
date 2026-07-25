@@ -23,6 +23,7 @@ export function Navbar({ session }: { session: Session | null }) {
     ["Overleden", "/admin/donors?status=DECEASED"]
   ] as const;
   const emailLinks = [
+    ["Verzenden", "/admin/email-send"],
     ["Templates", "/admin/email-templates"],
     ["E-maillog", "/admin/email-log"]
   ] as const;

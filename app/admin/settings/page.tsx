@@ -35,6 +35,11 @@ function groups(showSuperAdminItems: boolean) {
     title: "Communicatie",
     items: [
       {
+        title: "E-mail verzenden",
+        description: "Batchgewijs of per donateur een template versturen.",
+        href: "/admin/email-send"
+      },
+      {
         title: "E-mailtemplates",
         description: "Teksten beheren die klaargezet worden voor donateurs.",
         href: "/admin/email-templates"
@@ -49,6 +54,13 @@ function groups(showSuperAdminItems: boolean) {
   {
     title: "Beheer",
     items: [
+      ...(showSuperAdminItems
+        ? [{
+            title: "Enquetes",
+            description: "Enquetes maken, unieke links delen en antwoorden bekijken.",
+            href: "/admin/settings/surveys"
+          }]
+        : []),
       {
         title: "Controlecentrum",
         description: "Dagelijkse werklijst voor betalingen, importsignalen, gezinswijzigingen en statussen.",

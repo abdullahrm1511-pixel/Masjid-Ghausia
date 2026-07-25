@@ -102,7 +102,7 @@ export default async function FinancialPage({
         naam: `${donor.firstName} ${donor.lastName}`.trim(),
         voornaam: donor.firstName,
         achternaam: donor.lastName,
-        lidnummer: donor.registrationNumber ?? "",
+        registratienummer: donor.registrationNumber ?? "",
         bedrag: formatCurrency(latestPaid.amountCents),
         betaaldatum: formatDate(latestPaid.paidAt),
         organisatie: "St. GBC Masjid Ghausia"
@@ -117,7 +117,7 @@ export default async function FinancialPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Financieel beheer</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">{donor.firstName} {donor.lastName} - {donor.registrationNumber ?? "geen lidnummer"}</h1>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">{donor.firstName} {donor.lastName} - {donor.registrationNumber ?? "geen registratienummer"}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className={`rounded-md px-3 py-2 text-sm font-bold ${donorStatusBadgeClass(donor.status)}`}>

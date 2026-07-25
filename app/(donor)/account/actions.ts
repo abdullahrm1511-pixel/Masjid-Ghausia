@@ -152,7 +152,7 @@ export async function submitChangeRequest(formData: FormData) {
       naam: `${profile.firstName} ${profile.lastName}`.trim(),
       voornaam: profile.firstName,
       achternaam: profile.lastName,
-      lidnummer: profile.registrationNumber ?? "",
+      registratienummer: profile.registrationNumber ?? "",
       organisatie: "St. GBC Masjid Ghausia"
     }
   });

@@ -12,6 +12,9 @@ export default async function EmailTemplatesPage() {
     <main className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-3xl font-bold text-slate-900">E-mailtemplates</h1>
       <p className="mt-2 text-slate-700">Deze teksten worden voorbereid als e-maillog. Er wordt nog niets echt verzonden.</p>
+      <Link className="mt-5 inline-flex rounded-lg bg-[#1483d6] px-4 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f]" href="/admin/email-send">
+        E-mail verzenden
+      </Link>
       <div className="mt-8 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="bg-slate-50 text-slate-700">

@@ -11,7 +11,7 @@ const sampleData = {
   naam: "Mohammed Khan",
   voornaam: "Mohammed",
   achternaam: "Khan",
-  lidnummer: "11-001",
+  registratienummer: "11-001",
   status: "PAYMENT_REQUIRED",
   bedrag: "€ 125,00",
   betaaldatum: "07-06-2026",

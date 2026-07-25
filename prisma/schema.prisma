@@ -167,55 +167,55 @@ model User {
 }
 
 model DonorProfile {
-  id                   String         @id @default(cuid())
-  userId               String         @unique
-  currentMembershipId  String?
-  registrationNumber   String?        @unique
+  id                    String         @id @default(cuid())
+  userId                String         @unique
+  currentMembershipId   String?
+  registrationNumber    String?        @unique
   legacyMemberDetailKey String?
-  legacyAddressKey     String?
-  status               DonorStatus    @default(PENDING)
-  firstName            String
-  lastName             String
-  gender               Gender?
-  phone                String
-  addressLine1         String
-  addressLine2         String?
-  postalCode           String
-  city                 String
-  country              String         @default("NL")
-  dateOfBirth          DateTime
-  birthPlace           String
-  iban                 String
-  accountHolderName    String
-  maritalStatus        MaritalStatus?
-  pakistanContactName  String?
-  pakistanContactPhone String?
-  funeralWishes        String?
-  notes                String?
-  approvedAt           DateTime?
-  statusChangedAt      DateTime?
-  activeSince          DateTime?
-  inactiveSince        DateTime?
-  deceasedAt           DateTime?
-  statusInternalNote   String?
-  statusDonorMessage   String?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  legacyAddressKey      String?
+  status                DonorStatus    @default(PENDING)
+  firstName             String
+  lastName              String
+  gender                Gender?
+  phone                 String
+  addressLine1          String
+  addressLine2          String?
+  postalCode            String
+  city                  String
+  country               String         @default("NL")
+  dateOfBirth           DateTime
+  birthPlace            String
+  iban                  String
+  accountHolderName     String
+  maritalStatus         MaritalStatus?
+  pakistanContactName   String?
+  pakistanContactPhone  String?
+  funeralWishes         String?
+  notes                 String?
+  approvedAt            DateTime?
+  statusChangedAt       DateTime?
+  activeSince           DateTime?
+  inactiveSince         DateTime?
+  deceasedAt            DateTime?
+  statusInternalNote    String?
+  statusDonorMessage    String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
-  user                 User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentMembership    Membership?                 @relation("CurrentMembership", fields: [currentMembershipId], references: [id], onDelete: SetNull)
-  primaryMemberships   Membership[]                @relation("MembershipPrimary")
-  payerMemberships     Membership[]                @relation("MembershipPayer")
-  membershipMembers    MembershipMember[]
-  familyMembers        FamilyMember[]
-  registrationRequests RegistrationRequest[]
-  changeRequests       ChangeRequest[]
-  paymentObligations   PaymentObligation[]
-  identityDocument     IdentityDocument?
-  statusHistory        DonorStatusHistory[]
-  familyStatusHistory  FamilyMemberStatusHistory[]
-  previousAdultChildTransitions AdultChildTransition[] @relation("AdultTransitionPreviousDonor")
-  newAdultChildTransitions      AdultChildTransition[] @relation("AdultTransitionNewDonor")
+  user                          User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentMembership             Membership?                 @relation("CurrentMembership", fields: [currentMembershipId], references: [id], onDelete: SetNull)
+  primaryMemberships            Membership[]                @relation("MembershipPrimary")
+  payerMemberships              Membership[]                @relation("MembershipPayer")
+  membershipMembers             MembershipMember[]
+  familyMembers                 FamilyMember[]
+  registrationRequests          RegistrationRequest[]
+  changeRequests                ChangeRequest[]
+  paymentObligations            PaymentObligation[]
+  identityDocument              IdentityDocument?
+  statusHistory                 DonorStatusHistory[]
+  familyStatusHistory           FamilyMemberStatusHistory[]
+  previousAdultChildTransitions AdultChildTransition[]      @relation("AdultTransitionPreviousDonor")
+  newAdultChildTransitions      AdultChildTransition[]      @relation("AdultTransitionNewDonor")
 
   @@index([registrationNumber])
   @@index([legacyMemberDetailKey])
@@ -263,27 +263,27 @@ model DonorStatusHistory {
 }
 
 model FamilyMember {
-  id             String           @id @default(cuid())
-  donorProfileId String
+  id                    String             @id @default(cuid())
+  donorProfileId        String
   legacyMemberDetailKey String?
-  legacyAddressKey String?
-  type           FamilyMemberType
-  status         FamilyMemberStatus @default(ACTIVE_DEPENDENT)
-  firstName      String
-  lastName       String
-  gender         Gender?
-  dateOfBirth    DateTime
-  birthPlace     String?
-  relationship   String?
-  isActive       Boolean          @default(true)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  legacyAddressKey      String?
+  type                  FamilyMemberType
+  status                FamilyMemberStatus @default(ACTIVE_DEPENDENT)
+  firstName             String
+  lastName              String
+  gender                Gender?
+  dateOfBirth           DateTime
+  birthPlace            String?
+  relationship          String?
+  isActive              Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   donorProfile      DonorProfile                @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
   identityDocument  IdentityDocument?
   membershipMembers MembershipMember[]
   statusHistory     FamilyMemberStatusHistory[]
-  adultTransition    AdultChildTransition?
+  adultTransition   AdultChildTransition?
 
   @@index([legacyMemberDetailKey])
   @@index([legacyAddressKey])
@@ -313,22 +313,22 @@ model FamilyMemberStatusHistory {
 }
 
 model AdultChildTransition {
-  id                    String                     @id @default(cuid())
-  familyMemberId        String                     @unique
+  id                     String                     @id @default(cuid())
+  familyMemberId         String                     @unique
   previousDonorProfileId String
-  newDonorProfileId     String?
-  status                AdultChildTransitionStatus @default(NEEDS_REGISTRATION)
-  turned18At            DateTime
-  notes                 String?
-  resolvedById          String?
-  resolvedAt            DateTime?
-  createdAt             DateTime                   @default(now())
-  updatedAt             DateTime                   @updatedAt
+  newDonorProfileId      String?
+  status                 AdultChildTransitionStatus @default(NEEDS_REGISTRATION)
+  turned18At             DateTime
+  notes                  String?
+  resolvedById           String?
+  resolvedAt             DateTime?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
-  familyMember         FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
-  previousDonorProfile DonorProfile @relation("AdultTransitionPreviousDonor", fields: [previousDonorProfileId], references: [id], onDelete: Cascade)
+  familyMember         FamilyMember  @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  previousDonorProfile DonorProfile  @relation("AdultTransitionPreviousDonor", fields: [previousDonorProfileId], references: [id], onDelete: Cascade)
   newDonorProfile      DonorProfile? @relation("AdultTransitionNewDonor", fields: [newDonorProfileId], references: [id], onDelete: SetNull)
-  resolvedBy           User?        @relation("AdultTransitionResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedBy           User?         @relation("AdultTransitionResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
 
   @@index([previousDonorProfileId])
   @@index([newDonorProfileId])
@@ -579,6 +579,43 @@ model EmailLog {
   @@index([templateKey])
   @@index([recipient])
   @@index([entityType, entityId])
+}
+
+model Survey {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  title       String
+  description String?
+  templateKey String           @default("DONOR_JOURNEY")
+  isActive    Boolean          @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  responses   SurveyResponse[]
+
+  @@index([isActive])
+  @@index([startsAt])
+  @@index([endsAt])
+  @@index([createdAt])
+}
+
+model SurveyResponse {
+  id          String   @id @default(cuid())
+  surveyId    String
+  name        String
+  phone       String
+  email       String
+  answers     Json
+  submittedAt DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@index([email])
+  @@index([submittedAt])
 }
 
 model Account {

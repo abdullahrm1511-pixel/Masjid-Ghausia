@@ -29,10 +29,13 @@ export async function ensureDefaultEmailTemplates() {
     DEFAULT_EMAIL_TEMPLATES.map(async (template) => {
       const existing = await prisma.emailTemplate.findUnique({ where: { key: template.key } });
       const shouldRefreshBody =
+        /lidnummer/i.test(existing?.subject ?? "") ||
+        /lidnummer/i.test(existing?.bodyText ?? "") ||
         (template.key === "REGISTRATION_APPROVED_PAYMENT_REQUIRED" &&
           (!existing?.bodyText?.includes("{{eenmalig_bedrag}}") || !existing?.bodyText?.includes("{{rekeningnummer}}"))) ||
-        (template.key === "REGISTRATION_ANSWERS_COPY" && !existing?.bodyText?.includes("{{lidnummer}}")) ||
-        (template.key === "PASSWORD_RESET" && !existing?.bodyText?.includes("{{reset_link}}"));
+        (template.key === "REGISTRATION_ANSWERS_COPY" && !existing?.bodyText?.includes("{{registratienummer}}")) ||
+        (template.key === "PASSWORD_RESET" && !existing?.bodyText?.includes("{{reset_link}}")) ||
+        (template.key === "PAYMENT_REMINDER" && !existing?.bodyText?.includes("{{registratienummer}}"));
 
       return prisma.emailTemplate.upsert({
         where: { key: template.key },

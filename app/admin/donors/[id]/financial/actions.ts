@@ -316,7 +316,7 @@ export async function updatePaymentStatus(formData: FormData) {
         naam: `${donor.firstName} ${donor.lastName}`.trim(),
         voornaam: donor.firstName,
         achternaam: donor.lastName,
-        lidnummer: donor.registrationNumber ?? "",
+        registratienummer: donor.registrationNumber ?? "",
         bedrag: formatCurrency(updated.amountCents),
         betaaldatum: formatDate(updated.paidAt),
         organisatie: "St. GBC Masjid Ghausia"
@@ -357,7 +357,7 @@ export async function registerBankPayment(formData: FormData) {
       donorProfileId: donor.id,
       ...(membershipId ? { membershipId } : {}),
       updatedByAdminId: adminId,
-      lidnummer: isMosqueDonationPayment ? `${donor.registrationNumber ?? "zonder-lidnummer"}-DONATIE` : donor.registrationNumber,
+      lidnummer: isMosqueDonationPayment ? `${donor.registrationNumber ?? "zonder-registratienummer"}-DONATIE` : donor.registrationNumber,
       obligationType,
       amountCents,
       status: "PAID",
@@ -436,7 +436,7 @@ export async function registerBankPayment(formData: FormData) {
         naam: `${donor.firstName} ${donor.lastName}`.trim(),
         voornaam: donor.firstName,
         achternaam: donor.lastName,
-        lidnummer: donor.registrationNumber ?? "",
+        registratienummer: donor.registrationNumber ?? "",
         bedrag: formatCurrency(payment.amountCents),
         betaaldatum: formatDate(payment.paidAt),
         organisatie: "St. GBC Masjid Ghausia"

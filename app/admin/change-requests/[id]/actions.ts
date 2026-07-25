@@ -174,7 +174,7 @@ export async function approveChangeRequest(formData: FormData) {
       naam: `${request.donorProfile.firstName} ${request.donorProfile.lastName}`.trim(),
       voornaam: request.donorProfile.firstName,
       achternaam: request.donorProfile.lastName,
-      lidnummer: request.donorProfile.registrationNumber ?? "",
+      registratienummer: request.donorProfile.registrationNumber ?? "",
       organisatie: "St. GBC Masjid Ghausia"
     }
   });
@@ -217,7 +217,7 @@ export async function rejectChangeRequest(formData: FormData) {
       naam: `${request.donorProfile.firstName} ${request.donorProfile.lastName}`.trim(),
       voornaam: request.donorProfile.firstName,
       achternaam: request.donorProfile.lastName,
-      lidnummer: request.donorProfile.registrationNumber ?? "",
+      registratienummer: request.donorProfile.registrationNumber ?? "",
       reden: donorMessage || adminNote,
       organisatie: "St. GBC Masjid Ghausia"
     }

@@ -145,7 +145,7 @@ export async function approveRegistration(formData: FormData) {
     action: "APPROVE",
     entityType: "RegistrationRequest",
     entityId: id,
-    message: `Registratie goedgekeurd met lidnummer ${registrationNumber}`
+    message: `Registratie goedgekeurd met registratienummer ${registrationNumber}`
   });
 
   const approvedRequest = {
@@ -164,7 +164,7 @@ export async function approveRegistration(formData: FormData) {
     naam: `${request.donorProfile.firstName} ${request.donorProfile.lastName}`.trim(),
     voornaam: request.donorProfile.firstName,
     achternaam: request.donorProfile.lastName,
-    lidnummer: registrationNumber,
+    registratienummer: registrationNumber,
     status: "INACTIVE",
     bedrag: formatEuroCents(annualAmountCents + oneTimeAmountCents + donationAmountCents),
     eenmalig_bedrag: formatEuroCents(oneTimeAmountCents),
