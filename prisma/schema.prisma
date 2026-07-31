@@ -604,7 +604,8 @@ model Survey {
 model SurveyResponse {
   id          String   @id @default(cuid())
   surveyId    String
-  name        String
+  firstName   String
+  lastName    String
   phone       String
   email       String
   answers     Json
