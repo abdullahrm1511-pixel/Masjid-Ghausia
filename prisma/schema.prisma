@@ -619,6 +619,22 @@ model SurveyResponse {
   @@index([submittedAt])
 }
 
+model FuneralApplication {
+  id            String    @id @default(cuid())
+  accessToken   String    @unique
+  status        String    @default("OPEN")
+  formData      Json?
+  signatureData String?
+  createdById   String
+  createdAt     DateTime  @default(now())
+  submittedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([submittedAt])
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String

@@ -54,6 +54,11 @@ function groups(showSuperAdminItems: boolean) {
   {
     title: "Beheer",
     items: [
+      {
+        title: "Begrafenisaanvragen",
+        description: "Unieke invullinks maken en ingevulde aanvragen als PDF bekijken.",
+        href: "/admin/settings/funeral-applications"
+      },
       ...(showSuperAdminItems
         ? [{
             title: "Enquetes",

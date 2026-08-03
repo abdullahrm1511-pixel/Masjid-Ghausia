@@ -566,3 +566,16 @@ button:disabled {
 .survey-check { display: grid; width: 4rem; height: 4rem; place-items: center; border-radius: 999px; background: #0f766e; color: white; font-size: 2rem; font-weight: 900; }
 @keyframes survey-reveal { from { opacity: 0; transform: translateY(-6px); } }
 @media (min-width: 640px) { .survey-grid { grid-template-columns: 1fr 1fr; } .survey-wide { grid-column: 1 / -1; } .survey-choices { grid-template-columns: 1fr 1fr; } }
+
+.funeral-page { min-height: calc(100vh - 73px); padding: 2rem 1rem 4rem; }
+.funeral-card { display: grid; width: min(100%, 58rem); margin-inline: auto; gap: 1.25rem; border: 1px solid var(--donor-border); border-radius: 1.25rem; background: rgba(255,255,255,.97); padding: clamp(1rem,4vw,2rem); box-shadow: 0 24px 64px rgba(22,66,63,.12); }
+.funeral-heading h1,.funeral-complete h1 { margin-top:.35rem; font-size:clamp(1.9rem,5vw,2.7rem); font-weight:900; color:#10201f; }
+.funeral-heading p:last-child,.funeral-complete p { margin-top:.6rem; color:#526966; line-height:1.6; }
+.funeral-section { display:grid; gap:1rem; border-top:1px solid var(--donor-border); padding-top:1.25rem; }
+.funeral-section legend { width:100%; padding-top:1.25rem; color:#0f766e; font-size:1.2rem; font-weight:900; }
+.funeral-grid { display:grid; gap:1rem; }
+.funeral-options { display:grid; gap:.7rem; }
+.funeral-notice { display:grid; gap:.8rem; border:1px solid #f0c08d; border-radius:1rem; background:#fff9ed; padding:1rem; color:#614817; line-height:1.6; }
+.funeral-notice a { font-weight:800; text-decoration:underline; }
+.funeral-complete { min-height:22rem; align-content:center; justify-items:center; text-align:center; }
+@media (min-width:640px) { .funeral-grid { grid-template-columns:1fr 1fr; } .funeral-options { grid-template-columns:repeat(3,1fr); } .funeral-options p { grid-column:1/-1; } }
