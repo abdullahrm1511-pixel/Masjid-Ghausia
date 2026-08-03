@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { FuneralFormData } from "@/lib/funeral-application";
 
-export type FuneralState = { success: boolean; message: string; errors?: Record<string, string> };
+export type FuneralState = { success: boolean; message: string; errors?: Record<string, string>; values?: Record<string, string> };
 const required = (label: string, max = 120) => z.string().trim().min(1, `${label} is verplicht.`).max(max);
 const optional = (max = 120) => z.string().trim().max(max).optional().default("");
 const schema = z.object({
@@ -14,11 +14,17 @@ const schema = z.object({
 });
 
 export async function submitFuneralApplication(_previous: FuneralState, formData: FormData): Promise<FuneralState> {
-  const parsed = schema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { success: false, message: "Controleer de gemarkeerde gegevens.", errors: Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])) };
+  const submittedValues = Object.fromEntries(Array.from(formData.entries()).map(([key, value]) => [key, typeof value === "string" ? value : ""]));
+  const parsed = schema.safeParse(submittedValues);
+  if (!parsed.success) {
+    const errors = Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]));
+    const preservedValues = { ...submittedValues };
+    for (const field of Object.keys(errors)) delete preservedValues[field];
+    return { success: false, message: "Controleer de gemarkeerde gegevens. Uw overige antwoorden zijn bewaard.", errors, values: preservedValues };
+  }
   const { token, acceptedCosts, ...values } = parsed.data;
   const application = await prisma.funeralApplication.findUnique({ where: { accessToken: token } });
-  if (!application || application.status !== "OPEN") return { success: false, message: "Deze invullink is niet meer beschikbaar." };
+  if (!application || application.status !== "OPEN") return { success: false, message: "Deze invullink is niet meer beschikbaar.", values: submittedValues };
   const data: FuneralFormData = { ...values, acceptedCosts: acceptedCosts === "on" };
   await prisma.funeralApplication.update({ where: { id: application.id }, data: { formData: data, signatureData: data.signatureName, status: "SUBMITTED", submittedAt: new Date() } });
   return { success: true, message: "De begrafenisaanvraag is veilig ontvangen. Het bestuur kan de ingevulde PDF nu bekijken." };
