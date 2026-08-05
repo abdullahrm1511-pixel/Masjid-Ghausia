@@ -26,6 +26,7 @@ export async function createSurvey(formData: FormData) {
   const adminId = await requireSettingsAdmin();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const templateKey = formData.get("templateKey") === "ONE_TIME_DONATION" ? "ONE_TIME_DONATION" : "DONOR_JOURNEY";
   const unlimited = formData.get("unlimited") === "on";
   if (title.length < 3 || title.length > 140) throw new Error("Vul een geldige titel in");
   const startsAt = unlimited ? null : optionalDate(formData.get("startsAt"));
@@ -33,7 +34,7 @@ export async function createSurvey(formData: FormData) {
   if (startsAt && endsAt && endsAt < startsAt) throw new Error("De einddatum moet na de begindatum liggen");
 
   const survey = await prisma.survey.create({
-    data: { slug: createSurveySlug(), title, description: description || null, startsAt, endsAt, createdById: adminId }
+    data: { slug: createSurveySlug(), title, description: description || null, templateKey, startsAt, endsAt, createdById: adminId }
   });
   await writeAuditLog({ actorId: adminId, action: "CREATE", entityType: "Survey", entityId: survey.id, message: `Enquete aangemaakt: ${title}` });
   redirect(`/admin/settings/surveys/${survey.id}`);

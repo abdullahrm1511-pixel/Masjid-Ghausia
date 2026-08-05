@@ -602,21 +602,38 @@ model Survey {
 }
 
 model SurveyResponse {
-  id          String   @id @default(cuid())
-  surveyId    String
-  firstName   String
-  lastName    String
-  phone       String
-  email       String
-  answers     Json
-  submittedAt DateTime @default(now())
-  ipAddress   String?
-  userAgent   String?
-  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  surveyId        String
+  firstName       String
+  lastName        String
+  phone           String
+  email           String
+  answers         Json
+  submittedAt     DateTime         @default(now())
+  ipAddress       String?
+  userAgent       String?
+  survey          Survey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  donationPayment DonationPayment?
 
   @@index([surveyId])
   @@index([email])
   @@index([submittedAt])
+}
+
+model DonationPayment {
+  id               String         @id @default(cuid())
+  surveyResponseId String         @unique
+  molliePaymentId  String         @unique
+  amountCents      Int
+  status           String         @default("open")
+  checkoutUrl      String
+  paidAt           DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  surveyResponse   SurveyResponse @relation(fields: [surveyResponseId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model FuneralApplication {

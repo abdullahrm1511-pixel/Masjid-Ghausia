@@ -19,7 +19,8 @@ export const EMAIL_PLACEHOLDERS = [
   "verification_code",
   "reset_link",
   "boete",
-  "enquete_antwoord"
+  "enquete_antwoord",
+  "enquete_titel"
 ] as const;
 
 export type EmailTemplateKey =
@@ -41,6 +42,7 @@ export type EmailTemplateKey =
   | "SURVEY_EXISTING_DONOR_CONFIRMED"
   | "SURVEY_NO_MEMBERSHIP"
   | "SURVEY_MEMBERSHIP_INTEREST"
+  | "SURVEY_ONE_TIME_DONATION"
   | "FUNERAL_APPLICATION_RECEIVED"
   | "PASSWORD_RESET";
 
@@ -344,6 +346,19 @@ St. GBC Masjid Ghausia`
 Hartelijk dank voor uw interesse om donateur te worden van Masjid Ghausia. Uw antwoorden en donatievoorkeur zijn goed ontvangen.
 
 Zodra de beveiligde betaal- en machtigingslink beschikbaar is, informeren wij u over de vervolgstap. Er wordt tot die tijd niets automatisch afgeschreven.
+
+Met vriendelijke groet,
+St. GBC Masjid Ghausia`
+  },
+  {
+    key: "SURVEY_ONE_TIME_DONATION",
+    name: "Enquete: eenmalige donatie ontvangen",
+    subject: "Dank voor uw reactie op {{enquete_titel}}",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Hartelijk dank voor uw reactie op {{enquete_titel}}. Uw keuze voor de eenmalige donatie is goed ontvangen.
+
+Zodra de beveiligde betaallink aan deze actie is toegevoegd, informeren wij u over de vervolgstap.
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`

@@ -10,12 +10,19 @@ export const DONOR_SURVEY_TEMPLATE = {
   ]
 } as const;
 
+export const ONE_TIME_DONATION_TEMPLATE_KEY = "ONE_TIME_DONATION";
+
 export type DonorSurveyAnswers = {
   isExistingDonor: boolean;
   wantsToBecomeDonor: boolean | null;
   wantsMonthlyDonation: boolean | null;
   monthlyAmountCents: number | null;
   directDebitConsent: boolean;
+};
+
+export type OneTimeDonationAnswers = {
+  wantsOneTimeDonation: boolean;
+  oneTimeAmountCents: number | null;
 };
 
 export function createSurveySlug() {
