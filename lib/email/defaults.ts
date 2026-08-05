@@ -41,6 +41,7 @@ export type EmailTemplateKey =
   | "SURVEY_EXISTING_DONOR_CONFIRMED"
   | "SURVEY_NO_MEMBERSHIP"
   | "SURVEY_MEMBERSHIP_INTEREST"
+  | "FUNERAL_APPLICATION_RECEIVED"
   | "PASSWORD_RESET";
 
 export type DefaultEmailTemplate = {
@@ -343,6 +344,21 @@ St. GBC Masjid Ghausia`
 Hartelijk dank voor uw interesse om donateur te worden van Masjid Ghausia. Uw antwoorden en donatievoorkeur zijn goed ontvangen.
 
 Zodra de beveiligde betaal- en machtigingslink beschikbaar is, informeren wij u over de vervolgstap. Er wordt tot die tijd niets automatisch afgeschreven.
+
+Met vriendelijke groet,
+St. GBC Masjid Ghausia`
+  },
+  {
+    key: "FUNERAL_APPLICATION_RECEIVED",
+    name: "Begrafenisaanvraag ontvangen",
+    subject: "Uw begrafenisaanvraag is ontvangen",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Wij hebben uw begrafenisaanvraag ontvangen.
+
+In de bijlage vindt u een kopie van het volledig ingevulde aanvraagformulier. Bewaar deze PDF voor uw eigen administratie.
+
+Het bestuur neemt contact met u op over de verdere afhandeling.
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`

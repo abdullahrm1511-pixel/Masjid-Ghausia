@@ -5,6 +5,7 @@ export function createFuneralAccessToken() {
 }
 
 export type FuneralFormData = {
+  hasBsn: boolean; unbornUnder24Weeks: boolean | null;
   deceasedBsn: string; deceasedLastName: string; deceasedFirstName: string; deceasedBirthDate: string;
   deceasedBirthPlace: string; deceasedGender: string; deceasedStreet: string; deceasedHouseNumber: string;
   deceasedPostalCode: string; deceasedCity: string; deceasedCountry: string; deathPlace: string;

@@ -620,19 +620,36 @@ model SurveyResponse {
 }
 
 model FuneralApplication {
-  id            String    @id @default(cuid())
-  accessToken   String    @unique
-  status        String    @default("OPEN")
+  id            String                       @id @default(cuid())
+  accessToken   String                       @unique
+  status        String                       @default("OPEN")
   formData      Json?
   signatureData String?
   createdById   String
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime                     @default(now())
   submittedAt   DateTime?
-  updatedAt     DateTime  @updatedAt
+  updatedAt     DateTime                     @updatedAt
+  documents     FuneralApplicationDocument[]
 
   @@index([status])
   @@index([createdAt])
   @@index([submittedAt])
+}
+
+model FuneralApplicationDocument {
+  id                   String             @id @default(cuid())
+  funeralApplicationId String
+  kind                 String
+  filename             String
+  contentType          String
+  fileSize             Int
+  data                 Bytes
+  uploadedAt           DateTime           @default(now())
+  funeralApplication   FuneralApplication @relation(fields: [funeralApplicationId], references: [id], onDelete: Cascade)
+
+  @@unique([funeralApplicationId, kind])
+  @@index([funeralApplicationId])
+  @@index([kind])
 }
 
 model Account {

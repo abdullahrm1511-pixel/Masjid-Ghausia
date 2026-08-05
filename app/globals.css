@@ -577,5 +577,7 @@ button:disabled {
 .funeral-options { display:grid; gap:.7rem; }
 .funeral-notice { display:grid; gap:.8rem; border:1px solid #f0c08d; border-radius:1rem; background:#fff9ed; padding:1rem; color:#614817; line-height:1.6; }
 .funeral-notice a { font-weight:800; text-decoration:underline; }
+.funeral-warning { border:2px solid #dc2626; border-radius:1rem; background:#fef2f2; padding:1rem; color:#991b1b; line-height:1.55; }
+.funeral-warning strong { display:block; margin-bottom:.25rem; font-size:1rem; }
 .funeral-complete { min-height:22rem; align-content:center; justify-items:center; text-align:center; }
 @media (min-width:640px) { .funeral-grid { grid-template-columns:1fr 1fr; } .funeral-options { grid-template-columns:repeat(3,1fr); } .funeral-options p { grid-column:1/-1; } }
