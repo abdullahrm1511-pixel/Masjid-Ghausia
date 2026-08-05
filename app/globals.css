@@ -35,6 +35,14 @@ main {
   width: 100%;
 }
 
+/* Houd de mobiele menubalk op één horizontale scroll-as. */
+.mobile-nav-scroll {
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
 input,
 select,
 textarea {

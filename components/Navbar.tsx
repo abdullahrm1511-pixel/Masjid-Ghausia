@@ -49,7 +49,7 @@ export function Navbar({ session }: { session: Session | null }) {
             <span className="text-xs font-semibold text-[#f0c08d]">Donateursportaal</span>
           </span>
         </Link>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">
+        <div className="mobile-nav-scroll -mx-4 flex gap-2 overflow-x-auto overflow-y-hidden px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">
           {!role ? (
             <>
               <Link className={navLink} href="/over-masjid-ghausia">
