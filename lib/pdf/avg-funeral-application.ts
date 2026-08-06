@@ -1,6 +1,6 @@
 import { readFile } from "fs/promises";
 import path from "path";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts } from "pdf-lib";
 import type { FuneralFormData } from "@/lib/funeral-application";
 
 function safeFilenamePart(value: string) {
@@ -66,5 +66,12 @@ export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
   };
   form.getCheckBox(periodFields[data.gravePeriod]).check();
   form.updateFieldAppearances(font);
-  return Buffer.from(await pdf.save());
+  form.flatten();
+
+  // Maak een zelfstandige, compacte uitsnede van pagina 7 t/m 10 voor verzending.
+  const output = await PDFDocument.create();
+  pdf.getPages().slice(6, 10).forEach(page => page.node.delete(PDFName.of("Annots")));
+  const pages = await output.copyPages(pdf, [6, 7, 8, 9]);
+  pages.forEach(page => output.addPage(page));
+  return Buffer.from(await output.save({ useObjectStreams: true }));
 }
