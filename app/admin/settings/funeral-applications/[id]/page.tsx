@@ -30,6 +30,7 @@ export default async function FuneralApplicationDetail({ params }: { params: Pro
             <div className="grid w-full gap-3 sm:w-auto sm:min-w-64">
               <a className="rounded-md bg-[#1483d6] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/pdf`}>Gegevens-PDF downloaden</a>
               <a className="rounded-md bg-[#0f766e] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/avg-pdf`}>AVG - {data.deceasedFirstName} {data.deceasedLastName}</a>
+              <a className="rounded-md bg-[#0f5f9f] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/avg-mail-pdf`}>AVG - {data.deceasedFirstName} {data.deceasedLastName} om te mailen</a>
               {application.documents.map(document => <a className="rounded-md border border-slate-300 bg-white px-4 py-3 text-center font-semibold text-[#0f5f9f]" href={`/admin/settings/funeral-applications/${application.id}/documents/${document.id}`} key={document.id}>{documentLabel(document.kind)} downloaden</a>)}
             </div>
           </div>

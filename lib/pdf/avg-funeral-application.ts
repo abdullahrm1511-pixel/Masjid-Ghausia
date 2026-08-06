@@ -11,7 +11,11 @@ export function avgFuneralApplicationFilename(data: FuneralFormData) {
   return `AVG-${safeFilenamePart(`${data.deceasedFirstName} ${data.deceasedLastName}`)}.pdf`;
 }
 
-export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
+export function avgFuneralApplicationMailFilename(data: FuneralFormData) {
+  return `AVG-${safeFilenamePart(`${data.deceasedFirstName} ${data.deceasedLastName}`)}-om-te-mailen.pdf`;
+}
+
+async function createFilledAvgPdf(data: FuneralFormData) {
   const source = await readFile(path.join(process.cwd(), "public", "templates", "avg-zuiderbegraafplaats-2026.pdf"));
   const pdf = await PDFDocument.load(source);
   const form = pdf.getForm();
@@ -66,6 +70,16 @@ export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
   };
   form.getCheckBox(periodFields[data.gravePeriod]).check();
   form.updateFieldAppearances(font);
+  return { pdf, form };
+}
+
+export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
+  const { pdf } = await createFilledAvgPdf(data);
+  return Buffer.from(await pdf.save({ useObjectStreams: true }));
+}
+
+export async function generateAvgFuneralApplicationMailPdf(data: FuneralFormData) {
+  const { pdf, form } = await createFilledAvgPdf(data);
   form.flatten();
 
   // Maak een zelfstandige, compacte uitsnede van pagina 7 t/m 10 voor verzending.
