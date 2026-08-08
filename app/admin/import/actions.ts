@@ -620,6 +620,39 @@ function applyManualRegistrationOverrides(rows: ImportPreviewRow[], formData: Fo
   });
 }
 
+const unignorableImportErrors = ["Lidnummer ontbreekt", "Naam ontbreekt"];
+
+function prepareReviewedRows(rows: ImportPreviewRow[]) {
+  return rows.map((row) => {
+    const ignored = new Set(row.ignoredMessages ?? []);
+    const registrationNumber = String(row.registrationNumber ?? "").trim();
+    const firstName = String(row.firstName ?? "").trim();
+    const middleName = String(row.middleName ?? "").trim();
+    const lastName = String(row.lastName ?? "").trim();
+    const fullName = row.importMode === "member-personal-details"
+      ? [firstName, middleName, lastName].filter(Boolean).join(" ")
+      : String(row.fullName ?? "").trim();
+
+    let errors = row.errors.filter((message) => !ignored.has(message) || unignorableImportErrors.includes(message));
+    if (!registrationNumber && !errors.includes("Lidnummer ontbreekt")) errors.push("Lidnummer ontbreekt");
+    if (row.importMode === "member-personal-details" && !fullName && !errors.includes("Naam ontbreekt")) errors.push("Naam ontbreekt");
+    if (registrationNumber) errors = errors.filter((message) => message !== "Lidnummer ontbreekt");
+    if (fullName) errors = errors.filter((message) => message !== "Naam ontbreekt");
+
+    return {
+      ...row,
+      registrationNumber,
+      firstName,
+      middleName,
+      lastName,
+      fullName,
+      errors,
+      warnings: row.warnings.filter((message) => !ignored.has(message)),
+      reviewReasons: row.reviewReasons.filter((message) => !ignored.has(message))
+    };
+  });
+}
+
 async function findDonor(row: ImportPreviewRow, chosenId?: string) {
   if (chosenId) {
     return prisma.donorProfile.findUnique({ where: { id: chosenId } });
@@ -848,7 +881,7 @@ export async function commitImport(_previous: ImportResultState | null, formData
   const adminId = await requireAdmin();
   const rawRows = String(formData.get("rows") ?? "");
   const fileName = String(formData.get("fileName") ?? "import");
-  const rows = applyManualRegistrationOverrides(JSON.parse(rawRows) as ImportPreviewRow[], formData);
+  const rows = prepareReviewedRows(applyManualRegistrationOverrides(JSON.parse(rawRows) as ImportPreviewRow[], formData));
   if (rows.some((row) => row.importMode === "donor-status")) {
     return commitDonorStatusImport(rows, adminId, fileName);
   }

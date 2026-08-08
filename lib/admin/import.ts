@@ -57,6 +57,7 @@ export type ImportPreviewRow = {
   reviewReasons: string[];
   warnings: string[];
   errors: string[];
+  ignoredMessages?: string[];
 };
 
 type RawImportRow = {

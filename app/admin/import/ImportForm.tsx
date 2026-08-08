@@ -1,13 +1,16 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import type { ImportPreviewRow } from "@/lib/admin/import";
 import { previewImport, commitImport, type ImportPreviewState, type ImportResultState } from "./actions";
 import { formatCurrency, formatDate } from "@/lib/display";
 import { formatIban } from "@/lib/iban";
 
 const initialPreview: ImportPreviewState = { rows: [], fileName: "" };
 const initialResult: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
-type PreviewFilter = "all" | "new" | "linked" | "duplicates" | "warnings" | "review" | "invalid";
+type PreviewFilter = "all" | "new" | "linked" | "duplicates" | "warnings" | "review" | "invalid" | "ignored" | "required";
+
+const unignorableMessages = new Set(["Lidnummer ontbreekt", "Naam ontbreekt"]);
 
 function actionLabel(action: string, isMemberImport = false, relationshipToMember = "") {
   const isPrimaryMember = relationshipToMember.toLowerCase().includes("primary");
@@ -29,24 +32,70 @@ export function ImportForm() {
   const [preview, previewAction, previewPending] = useActionState(previewImport, initialPreview);
   const [result, commitAction, commitPending] = useActionState(commitImport, initialResult);
   const [filter, setFilter] = useState<PreviewFilter>("all");
-  const isBankImport = preview.rows.some((row) => row.importMode === "bank-transactions");
-  const isMemberImport = preview.rows.some((row) => row.importMode === "member-personal-details");
-  const isStatusImport = preview.rows.some((row) => row.importMode === "donor-status");
-  const invalidRows = preview.rows.filter((row) => row.errors.length > 0).length;
-  const reviewRows = preview.rows.filter((row) => row.detectedAction === "PAYMENT_ONLY_REQUIRES_REVIEW" || row.reviewReasons.length > 0).length;
-  const warningRows = preview.rows.filter((row) => row.errors.length === 0 && row.warnings.length > 0).length;
-  const duplicateRows = preview.rows.filter((row) => row.detectedAction === "DUPLICATE_PAYMENT" || row.detectedAction === "DUPLICATE_IMPORT_ROW").length;
-  const newRows = preview.rows.filter((row) => row.detectedAction === "NEW").length;
-  const linkedRows = preview.rows.filter((row) => Boolean(row.existingDonorId)).length;
+  const [rows, setRows] = useState<ImportPreviewRow[]>([]);
+  useEffect(() => setRows(preview.rows), [preview.rows]);
+
+  const activeMessages = (row: ImportPreviewRow) => [...row.errors, ...row.reviewReasons, ...row.warnings].filter((message) => !(row.ignoredMessages ?? []).includes(message));
+  const isBankImport = rows.some((row) => row.importMode === "bank-transactions");
+  const isMemberImport = rows.some((row) => row.importMode === "member-personal-details");
+  const isStatusImport = rows.some((row) => row.importMode === "donor-status");
+  const invalidRows = rows.filter((row) => row.errors.some((message) => !(row.ignoredMessages ?? []).includes(message))).length;
+  const reviewRows = rows.filter((row) => row.reviewReasons.some((message) => !(row.ignoredMessages ?? []).includes(message))).length;
+  const warningRows = rows.filter((row) => row.warnings.some((message) => !(row.ignoredMessages ?? []).includes(message))).length;
+  const ignoredRows = rows.filter((row) => (row.ignoredMessages ?? []).length > 0).length;
+  const requiredRows = rows.filter((row) => activeMessages(row).length > 0).length;
+  const duplicateRows = rows.filter((row) => row.detectedAction === "DUPLICATE_PAYMENT" || row.detectedAction === "DUPLICATE_IMPORT_ROW").length;
+  const newRows = rows.filter((row) => row.detectedAction === "NEW").length;
+  const linkedRows = rows.filter((row) => Boolean(row.existingDonorId)).length;
   const filteredRows = useMemo(() => {
-    if (filter === "new") return preview.rows.filter((row) => row.detectedAction === "NEW");
-    if (filter === "linked") return preview.rows.filter((row) => Boolean(row.existingDonorId));
-    if (filter === "duplicates") return preview.rows.filter((row) => row.detectedAction === "DUPLICATE_PAYMENT" || row.detectedAction === "DUPLICATE_IMPORT_ROW");
-    if (filter === "warnings") return preview.rows.filter((row) => row.errors.length === 0 && row.warnings.length > 0);
-    if (filter === "review") return preview.rows.filter((row) => row.detectedAction === "PAYMENT_ONLY_REQUIRES_REVIEW" || row.reviewReasons.length > 0);
-    if (filter === "invalid") return preview.rows.filter((row) => row.errors.length > 0);
-    return preview.rows;
-  }, [filter, preview.rows]);
+    if (filter === "new") return rows.filter((row) => row.detectedAction === "NEW");
+    if (filter === "linked") return rows.filter((row) => Boolean(row.existingDonorId));
+    if (filter === "duplicates") return rows.filter((row) => row.detectedAction === "DUPLICATE_PAYMENT" || row.detectedAction === "DUPLICATE_IMPORT_ROW");
+    if (filter === "warnings") return rows.filter((row) => row.warnings.some((message) => !(row.ignoredMessages ?? []).includes(message)));
+    if (filter === "review") return rows.filter((row) => row.reviewReasons.some((message) => !(row.ignoredMessages ?? []).includes(message)));
+    if (filter === "invalid") return rows.filter((row) => row.errors.some((message) => !(row.ignoredMessages ?? []).includes(message)));
+    if (filter === "ignored") return rows.filter((row) => (row.ignoredMessages ?? []).length > 0);
+    if (filter === "required") return rows.filter((row) => activeMessages(row).length > 0);
+    return rows;
+  }, [filter, rows]);
+
+  const updateRow = (rowNumber: number, changes: Partial<ImportPreviewRow>) => {
+    setRows((current) => current.map((row) => row.rowNumber === rowNumber ? { ...row, ...changes } : row));
+  };
+
+  const updateMemberField = (row: ImportPreviewRow, field: keyof ImportPreviewRow, value: string) => {
+    const changes: Partial<ImportPreviewRow> = { [field]: value };
+    if (field === "registrationNumber" && value.trim()) changes.errors = row.errors.filter((message) => message !== "Lidnummer ontbreekt");
+    if (["firstName", "middleName", "lastName"].includes(String(field))) {
+      const next = { firstName: row.firstName ?? "", middleName: row.middleName ?? "", lastName: row.lastName ?? "", [field]: value };
+      const fullName = [next.firstName, next.middleName, next.lastName].filter(Boolean).join(" ").trim();
+      changes.fullName = fullName;
+      if (fullName) changes.errors = row.errors.filter((message) => message !== "Naam ontbreekt");
+    }
+    updateRow(row.rowNumber, changes);
+  };
+
+  const toggleIgnored = (row: ImportPreviewRow, message: string) => {
+    if (unignorableMessages.has(message)) return;
+    const ignored = new Set(row.ignoredMessages ?? []);
+    if (ignored.has(message)) ignored.delete(message); else ignored.add(message);
+    updateRow(row.rowNumber, { ignoredMessages: [...ignored] });
+  };
+
+  const messageControls = (row: ImportPreviewRow) => {
+    const messages = [...row.errors, ...row.reviewReasons, ...row.warnings];
+    if (!messages.length) return <span>-</span>;
+    return <div className="grid min-w-64 gap-2">{messages.map((message) => {
+      const ignored = (row.ignoredMessages ?? []).includes(message);
+      const locked = unignorableMessages.has(message);
+      return <div className={`rounded-md border p-2 ${ignored ? "border-slate-200 bg-slate-100 text-slate-500 line-through" : "border-amber-200 bg-white"}`} key={message}>
+        <p>{message}</p>
+        <button className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold no-underline disabled:cursor-not-allowed disabled:opacity-50" disabled={locked} onClick={() => toggleIgnored(row, message)} type="button">
+          {locked ? "Verplicht oplossen" : ignored ? "Niet meer negeren" : "Negeren"}
+        </button>
+      </div>;
+    })}</div>;
+  };
 
   const filterButtonClass = (name: PreviewFilter, baseClass: string) =>
     `rounded-xl p-4 text-left transition hover:ring-2 hover:ring-[#1483d6]/30 ${baseClass} ${filter === name ? "ring-2 ring-[#1483d6]" : ""}`;
@@ -88,18 +137,18 @@ export function ImportForm() {
         <form action={commitAction} className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <input name="fileName" type="hidden" value={preview.fileName} />
           <textarea className="hidden" name="archiveBase64" readOnly value={preview.archiveBase64 ?? ""} />
-          <textarea className="hidden" name="rows" readOnly value={JSON.stringify(preview.rows)} />
+          <textarea className="hidden" name="rows" readOnly value={JSON.stringify(rows)} />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-black text-slate-950">Import preview</h2>
               <p className="mt-1 text-sm text-slate-600">{preview.fileName}</p>
             </div>
-            <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f] disabled:opacity-60" disabled={commitPending} type="submit">
+            <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f] disabled:cursor-not-allowed disabled:opacity-60" disabled={commitPending || requiredRows > 0} type="submit">
               {commitPending ? "Verwerken..." : "Import verwerken"}
             </button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9">
             <button className={filterButtonClass("all", "bg-slate-100")} onClick={() => setFilter("all")} type="button">
               <p className="text-xs font-bold uppercase text-slate-500">Rijen</p>
               <p className="mt-1 text-2xl font-black text-slate-950">{preview.rows.length}</p>
@@ -128,11 +177,21 @@ export function ImportForm() {
               <p className="text-xs font-bold uppercase text-red-700">Ongeldig</p>
               <p className="mt-1 text-2xl font-black text-red-900">{invalidRows}</p>
             </button>
+            <button className={filterButtonClass("ignored", "bg-slate-100")} onClick={() => setFilter("ignored")} type="button">
+              <p className="text-xs font-bold uppercase text-slate-600">Genegeerd</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{ignoredRows}</p>
+            </button>
+            <button className={filterButtonClass("required", "bg-rose-100")} onClick={() => setFilter("required")} type="button">
+              <p className="text-xs font-bold uppercase text-rose-700">Actie vereist</p>
+              <p className="mt-1 text-2xl font-black text-rose-950">{requiredRows}</p>
+            </button>
           </div>
+
+          {requiredRows > 0 ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-900">Los de meldingen bij Actie vereist op of kies Negeren. Lidnummer en naam moeten altijd worden ingevuld.</p> : null}
 
           {filter !== "all" ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-100 p-3 text-sm font-semibold text-slate-800">
-              <p>{filteredRows.length} van {preview.rows.length} regels getoond.</p>
+              <p>{filteredRows.length} van {rows.length} regels getoond.</p>
               <button className="rounded-md border border-slate-300 bg-white px-3 py-2 font-bold" onClick={() => setFilter("all")} type="button">
                 Alle regels tonen
               </button>
@@ -181,7 +240,7 @@ export function ImportForm() {
                       <td className="p-3">{row.fullName || "-"}</td>
                       <td className="p-3 font-semibold">{row.status || "-"}</td>
                       <td className="p-3 font-semibold">{actionLabel(row.detectedAction)}</td>
-                      <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
+                      <td className="p-3">{messageControls(row)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -211,20 +270,20 @@ export function ImportForm() {
                   {filteredRows.map((row) => (
                     <tr className={`border-t border-slate-200 align-top ${row.errors.length ? "border-l-4 border-l-red-700 bg-red-100/80" : row.reviewReasons.length ? "border-l-4 border-l-red-600 bg-red-50/80" : row.warnings.length ? "bg-amber-50/50" : "bg-white"}`} key={row.rowNumber}>
                       <td className="p-3">{row.rowNumber}</td>
-                      <td className="p-3 font-semibold">{row.registrationNumber || "-"}</td>
-                      <td className="p-3">{row.relationshipToMember || "-"}</td>
-                      <td className="p-3 font-semibold">{row.fullName || "-"}</td>
-                      <td className="p-3">{formatDate(row.birthDate)}</td>
-                      <td className="p-3">{row.gender || "-"}</td>
-                      <td className="p-3">{row.phone || "-"}</td>
-                      <td className="p-3">{row.email || "-"}</td>
-                      <td className="p-3">{row.addressLine1 || "-"}</td>
-                      <td className="p-3">{[row.postalCode, row.city].filter(Boolean).join(" ") || "-"}</td>
-                      <td className="p-3">{row.country || "-"}</td>
-                      <td className="p-3"><span className="block">{row.bsn || "-"}</span><span className="block text-xs text-slate-500">{row.iban ? formatIban(row.iban) : "-"}</span></td>
+                      <td className="p-3"><input className="w-28 rounded border p-2 font-semibold" value={row.registrationNumber} onChange={(event) => updateMemberField(row, "registrationNumber", event.target.value)} /></td>
+                      <td className="p-3"><select className="min-w-36 rounded border p-2" value={row.relationshipToMember ?? ""} onChange={(event) => updateMemberField(row, "relationshipToMember", event.target.value)}><option value="">Kies rol</option><option value="Primary Member">Hoofdlid</option><option value="Member's Partner">Partner</option><option value="Member's Child">Kind</option></select></td>
+                      <td className="p-3"><div className="grid min-w-44 gap-1"><input className="rounded border p-2 font-semibold" placeholder="Voornaam" value={row.firstName ?? ""} onChange={(event) => updateMemberField(row, "firstName", event.target.value)} /><input className="rounded border p-2" placeholder="Tussenvoegsel" value={row.middleName ?? ""} onChange={(event) => updateMemberField(row, "middleName", event.target.value)} /><input className="rounded border p-2" placeholder="Achternaam" value={row.lastName ?? ""} onChange={(event) => updateMemberField(row, "lastName", event.target.value)} /></div></td>
+                      <td className="p-3"><input className="w-36 rounded border p-2" type="date" value={row.birthDate ? row.birthDate.slice(0, 10) : ""} onChange={(event) => updateMemberField(row, "birthDate", event.target.value)} /></td>
+                      <td className="p-3"><select className="rounded border p-2" value={row.gender ?? ""} onChange={(event) => updateMemberField(row, "gender", event.target.value)}><option value="">Onbekend</option><option value="Male">Man</option><option value="Female">Vrouw</option></select></td>
+                      <td className="p-3"><input className="w-32 rounded border p-2" value={row.phone ?? ""} onChange={(event) => updateMemberField(row, "phone", event.target.value)} /></td>
+                      <td className="p-3"><input className="w-52 rounded border p-2" type="email" value={row.email ?? ""} onChange={(event) => updateMemberField(row, "email", event.target.value)} /></td>
+                      <td className="p-3"><input className="w-48 rounded border p-2" value={row.addressLine1 ?? ""} onChange={(event) => updateMemberField(row, "addressLine1", event.target.value)} /></td>
+                      <td className="p-3"><div className="grid min-w-36 gap-1"><input className="rounded border p-2" placeholder="Postcode" value={row.postalCode ?? ""} onChange={(event) => updateMemberField(row, "postalCode", event.target.value)} /><input className="rounded border p-2" placeholder="Plaats" value={row.city ?? ""} onChange={(event) => updateMemberField(row, "city", event.target.value)} /></div></td>
+                      <td className="p-3"><input className="w-28 rounded border p-2" value={row.country ?? ""} onChange={(event) => updateMemberField(row, "country", event.target.value)} /></td>
+                      <td className="p-3"><div className="grid min-w-40 gap-1"><input className="rounded border p-2" inputMode="numeric" placeholder="BSN" value={row.bsn ?? ""} onChange={(event) => updateMemberField(row, "bsn", event.target.value)} /><input className="rounded border p-2" placeholder="IBAN" value={row.iban ?? ""} onChange={(event) => updateMemberField(row, "iban", event.target.value)} /></div></td>
                       <td className="p-3 font-semibold text-teal-800">Actief / volledig betaald</td>
                       <td className="p-3 font-semibold">{actionLabel(row.detectedAction, true, row.relationshipToMember)}</td>
-                      <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
+                      <td className="p-3">{messageControls(row)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -271,7 +330,7 @@ export function ImportForm() {
                         <td className="p-3">{row.iban ? formatIban(row.iban) : "-"}</td>
                         <td className="p-3">{row.contributionYear ?? "-"}</td>
                         <td className="p-3 font-semibold">{actionLabel(row.detectedAction)}</td>
-                        <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
+                        <td className="p-3">{messageControls(row)}</td>
                       </tr>
                     );
                   })}
