@@ -150,7 +150,7 @@ export function ImportForm() {
             ) : null}
             {isMemberImport ? (
               <p className="rounded-md bg-sky-50 p-3 text-sm font-semibold text-sky-900">
-                Volledig ledenbestand herkend. Persoonsgegevens worden gekoppeld aan Address, Banking Details, Membership, Burial Wishes en Health Notes. De gekoppelde bronrijen worden ook volledig in de database bewaard. Partner en kinderen worden op lidnummer en adresnummer gekoppeld.
+                Volledig ledenbestand herkend. Persoonsgegevens worden exact overgenomen. MEM DETAIL NR KEY, RECORD STATUS en BEFORE 18 YR worden genegeerd. ADDR NR KEY wordt alleen gebruikt om het gedeelde adres te vinden. Alle huishoudens worden als actief en volledig betaald geïmporteerd.
               </p>
             ) : null}
             {isStatusImport ? (
@@ -202,7 +202,7 @@ export function ImportForm() {
                     <th className="p-3">Postcode / plaats</th>
                     <th className="p-3">Land</th>
                     <th className="p-3">BSN / IBAN</th>
-                    <th className="p-3">Recordstatus</th>
+                    <th className="p-3">Importstatus</th>
                     <th className="p-3">Actie</th>
                     <th className="p-3">Fouten / waarschuwingen</th>
                   </tr>
@@ -223,7 +223,7 @@ export function ImportForm() {
                       <td className="p-3">{[row.postalCode, row.city].filter(Boolean).join(" ") || "-"}</td>
                       <td className="p-3">{row.country || "-"}</td>
                       <td className="p-3"><span className="block">{row.bsn || "-"}</span><span className="block text-xs text-slate-500">{row.iban ? formatIban(row.iban) : "-"}</span></td>
-                      <td className="p-3">{row.legacyRecordStatus || row.membershipStatus || "-"}</td>
+                      <td className="p-3 font-semibold text-teal-800">Actief / volledig betaald</td>
                       <td className="p-3 font-semibold">{actionLabel(row.detectedAction, true)}</td>
                       <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
                     </tr>

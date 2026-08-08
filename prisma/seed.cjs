@@ -34,35 +34,6 @@ async function main() {
     }
   });
 
-  const registrationAdminPasswordHash = await bcrypt.hash("Registratie123!", 12);
-  const registrationAdmin = await prisma.user.upsert({
-    where: { email: "registraties@stgbc.local" },
-    update: {
-      name: "St. GBC Registratiebeheer",
-      passwordHash: registrationAdminPasswordHash,
-      role: "REGISTRATION_ADMIN",
-      isActive: true
-    },
-    create: {
-      name: "St. GBC Registratiebeheer",
-      email: "registraties@stgbc.local",
-      passwordHash: registrationAdminPasswordHash,
-      role: "REGISTRATION_ADMIN",
-      isActive: true
-    }
-  });
-
-  await prisma.adminProfile.upsert({
-    where: { userId: registrationAdmin.id },
-    update: { displayName: "St. GBC Registratiebeheer" },
-    create: {
-      userId: registrationAdmin.id,
-      displayName: "St. GBC Registratiebeheer",
-      twoFactorRequired: false,
-      twoFactorEnabled: false
-    }
-  });
-
   await prisma.registrationCounter.upsert({
     where: { prefix: "11" },
     update: { current: 0 },

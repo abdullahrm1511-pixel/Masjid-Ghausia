@@ -42,7 +42,17 @@ export default async function DashboardPage() {
   });
 
   if (!profile) {
-    redirect("/");
+    return (
+      <main className="donor-dashboard mx-auto max-w-3xl px-4 py-12">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <p className="text-sm font-bold uppercase text-amber-800">Account niet volledig gekoppeld</p>
+          <h1 className="mt-2 text-2xl font-black text-slate-950">Uw donateursprofiel ontbreekt</h1>
+          <p className="mt-3 leading-7 text-slate-700">
+            Het gebruikersaccount bestaat, maar de bijbehorende donateursgegevens zijn niet gevonden. Neem contact op met de beheerder om het account opnieuw te koppelen.
+          </p>
+        </section>
+      </main>
+    );
   }
 
   const latestRegistration = profile.registrationRequests[0];

@@ -1,6 +1,7 @@
 const { loadEnvConfig } = require("@next/env");
 loadEnvConfig(process.cwd());
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
@@ -9,14 +10,7 @@ async function main() {
     throw new Error("Set CONFIRM_DATABASE_RESET=yes om de database-reset uit te voeren.");
   }
 
-  const preserveEmail = String(process.env.PRESERVE_USER_EMAIL || "").trim().toLowerCase();
-  if (!preserveEmail) {
-    throw new Error("Set PRESERVE_USER_EMAIL op het e-mailadres van het account dat behouden moet blijven.");
-  }
-  const preservedUser = await prisma.user.findFirst({ where: { email: { equals: preserveEmail, mode: "insensitive" } }, select: { id: true, email: true, role: true } });
-  if (!preservedUser) {
-    throw new Error(`Reset gestopt: gebruiker ${preserveEmail} bestaat niet.`);
-  }
+  const passwordHash = await bcrypt.hash("Admin123!", 12);
 
   await prisma.$transaction(async (tx) => {
     await tx.donationPayment.deleteMany({});
@@ -40,7 +34,23 @@ async function main() {
     await tx.donorStatusHistory.deleteMany({});
     await tx.membership.deleteMany({});
     await tx.donorProfile.deleteMany({});
-    await tx.user.deleteMany({ where: { id: { not: preservedUser.id } } });
+    await tx.user.deleteMany({});
+    await tx.user.create({
+      data: {
+        name: "St. GBC Admin",
+        email: "admin@stgbc.local",
+        passwordHash,
+        role: "SUPER_ADMIN",
+        isActive: true,
+        adminProfile: {
+          create: {
+            displayName: "St. GBC Admin",
+            twoFactorRequired: false,
+            twoFactorEnabled: false
+          }
+        }
+      }
+    });
     await tx.registrationCounter.upsert({
       where: { prefix: "11" },
       update: { current: 0 },
@@ -51,7 +61,7 @@ async function main() {
   const counter = await prisma.registrationCounter.findUnique({ where: { prefix: "11" }, select: { current: true } });
   const userCount = await prisma.user.count();
   const donorCount = await prisma.donorProfile.count();
-  console.log(`Database reset klaar. Behouden account: ${preservedUser.email} (${preservedUser.role}). Gebruikers: ${userCount}. Donateurs: ${donorCount}. Lidnummer-teller: ${counter?.current ?? 0}.`);
+  console.log(`Database reset klaar. Standaardbeheerder: admin@stgbc.local. Gebruikers: ${userCount}. Donateurs: ${donorCount}. Lidnummer-teller: ${counter?.current ?? 0}.`);
 }
 
 main()

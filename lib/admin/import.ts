@@ -422,7 +422,10 @@ export function splitName(fullName: string) {
   };
 }
 
-async function detectAction(row: Omit<ImportPreviewRow, "detectedAction" | "existingDonorId">) {
+async function detectAction(
+  row: Omit<ImportPreviewRow, "detectedAction" | "existingDonorId">,
+  existingMemberDonors?: Map<string, string>
+) {
   if (row.errors.length) {
     return { detectedAction: row.importMode === "bank-transactions" ? "INVALID_REQUIRES_REVIEW" as const : "INVALID" as const };
   }
@@ -437,6 +440,12 @@ async function detectAction(row: Omit<ImportPreviewRow, "detectedAction" | "exis
 
   if (row.importMode === "member-personal-details") {
     if (!row.registrationNumber || !row.legacyAddressKey) return { detectedAction: "INVALID" as const };
+    if (existingMemberDonors) {
+      const existingDonorId = existingMemberDonors.get(row.registrationNumber);
+      return existingDonorId
+        ? { detectedAction: "DUPLICATE" as const, existingDonorId }
+        : { detectedAction: "NEW" as const };
+    }
     const existing = await prisma.donorProfile.findUnique({
       where: { registrationNumber: row.registrationNumber },
       select: { id: true }
@@ -600,7 +609,7 @@ async function rowsFromXlsxWorkbook(buffer: ArrayBuffer): Promise<RawImportRow[]
       const membership = membershipByRegistration.get(row.registrationNumber);
       const burial = burialByMember.get(row.legacyMemberDetailKey);
       const health = healthByMember.get(row.legacyMemberDetailKey);
-      row.addressLine1 = legacyText(address, "ADDRESS LINE 1") || row.addressLine1;
+      row.addressLine1 = row.addressLine1 || legacyText(address, "ADDRESS LINE 1");
       row.addressLine2 = legacyText(address, "ADDRESS LINE 2") || row.addressLine2;
       row.city = legacyText(address, "CITY") || row.city;
       row.country = legacyText(address, "COUNTRY");
@@ -665,6 +674,18 @@ async function rowsFromCsv(text: string) {
 }
 
 function rowHasUsefulData(row: RawImportRow) {
+  if (row.importMode === "member-personal-details") {
+    return [
+      row.registrationNumber,
+      row.firstName,
+      row.middleName,
+      row.lastName,
+      row.relationshipToMember,
+      row.email,
+      row.phone
+    ].some((value) => value.trim());
+  }
+
   return [
     row.registrationNumber,
     row.legacyMemberDetailKey,
@@ -710,16 +731,12 @@ function duplicateKeyForRow(row: ImportPreviewRow) {
   }
 
   if (row.importMode === "member-personal-details") {
-    const memberKey = duplicateKeyPart(row.legacyMemberDetailKey);
-    if (memberKey) return `member-key:${memberKey}`;
-
     const registration = duplicateKeyPart(row.registrationNumber);
-    const address = duplicateKeyPart(row.legacyAddressKey);
     const relation = duplicateKeyPart(row.relationshipToMember);
     const name = duplicateKeyPart(row.fullName);
     const birthDate = row.birthDate ? new Date(row.birthDate).toISOString().slice(0, 10) : "";
-    if (!registration || !address || !relation || !name) return null;
-    return `member-person:${registration}:${address}:${relation}:${name}:${birthDate}`;
+    if (!registration || !relation || !name) return null;
+    return `member-person:${registration}:${relation}:${name}:${birthDate}`;
   }
 
   const registration = duplicateKeyPart(row.registrationNumber);
@@ -775,6 +792,23 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       ? await rowsFromLegacyWorkbook(await file.arrayBuffer())
       : await rowsFromXlsxWorkbook(await file.arrayBuffer());
 
+  const memberRegistrationNumbers = [...new Set(
+    rawRows
+      .filter((row) => row.importMode === "member-personal-details")
+      .map((row) => normalizeRegistrationNumberForImport(row.registrationNumber, row.importMode))
+      .filter(Boolean)
+  )];
+  const existingMemberDonors = memberRegistrationNumbers.length
+    ? new Map(
+        (await prisma.donorProfile.findMany({
+          where: { registrationNumber: { in: memberRegistrationNumbers } },
+          select: { id: true, registrationNumber: true }
+        }))
+          .filter((donor): donor is { id: string; registrationNumber: string } => Boolean(donor.registrationNumber))
+          .map((donor) => [donor.registrationNumber, donor.id])
+      )
+    : undefined;
+
   const preview: ImportPreviewRow[] = [];
   for (const raw of rawRows) {
     const warnings: string[] = [];
@@ -824,7 +858,7 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       middleName: raw.middleName,
       lastName: raw.lastName,
       relationshipToMember: raw.relationshipToMember,
-      legacyMemberDetailKey: raw.legacyMemberDetailKey,
+      legacyMemberDetailKey: undefined,
       legacyAddressKey: raw.legacyAddressKey,
       addressLine1: raw.addressLine1,
       addressLine2: raw.addressLine2,
@@ -832,7 +866,7 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       city: raw.city,
       country: raw.country,
       bsn: raw.bsn,
-      legacyRecordStatus: raw.legacyRecordStatus,
+      legacyRecordStatus: undefined,
       membershipStatus: raw.membershipStatus,
       gender: raw.gender,
       maritalStatus: raw.maritalStatus,
@@ -851,7 +885,7 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       warnings,
       errors
     };
-    const detected = await detectAction(base);
+    const detected = await detectAction(base, existingMemberDonors);
     preview.push({ ...base, ...detected });
   }
 

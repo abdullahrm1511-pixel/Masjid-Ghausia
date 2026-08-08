@@ -8,7 +8,7 @@ import type { Prisma } from "@prisma/client";
 import { buildImportPreview, normalizeImportedDonorStatus, splitName, type ImportPreviewRow } from "@/lib/admin/import";
 import { syncRegistrationCounter } from "@/lib/registration/numbers";
 import { writeAuditLog } from "@/lib/audit";
-import { calculateCurrentAnnualAmount, getPricingConfig } from "@/lib/pricing";
+import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 import type { PricingConfig } from "@/lib/pricing-config";
 import { ensurePrimaryMembership, findPrimaryDonorByMembershipNumber, membershipIdForRegistrationNumber } from "@/lib/membership";
 import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
@@ -109,15 +109,6 @@ function safeBirthDate(value?: string | null) {
   return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date("1900-01-01T00:00:00.000Z");
 }
 
-function importedMemberIsActive(recordStatus?: string) {
-  return !/cancelled|canceled|inactive|inactief|be[eë]indigd/i.test(String(recordStatus ?? ""));
-}
-
-function importedPrimaryStatus(row: ImportPreviewRow) {
-  if (!importedMemberIsActive(row.legacyRecordStatus)) return "INACTIVE" as const;
-  return normalizeImportedDonorStatus(row.membershipStatus) ?? "ACTIVE" as const;
-}
-
 function normalizedBsn(value?: string) {
   const digits = String(value ?? "").replace(/\D/g, "");
   return digits ? digits.padStart(9, "0").slice(-9) : undefined;
@@ -141,7 +132,7 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
   const firstName = row.firstName?.trim() || splitName(fullName).firstName || fullName;
   const lastName = row.lastName?.trim() || splitName(fullName).lastName;
   const birthDate = safeBirthDate(row.birthDate);
-  const importedStatus = importedPrimaryStatus(row);
+  const importedStatus = "ACTIVE" as const;
 
   const existingDonor = await prisma.donorProfile.findUnique({
     where: { registrationNumber: row.registrationNumber },
@@ -153,8 +144,8 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
       where: { id: existingDonor.id },
       data: {
         status: importedStatus,
-        legacyMemberDetailKey: row.legacyMemberDetailKey || existingDonor.legacyMemberDetailKey,
-        legacyAddressKey: row.legacyAddressKey || existingDonor.legacyAddressKey,
+        legacyMemberDetailKey: null,
+        legacyAddressKey: null,
         firstName,
         middleName: row.middleName || null,
         lastName,
@@ -172,8 +163,8 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
         maritalStatus: normalizeMaritalStatus(row.maritalStatus),
         iban: row.iban || existingDonor.iban,
         legacyData: row.legacyData as Prisma.InputJsonValue,
-        activeSince: importedStatus === "ACTIVE" ? (existingDonor.activeSince ?? new Date()) : existingDonor.activeSince,
-        inactiveSince: importedStatus === "INACTIVE" ? (existingDonor.inactiveSince ?? new Date()) : null
+        activeSince: existingDonor.activeSince ?? new Date(),
+        inactiveSince: null
       }
     });
 
@@ -183,13 +174,13 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
       if (!emailOwner) {
         await prisma.user.update({
           where: { id: existingDonor.userId },
-          data: { email: rowEmail, name: fullName || existingDonor.user.name }
+          data: { email: rowEmail, name: fullName || existingDonor.user.name, isActive: true }
         });
       }
     } else {
       await prisma.user.update({
         where: { id: existingDonor.userId },
-        data: { name: fullName || existingDonor.user.name }
+        data: { name: fullName || existingDonor.user.name, isActive: true }
       });
     }
 
@@ -199,12 +190,12 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
   const email = await userEmailForImportedPrimary(row);
   const user = await prisma.user.upsert({
     where: { email },
-    update: { name: fullName, isActive: false },
+    update: { name: fullName, isActive: true, role: "DONOR" },
     create: {
       name: fullName,
       email,
       role: "DONOR",
-      isActive: false
+      isActive: true
     }
   });
 
@@ -212,8 +203,8 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
     data: {
       userId: user.id,
       registrationNumber: row.registrationNumber,
-      legacyMemberDetailKey: row.legacyMemberDetailKey || null,
-      legacyAddressKey: row.legacyAddressKey || null,
+      legacyMemberDetailKey: null,
+      legacyAddressKey: null,
       status: importedStatus,
       firstName,
       middleName: row.middleName || null,
@@ -232,8 +223,8 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
       accountHolderName: fullName,
       maritalStatus: normalizeMaritalStatus(row.maritalStatus),
       legacyData: row.legacyData as Prisma.InputJsonValue,
-      activeSince: importedStatus === "ACTIVE" ? new Date() : null,
-      inactiveSince: importedStatus === "INACTIVE" ? new Date() : null,
+      activeSince: new Date(),
+      inactiveSince: null,
       approvedAt: new Date()
     }
   });
@@ -250,7 +241,7 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
   const lastName = row.lastName?.trim() || splitName(fullName).lastName;
   const dateOfBirth = safeBirthDate(row.birthDate);
   const type = relation === "PARTNER" ? "PARTNER" : relation === "CHILD" ? "CHILD" : "OTHER";
-  const isActive = importedMemberIsActive(row.legacyRecordStatus);
+  const isActive = true;
 
   const existing = await prisma.familyMember.findFirst({
     where: {
@@ -269,8 +260,8 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
           firstName,
           middleName: row.middleName || null,
           lastName,
-          legacyMemberDetailKey: row.legacyMemberDetailKey || existing.legacyMemberDetailKey,
-          legacyAddressKey: row.legacyAddressKey || existing.legacyAddressKey,
+          legacyMemberDetailKey: null,
+          legacyAddressKey: null,
           gender: normalizeGender(row.gender),
           dateOfBirth,
           birthPlace: row.birthPlace || existing.birthPlace,
@@ -278,17 +269,17 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
           phone: row.phone || existing.phone,
           email: isValidEmail(row.email) ? row.email?.toLowerCase() : existing.email,
           maritalStatus: normalizeMaritalStatus(row.maritalStatus),
-          legacyRecordStatus: row.legacyRecordStatus || existing.legacyRecordStatus,
+          legacyRecordStatus: null,
           legacyData: row.legacyData as Prisma.InputJsonValue,
           isActive,
-          status: isActive ? existing.status : "NOT_A_MEMBER"
+          status: "ACTIVE_DEPENDENT"
         }
       })
     : await prisma.familyMember.create({
         data: {
           donorProfileId: donorId,
-          legacyMemberDetailKey: row.legacyMemberDetailKey || null,
-          legacyAddressKey: row.legacyAddressKey || null,
+          legacyMemberDetailKey: null,
+          legacyAddressKey: null,
           type,
           firstName,
           middleName: row.middleName || null,
@@ -300,10 +291,10 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
           phone: row.phone || null,
           email: isValidEmail(row.email) ? row.email?.toLowerCase() : null,
           maritalStatus: normalizeMaritalStatus(row.maritalStatus),
-          legacyRecordStatus: row.legacyRecordStatus || null,
+          legacyRecordStatus: null,
           legacyData: row.legacyData as Prisma.InputJsonValue,
           isActive,
-          status: isActive ? (type === "CHILD" ? "UNDER_18" : "ACTIVE_DEPENDENT") : "NOT_A_MEMBER"
+          status: "ACTIVE_DEPENDENT"
         }
       });
 
@@ -318,8 +309,8 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
       update: {
         role: type === "PARTNER" ? "PARTNER" : "CHILD",
         isActive,
-        endedAt: isActive ? null : new Date(),
-        endReason: isActive ? null : (row.legacyRecordStatus || "Inactief volgens import")
+        endedAt: null,
+        endReason: null
       },
       create: {
         membershipId,
@@ -329,8 +320,8 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
         isPrimaryPayer: false,
         isActive,
         activeFrom: new Date(),
-        endedAt: isActive ? null : new Date(),
-        endReason: isActive ? null : (row.legacyRecordStatus || "Inactief volgens import")
+        endedAt: null,
+        endReason: null
       }
     });
   }
@@ -338,15 +329,84 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
   return !existing;
 }
 
+async function markImportedHouseholdFullyPaid(
+  donorId: string,
+  membershipId: string | null | undefined,
+  adminId: string,
+  pricing: PricingConfig
+) {
+  const donor = await prisma.donorProfile.findUnique({
+    where: { id: donorId },
+    include: { familyMembers: true }
+  });
+  if (!donor) return;
+
+  const paidAt = new Date();
+  const annualCents = calculateCurrentAnnualAmount(donor, donor.familyMembers, pricing, paidAt) * 100;
+  const oneTimeCents = calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, paidAt) * 100;
+
+  await prisma.paymentObligation.updateMany({
+    where: { donorProfileId: donorId, status: "DUE" },
+    data: {
+      status: "PAID",
+      paidAt,
+      paymentMethod: "OTHER",
+      updatedByAdminId: adminId,
+      adminNote: "Als volledig betaald gemarkeerd bij import van bestaande leden."
+    }
+  });
+  await prisma.paymentObligation.deleteMany({
+    where: { donorProfileId: donorId, source: "IMPORT_EXISTING_MEMBER_PAID" }
+  });
+
+  const payments = [
+    annualCents > 0
+      ? {
+          donorProfileId: donorId,
+          membershipId: membershipId ?? null,
+          updatedByAdminId: adminId,
+          lidnummer: donor.registrationNumber,
+          obligationType: "ANNUAL" as const,
+          amountCents: annualCents,
+          status: "PAID" as const,
+          paymentMethod: "OTHER" as const,
+          paidAt,
+          source: "IMPORT_EXISTING_MEMBER_PAID",
+          notes: `Bestaand lid volledig betaald geïmporteerd. Contributiejaar: ${paidAt.getFullYear()}`
+        }
+      : null,
+    oneTimeCents > 0
+      ? {
+          donorProfileId: donorId,
+          membershipId: membershipId ?? null,
+          updatedByAdminId: adminId,
+          lidnummer: donor.registrationNumber,
+          obligationType: "ONE_TIME" as const,
+          amountCents: oneTimeCents,
+          status: "PAID" as const,
+          paymentMethod: "OTHER" as const,
+          paidAt,
+          source: "IMPORT_EXISTING_MEMBER_PAID",
+          notes: "Bestaand lid: eenmalige bijdrage als volledig betaald geïmporteerd."
+        }
+      : null
+  ].filter((payment): payment is NonNullable<typeof payment> => Boolean(payment));
+
+  if (payments.length) {
+    await prisma.paymentObligation.createMany({ data: payments });
+  }
+}
+
 async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], adminId: string, fileName: string, archiveBase64: string): Promise<ImportResultState> {
   const summary: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
   const validRows = rows.filter((row) => row.importMode === "member-personal-details" && row.errors.length === 0);
   const invalidRows = rows.filter((row) => row.importMode === "member-personal-details" && row.errors.length > 0);
   summary.invalid = invalidRows.length;
+  const pricing = await getPricingConfig();
 
   const groups = new Map<string, ImportPreviewRow[]>();
   for (const row of validRows) {
-    const key = `${row.registrationNumber}::${row.legacyAddressKey}`;
+    const key = row.registrationNumber;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
 
@@ -376,6 +436,7 @@ async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], admin
       const familyCreated = await upsertImportedFamilyMember(donor.id, row, membership?.id);
       if (familyCreated) summary.linked += 1;
     }
+    await markImportedHouseholdFullyPaid(donor.id, membership?.id, adminId, pricing);
   }
 
   await syncRegistrationCounter(validRows.map((row) => row.registrationNumber).filter(Boolean));
