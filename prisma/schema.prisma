@@ -175,7 +175,9 @@ model DonorProfile {
   legacyAddressKey      String?
   status                DonorStatus    @default(PENDING)
   firstName             String
+  middleName            String?
   lastName              String
+  bsn                   String?
   gender                Gender?
   phone                 String
   addressLine1          String
@@ -192,6 +194,7 @@ model DonorProfile {
   pakistanContactPhone  String?
   funeralWishes         String?
   notes                 String?
+  legacyData            Json?
   approvedAt            DateTime?
   statusChangedAt       DateTime?
   activeSince           DateTime?
@@ -223,6 +226,7 @@ model DonorProfile {
   @@index([currentMembershipId])
   @@index([status])
   @@index([iban])
+  @@index([bsn])
 }
 
 model IdentityDocument {
@@ -270,11 +274,17 @@ model FamilyMember {
   type                  FamilyMemberType
   status                FamilyMemberStatus @default(ACTIVE_DEPENDENT)
   firstName             String
+  middleName            String?
   lastName              String
   gender                Gender?
   dateOfBirth           DateTime
   birthPlace            String?
   relationship          String?
+  phone                 String?
+  email                 String?
+  maritalStatus         MaritalStatus?
+  legacyRecordStatus    String?
+  legacyData            Json?
   isActive              Boolean            @default(true)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
@@ -498,6 +508,18 @@ model AppConfig {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model LegacyImportArchive {
+  id           String   @id @default(cuid())
+  filename     String
+  fileSize     Int
+  workbookData Bytes
+  importedById String
+  importedAt   DateTime @default(now())
+
+  @@index([importedAt])
+  @@index([filename])
 }
 
 model RegistrationCounter {

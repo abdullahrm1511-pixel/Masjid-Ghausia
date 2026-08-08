@@ -86,6 +86,7 @@ export function ImportForm() {
       {preview.rows.length ? (
         <form action={commitAction} className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <input name="fileName" type="hidden" value={preview.fileName} />
+          <textarea className="hidden" name="archiveBase64" readOnly value={preview.archiveBase64 ?? ""} />
           <textarea className="hidden" name="rows" readOnly value={JSON.stringify(preview.rows)} />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -149,7 +150,7 @@ export function ImportForm() {
             ) : null}
             {isMemberImport ? (
               <p className="rounded-md bg-sky-50 p-3 text-sm font-semibold text-sky-900">
-                Ledenbestand herkend. Dit maakt of werkt bestaande leden bij en koppelt partner/kinderen alleen als lidnummer en adresnummer allebei hetzelfde zijn. Betalingen, schulden en record status worden hierbij niet verwerkt.
+                Volledig ledenbestand herkend. Persoonsgegevens worden gekoppeld aan Address, Banking Details, Membership, Burial Wishes en Health Notes. De gekoppelde bronrijen worden ook volledig in de database bewaard. Partner en kinderen worden op lidnummer en adresnummer gekoppeld.
               </p>
             ) : null}
             {isStatusImport ? (
@@ -185,7 +186,7 @@ export function ImportForm() {
                 </tbody>
               </table>
             ) : isMemberImport ? (
-              <table className="w-full min-w-[1300px] text-left text-sm">
+              <table className="w-full min-w-[1800px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="p-3">Rij</th>
@@ -198,6 +199,10 @@ export function ImportForm() {
                     <th className="p-3">Telefoon</th>
                     <th className="p-3">E-mail</th>
                     <th className="p-3">Adres</th>
+                    <th className="p-3">Postcode / plaats</th>
+                    <th className="p-3">Land</th>
+                    <th className="p-3">BSN / IBAN</th>
+                    <th className="p-3">Recordstatus</th>
                     <th className="p-3">Actie</th>
                     <th className="p-3">Fouten / waarschuwingen</th>
                   </tr>
@@ -215,6 +220,10 @@ export function ImportForm() {
                       <td className="p-3">{row.phone || "-"}</td>
                       <td className="p-3">{row.email || "-"}</td>
                       <td className="p-3">{row.addressLine1 || "-"}</td>
+                      <td className="p-3">{[row.postalCode, row.city].filter(Boolean).join(" ") || "-"}</td>
+                      <td className="p-3">{row.country || "-"}</td>
+                      <td className="p-3"><span className="block">{row.bsn || "-"}</span><span className="block text-xs text-slate-500">{row.iban ? formatIban(row.iban) : "-"}</span></td>
+                      <td className="p-3">{row.legacyRecordStatus || row.membershipStatus || "-"}</td>
                       <td className="p-3 font-semibold">{actionLabel(row.detectedAction, true)}</td>
                       <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
                     </tr>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { canManageDonors } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { buildImportPreview, normalizeImportedDonorStatus, splitName, type ImportPreviewRow } from "@/lib/admin/import";
 import { syncRegistrationCounter } from "@/lib/registration/numbers";
 import { writeAuditLog } from "@/lib/audit";
@@ -15,6 +16,7 @@ import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
 export type ImportPreviewState = {
   rows: ImportPreviewRow[];
   fileName: string;
+  archiveBase64?: string;
   error?: string;
 };
 
@@ -66,7 +68,7 @@ export async function previewImport(_previous: ImportPreviewState | null, formDa
         "Geen importeerbare rijen gevonden. Voor Alle leden import verwacht het systeem kolommen zoals REGISTRATION NR KEY, ADDR NR KEY, FIRST NAME, SURNAME en RELATIONSHIP TO MEMBER."
     };
   }
-  return { rows, fileName: file.name };
+  return { rows, fileName: file.name, archiveBase64: Buffer.from(await file.arrayBuffer()).toString("base64") };
 }
 
 function legacyEmail(registrationNumber: string, rowNumber: number) {
@@ -107,6 +109,20 @@ function safeBirthDate(value?: string | null) {
   return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date("1900-01-01T00:00:00.000Z");
 }
 
+function importedMemberIsActive(recordStatus?: string) {
+  return !/cancelled|canceled|inactive|inactief|be[eë]indigd/i.test(String(recordStatus ?? ""));
+}
+
+function importedPrimaryStatus(row: ImportPreviewRow) {
+  if (!importedMemberIsActive(row.legacyRecordStatus)) return "INACTIVE" as const;
+  return normalizeImportedDonorStatus(row.membershipStatus) ?? "ACTIVE" as const;
+}
+
+function normalizedBsn(value?: string) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? digits.padStart(9, "0").slice(-9) : undefined;
+}
+
 async function userEmailForImportedPrimary(row: ImportPreviewRow) {
   const rowEmail = row.email?.toLowerCase();
   const preferred = isValidEmail(rowEmail) && rowEmail ? rowEmail : legacyEmail(row.registrationNumber, row.rowNumber);
@@ -125,6 +141,7 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
   const firstName = row.firstName?.trim() || splitName(fullName).firstName || fullName;
   const lastName = row.lastName?.trim() || splitName(fullName).lastName;
   const birthDate = safeBirthDate(row.birthDate);
+  const importedStatus = importedPrimaryStatus(row);
 
   const existingDonor = await prisma.donorProfile.findUnique({
     where: { registrationNumber: row.registrationNumber },
@@ -135,22 +152,28 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
     const donor = await prisma.donorProfile.update({
       where: { id: existingDonor.id },
       data: {
-        status: existingDonor.status === "PENDING" ? "ACTIVE" : existingDonor.status,
+        status: importedStatus,
         legacyMemberDetailKey: row.legacyMemberDetailKey || existingDonor.legacyMemberDetailKey,
         legacyAddressKey: row.legacyAddressKey || existingDonor.legacyAddressKey,
         firstName,
+        middleName: row.middleName || null,
         lastName,
+        bsn: normalizedBsn(row.bsn) || existingDonor.bsn,
         gender: normalizeGender(row.gender),
         phone: row.phone || existingDonor.phone,
         addressLine1: row.addressLine1 || existingDonor.addressLine1,
         addressLine2: row.addressLine2 ?? existingDonor.addressLine2,
         postalCode: row.postalCode || existingDonor.postalCode,
         city: row.city || existingDonor.city,
+        country: row.country || existingDonor.country,
         dateOfBirth: birthDate,
         birthPlace: row.birthPlace || existingDonor.birthPlace,
         accountHolderName: fullName || existingDonor.accountHolderName,
         maritalStatus: normalizeMaritalStatus(row.maritalStatus),
-        activeSince: existingDonor.activeSince ?? new Date()
+        iban: row.iban || existingDonor.iban,
+        legacyData: row.legacyData as Prisma.InputJsonValue,
+        activeSince: importedStatus === "ACTIVE" ? (existingDonor.activeSince ?? new Date()) : existingDonor.activeSince,
+        inactiveSince: importedStatus === "INACTIVE" ? (existingDonor.inactiveSince ?? new Date()) : null
       }
     });
 
@@ -191,21 +214,26 @@ async function upsertImportedPrimary(row: ImportPreviewRow) {
       registrationNumber: row.registrationNumber,
       legacyMemberDetailKey: row.legacyMemberDetailKey || null,
       legacyAddressKey: row.legacyAddressKey || null,
-      status: "ACTIVE",
+      status: importedStatus,
       firstName,
+      middleName: row.middleName || null,
       lastName,
+      bsn: normalizedBsn(row.bsn) || null,
       gender: normalizeGender(row.gender),
       phone: row.phone || "",
       addressLine1: row.addressLine1 || "",
       addressLine2: row.addressLine2 || null,
       postalCode: row.postalCode || "",
       city: row.city || "",
+      country: row.country || "NL",
       dateOfBirth: birthDate,
       birthPlace: row.birthPlace || "",
-      iban: "",
+      iban: row.iban || "",
       accountHolderName: fullName,
       maritalStatus: normalizeMaritalStatus(row.maritalStatus),
-      activeSince: new Date(),
+      legacyData: row.legacyData as Prisma.InputJsonValue,
+      activeSince: importedStatus === "ACTIVE" ? new Date() : null,
+      inactiveSince: importedStatus === "INACTIVE" ? new Date() : null,
       approvedAt: new Date()
     }
   });
@@ -222,6 +250,7 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
   const lastName = row.lastName?.trim() || splitName(fullName).lastName;
   const dateOfBirth = safeBirthDate(row.birthDate);
   const type = relation === "PARTNER" ? "PARTNER" : relation === "CHILD" ? "CHILD" : "OTHER";
+  const isActive = importedMemberIsActive(row.legacyRecordStatus);
 
   const existing = await prisma.familyMember.findFirst({
     where: {
@@ -238,6 +267,7 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
         where: { id: existing.id },
         data: {
           firstName,
+          middleName: row.middleName || null,
           lastName,
           legacyMemberDetailKey: row.legacyMemberDetailKey || existing.legacyMemberDetailKey,
           legacyAddressKey: row.legacyAddressKey || existing.legacyAddressKey,
@@ -245,7 +275,13 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
           dateOfBirth,
           birthPlace: row.birthPlace || existing.birthPlace,
           relationship: row.relationshipToMember || existing.relationship,
-          isActive: true
+          phone: row.phone || existing.phone,
+          email: isValidEmail(row.email) ? row.email?.toLowerCase() : existing.email,
+          maritalStatus: normalizeMaritalStatus(row.maritalStatus),
+          legacyRecordStatus: row.legacyRecordStatus || existing.legacyRecordStatus,
+          legacyData: row.legacyData as Prisma.InputJsonValue,
+          isActive,
+          status: isActive ? existing.status : "NOT_A_MEMBER"
         }
       })
     : await prisma.familyMember.create({
@@ -255,12 +291,19 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
           legacyAddressKey: row.legacyAddressKey || null,
           type,
           firstName,
+          middleName: row.middleName || null,
           lastName,
           gender: normalizeGender(row.gender),
           dateOfBirth,
           birthPlace: row.birthPlace || "",
           relationship: row.relationshipToMember || null,
-          isActive: true
+          phone: row.phone || null,
+          email: isValidEmail(row.email) ? row.email?.toLowerCase() : null,
+          maritalStatus: normalizeMaritalStatus(row.maritalStatus),
+          legacyRecordStatus: row.legacyRecordStatus || null,
+          legacyData: row.legacyData as Prisma.InputJsonValue,
+          isActive,
+          status: isActive ? (type === "CHILD" ? "UNDER_18" : "ACTIVE_DEPENDENT") : "NOT_A_MEMBER"
         }
       });
 
@@ -274,9 +317,9 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
       },
       update: {
         role: type === "PARTNER" ? "PARTNER" : "CHILD",
-        isActive: true,
-        endedAt: null,
-        endReason: null
+        isActive,
+        endedAt: isActive ? null : new Date(),
+        endReason: isActive ? null : (row.legacyRecordStatus || "Inactief volgens import")
       },
       create: {
         membershipId,
@@ -284,8 +327,10 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
         role: type === "PARTNER" ? "PARTNER" : "CHILD",
         displayNumber: type === "PARTNER" ? `${row.registrationNumber}-P` : null,
         isPrimaryPayer: false,
-        isActive: true,
-        activeFrom: new Date()
+        isActive,
+        activeFrom: new Date(),
+        endedAt: isActive ? null : new Date(),
+        endReason: isActive ? null : (row.legacyRecordStatus || "Inactief volgens import")
       }
     });
   }
@@ -293,7 +338,7 @@ async function upsertImportedFamilyMember(donorId: string, row: ImportPreviewRow
   return !existing;
 }
 
-async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], adminId: string, fileName: string): Promise<ImportResultState> {
+async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], adminId: string, fileName: string, archiveBase64: string): Promise<ImportResultState> {
   const summary: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
   const validRows = rows.filter((row) => row.importMode === "member-personal-details" && row.errors.length === 0);
   const invalidRows = rows.filter((row) => row.importMode === "member-personal-details" && row.errors.length > 0);
@@ -334,6 +379,10 @@ async function commitMemberPersonalDetailsImport(rows: ImportPreviewRow[], admin
   }
 
   await syncRegistrationCounter(validRows.map((row) => row.registrationNumber).filter(Boolean));
+  if (archiveBase64) {
+    const workbookData = Buffer.from(archiveBase64, "base64");
+    await prisma.legacyImportArchive.create({ data: { filename: fileName, fileSize: workbookData.length, workbookData, importedById: adminId } });
+  }
   await writeAuditLog({
     actorId: adminId,
     action: "IMPORT",
@@ -743,7 +792,7 @@ export async function commitImport(_previous: ImportResultState | null, formData
     return commitDonorStatusImport(rows, adminId, fileName);
   }
   if (rows.some((row) => row.importMode === "member-personal-details")) {
-    return commitMemberPersonalDetailsImport(rows, adminId, fileName);
+    return commitMemberPersonalDetailsImport(rows, adminId, fileName, String(formData.get("archiveBase64") ?? ""));
   }
 
   const summary: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };

@@ -35,6 +35,10 @@ export type ImportPreviewRow = {
   addressLine2?: string;
   postalCode?: string;
   city?: string;
+  country?: string;
+  bsn?: string;
+  legacyRecordStatus?: string;
+  membershipStatus?: string;
   gender?: string;
   maritalStatus?: string;
   birthPlace?: string;
@@ -47,6 +51,7 @@ export type ImportPreviewRow = {
   email?: string;
   phone?: string;
   birthDate?: string | null;
+  legacyData?: Record<string, unknown>;
   detectedAction: ImportAction;
   existingDonorId?: string;
   reviewReasons: string[];
@@ -64,6 +69,10 @@ type RawImportRow = {
   addressLine2: string;
   postalCode: string;
   city: string;
+  country: string;
+  bsn: string;
+  legacyRecordStatus: string;
+  membershipStatus: string;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -82,6 +91,7 @@ type RawImportRow = {
   email: string;
   phone: string;
   birthDate: unknown;
+  legacyData: Record<string, unknown>;
 };
 
 const aliases = {
@@ -92,6 +102,9 @@ const aliases = {
   addressLine2: ["address line 2", "adresregel 2", "toevoeging"],
   postalCode: ["postcode", "postal code", "zip", "zip code"],
   city: ["woonplaats", "plaats", "city", "town"],
+  country: ["country", "land"],
+  bsn: ["bsn nr", "bsn", "burgerservicenummer"],
+  legacyRecordStatus: ["record status"],
   iban: ["rek nr", "iban", "bankrekening", "rekeningnummer"],
   fullName: ["naam", "name"],
   status: ["status", "lid status", "donateurstatus", "member status"],
@@ -156,6 +169,9 @@ function buildIndexes(headers: string[]) {
     addressLine2: headerIndex(headers, aliases.addressLine2),
     postalCode: headerIndex(headers, aliases.postalCode),
     city: headerIndex(headers, aliases.city),
+    country: headerIndex(headers, aliases.country),
+    bsn: headerIndex(headers, aliases.bsn),
+    legacyRecordStatus: headerIndex(headers, aliases.legacyRecordStatus),
     firstName: headerIndex(headers, aliases.firstName),
     middleName: headerIndex(headers, aliases.middleName),
     lastName: headerIndex(headers, aliases.lastName),
@@ -230,7 +246,7 @@ function findHeaderRow(rows: unknown[][]) {
   return { headerIndex: 0, headers, indexes, importMode: detectImportMode(indexes), score: headerScore(indexes) };
 }
 
-function rawRowToImportRow(rowNumber: number, values: unknown[], indexes: Record<string, number>, importMode: ImportMode): RawImportRow {
+function rawRowToImportRow(rowNumber: number, values: unknown[], indexes: Record<string, number>, importMode: ImportMode, legacyData: Record<string, unknown> = {}): RawImportRow {
   return {
     rowNumber,
     importMode,
@@ -241,6 +257,10 @@ function rawRowToImportRow(rowNumber: number, values: unknown[], indexes: Record
     addressLine2: indexes.addressLine2 >= 0 ? cellText(values[indexes.addressLine2]) : "",
     postalCode: indexes.postalCode >= 0 ? cellText(values[indexes.postalCode]) : "",
     city: indexes.city >= 0 ? cellText(values[indexes.city]) : "",
+    country: indexes.country >= 0 ? cellText(values[indexes.country]) : "",
+    bsn: indexes.bsn >= 0 ? cellText(values[indexes.bsn]) : "",
+    legacyRecordStatus: indexes.legacyRecordStatus >= 0 ? cellText(values[indexes.legacyRecordStatus]) : "",
+    membershipStatus: "",
     firstName: indexes.firstName >= 0 ? cellText(values[indexes.firstName]) : "",
     middleName: indexes.middleName >= 0 ? cellText(values[indexes.middleName]) : "",
     lastName: indexes.lastName >= 0 ? cellText(values[indexes.lastName]) : "",
@@ -258,8 +278,53 @@ function rawRowToImportRow(rowNumber: number, values: unknown[], indexes: Record
     rentDate: indexes.rentDate >= 0 ? values[indexes.rentDate] : "",
     email: indexes.email >= 0 ? cellText(values[indexes.email]) : "",
     phone: indexes.phone >= 0 ? cellText(values[indexes.phone]) : "",
-    birthDate: indexes.birthDate >= 0 ? values[indexes.birthDate] : ""
+    birthDate: indexes.birthDate >= 0 ? values[indexes.birthDate] : "",
+    legacyData
   };
+}
+
+function jsonCellValue(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (typeof value === "object") {
+    const item = value as { result?: unknown; text?: unknown; richText?: Array<{ text?: unknown }>; error?: unknown };
+    if (item.result !== undefined) return jsonCellValue(item.result);
+    if (item.text !== undefined) return String(item.text);
+    if (item.richText) return item.richText.map((part) => String(part.text ?? "")).join("");
+    if (item.error !== undefined) return String(item.error);
+  }
+  return String(value);
+}
+
+type LegacySheetRow = { rowNumber: number; values: unknown[]; exact: Record<string, string | number | boolean | null>; normalized: Record<string, string | number | boolean | null> };
+
+function legacySheetRows(workbook: ExcelJS.Workbook, sheetName: string, requiredHeader: string): LegacySheetRow[] {
+  const worksheet = workbook.getWorksheet(sheetName);
+  if (!worksheet) return [];
+  const rows: Array<{ rowNumber: number; values: unknown[] }> = [];
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => rows.push({ rowNumber, values: rowValues(row.values) }));
+  const headerPosition = rows.findIndex((row) => row.values.some((value) => normalizeHeader(value) === normalizeHeader(requiredHeader)));
+  if (headerPosition < 0) return [];
+  const headers = rows[headerPosition].values.map((value, index) => cellText(value) || `Kolom ${index + 1}`);
+  return rows.slice(headerPosition + 1).map(({ rowNumber, values }) => {
+    const exact: Record<string, string | number | boolean | null> = {};
+    const normalized: Record<string, string | number | boolean | null> = {};
+    headers.forEach((header, index) => {
+      const value = jsonCellValue(values[index]);
+      exact[header] = value;
+      normalized[normalizeHeader(header)] = value;
+    });
+    return { rowNumber, values, exact, normalized };
+  });
+}
+
+function legacyLookup(rows: LegacySheetRow[], key: string) {
+  return new Map(rows.filter((row) => row.normalized[key] !== null).map((row) => [String(row.normalized[key]), row]));
+}
+
+function legacyText(row: LegacySheetRow | undefined, key: string) {
+  return row ? String(row.normalized[normalizeHeader(key)] ?? "").trim() : "";
 }
 
 export function parseExcelDate(value: unknown) {
@@ -519,6 +584,44 @@ async function rowsFromXlsxWorkbook(buffer: ArrayBuffer): Promise<RawImportRow[]
 
   if (!bestSheet || bestSheet.score < 3) return [];
 
+  if (bestSheet.importMode === "member-personal-details") {
+    const memberRows = legacySheetRows(workbook, "Member Details", "MEM DETAIL NR KEY");
+    const addressByKey = legacyLookup(legacySheetRows(workbook, "Address", "ADDR NR KEY"), "addr nr key");
+    const bankingByRegistration = legacyLookup(legacySheetRows(workbook, "Banking Details", "REGISTRATION NR KEY"), "registration nr key");
+    const membershipByRegistration = legacyLookup(legacySheetRows(workbook, "Membership", "REGISTRATION NR KEY"), "registration nr key");
+    const burialByMember = legacyLookup(legacySheetRows(workbook, "Burial Wishes", "MEM DETAIL NR KEY"), "mem detail nr key");
+    const healthByMember = legacyLookup(legacySheetRows(workbook, "Health Notes", "MEM DETAIL NR KEY"), "mem detail nr key");
+
+    return memberRows.map((memberRow) => {
+      const indexes = buildIndexes(Object.keys(memberRow.normalized));
+      const row = rawRowToImportRow(memberRow.rowNumber, memberRow.values, indexes, "member-personal-details");
+      const address = addressByKey.get(row.legacyAddressKey);
+      const banking = bankingByRegistration.get(row.registrationNumber);
+      const membership = membershipByRegistration.get(row.registrationNumber);
+      const burial = burialByMember.get(row.legacyMemberDetailKey);
+      const health = healthByMember.get(row.legacyMemberDetailKey);
+      row.addressLine1 = legacyText(address, "ADDRESS LINE 1") || row.addressLine1;
+      row.addressLine2 = legacyText(address, "ADDRESS LINE 2") || row.addressLine2;
+      row.city = legacyText(address, "CITY") || row.city;
+      row.country = legacyText(address, "COUNTRY");
+      row.postalCode = legacyText(address, "POST CODE ZIP CODE");
+      row.bsn = legacyText(banking, "BSN NR");
+      row.iban = legacyText(banking, "IBAN ACCOUNT NR");
+      row.membershipStatus = legacyText(membership, "STATUS");
+      row.legacyData = {
+        sourceSheet: "Member Details",
+        sourceRow: memberRow.rowNumber,
+        memberDetails: memberRow.exact,
+        address: address?.exact ?? null,
+        bankingDetails: banking?.exact ?? null,
+        membership: membership?.exact ?? null,
+        burialWishes: burial?.exact ?? null,
+        healthNotes: health?.exact ?? null
+      };
+      return row;
+    }).filter(rowHasUsefulData);
+  }
+
   return bestSheet.rows
     .filter((_, index) => index > bestSheet.headerIndex)
     .map(({ rowNumber, values }) => rawRowToImportRow(rowNumber, values, bestSheet.indexes, bestSheet.importMode))
@@ -727,6 +830,10 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       addressLine2: raw.addressLine2,
       postalCode: raw.postalCode,
       city: raw.city,
+      country: raw.country,
+      bsn: raw.bsn,
+      legacyRecordStatus: raw.legacyRecordStatus,
+      membershipStatus: raw.membershipStatus,
       gender: raw.gender,
       maritalStatus: raw.maritalStatus,
       birthPlace: raw.birthPlace,
@@ -739,6 +846,7 @@ export async function buildImportPreview(file: File): Promise<ImportPreviewRow[]
       email,
       phone,
       birthDate: birthDate ? birthDate.toISOString() : null,
+      legacyData: raw.legacyData,
       reviewReasons,
       warnings,
       errors
