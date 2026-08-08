@@ -141,8 +141,13 @@ function headerIndex(headers: string[], names: string[]) {
 }
 
 function cellText(value: unknown) {
-  if (value && typeof value === "object" && "text" in value) {
-    return String((value as { text: string }).text ?? "").trim();
+  if (value && typeof value === "object") {
+    const item = value as { result?: unknown; text?: unknown; richText?: Array<{ text?: unknown }>; error?: unknown };
+    if (item.result !== undefined) return cellText(item.result);
+    if (item.text !== undefined) return String(item.text ?? "").trim();
+    if (item.richText) return item.richText.map((part) => String(part.text ?? "")).join("").trim();
+    if (item.error !== undefined) return String(item.error ?? "").trim();
+    return "";
   }
   return String(value ?? "").trim();
 }
@@ -293,6 +298,7 @@ function jsonCellValue(value: unknown): string | number | boolean | null {
     if (item.text !== undefined) return String(item.text);
     if (item.richText) return item.richText.map((part) => String(part.text ?? "")).join("");
     if (item.error !== undefined) return String(item.error);
+    return null;
   }
   return String(value);
 }
@@ -320,7 +326,11 @@ function legacySheetRows(workbook: ExcelJS.Workbook, sheetName: string, required
 }
 
 function legacyLookup(rows: LegacySheetRow[], key: string) {
-  return new Map(rows.filter((row) => row.normalized[key] !== null).map((row) => [String(row.normalized[key]), row]));
+  return new Map(
+    rows
+      .filter((row) => row.normalized[key] !== null && row.normalized[key] !== undefined && String(row.normalized[key]).trim() !== "")
+      .map((row) => [String(row.normalized[key]), row])
+  );
 }
 
 function legacyText(row: LegacySheetRow | undefined, key: string) {
@@ -600,10 +610,28 @@ async function rowsFromXlsxWorkbook(buffer: ArrayBuffer): Promise<RawImportRow[]
     const membershipByRegistration = legacyLookup(legacySheetRows(workbook, "Membership", "REGISTRATION NR KEY"), "registration nr key");
     const burialByMember = legacyLookup(legacySheetRows(workbook, "Burial Wishes", "MEM DETAIL NR KEY"), "mem detail nr key");
     const healthByMember = legacyLookup(legacySheetRows(workbook, "Health Notes", "MEM DETAIL NR KEY"), "mem detail nr key");
+    const memberHeaders = [
+      "MEM DETAIL NR KEY",
+      "REGISTRATION NR KEY",
+      "ADDR NR KEY",
+      "ADDRESS LINE 1 Display Only",
+      "FIRST NAME",
+      "MIDDLE NAME",
+      "SURNAME",
+      "RELATIONSHIP TO MEMBER",
+      "DATE OF BIRTH",
+      "PLACE OF BIRTH",
+      "GENDER",
+      "MARITAL STATUS",
+      "TELEPHONE",
+      "EMAIL",
+      "RECORD STATUS"
+    ];
+    const memberIndexes = buildIndexes(memberHeaders.map(normalizeHeader));
 
     return memberRows.map((memberRow) => {
-      const indexes = buildIndexes(Object.keys(memberRow.normalized));
-      const row = rawRowToImportRow(memberRow.rowNumber, memberRow.values, indexes, "member-personal-details");
+      const memberValues = memberHeaders.map((header) => memberRow.normalized[normalizeHeader(header)] ?? "");
+      const row = rawRowToImportRow(memberRow.rowNumber, memberValues, memberIndexes, "member-personal-details");
       const address = addressByKey.get(row.legacyAddressKey);
       const banking = bankingByRegistration.get(row.registrationNumber);
       const membership = membershipByRegistration.get(row.registrationNumber);

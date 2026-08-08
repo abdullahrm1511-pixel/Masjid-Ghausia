@@ -9,9 +9,10 @@ const initialPreview: ImportPreviewState = { rows: [], fileName: "" };
 const initialResult: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
 type PreviewFilter = "all" | "new" | "linked" | "duplicates" | "warnings" | "review" | "invalid";
 
-function actionLabel(action: string, isMemberImport = false) {
-  if (isMemberImport && action === "DUPLICATE") return "Bestaand lid bijwerken";
-  if (isMemberImport && action === "NEW") return "Nieuw lid aanmaken";
+function actionLabel(action: string, isMemberImport = false, relationshipToMember = "") {
+  const isPrimaryMember = relationshipToMember.toLowerCase().includes("primary");
+  if (isMemberImport && action === "DUPLICATE") return isPrimaryMember ? "Bestaand hoofdlid bijwerken" : "Gezinslid bijwerken / koppelen";
+  if (isMemberImport && action === "NEW") return isPrimaryMember ? "Nieuw hoofdlid aanmaken" : "Koppelen aan hoofdlid";
   if (action === "UPDATE_STATUS") return "Status bijwerken";
   if (action === "STATUS_NOT_FOUND") return "Lidnummer niet gevonden";
   if (action === "DUPLICATE_IMPORT_ROW") return "Dubbele rij in bestand";
@@ -186,12 +187,11 @@ export function ImportForm() {
                 </tbody>
               </table>
             ) : isMemberImport ? (
-              <table className="w-full min-w-[1800px] text-left text-sm">
+              <table className="w-full min-w-[1700px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="p-3">Rij</th>
                     <th className="p-3">Lidnummer</th>
-                    <th className="p-3">Adresnr</th>
                     <th className="p-3">Rol</th>
                     <th className="p-3">Naam</th>
                     <th className="p-3">Geboortedatum</th>
@@ -212,7 +212,6 @@ export function ImportForm() {
                     <tr className={`border-t border-slate-200 align-top ${row.errors.length ? "border-l-4 border-l-red-700 bg-red-100/80" : row.reviewReasons.length ? "border-l-4 border-l-red-600 bg-red-50/80" : row.warnings.length ? "bg-amber-50/50" : "bg-white"}`} key={row.rowNumber}>
                       <td className="p-3">{row.rowNumber}</td>
                       <td className="p-3 font-semibold">{row.registrationNumber || "-"}</td>
-                      <td className="p-3">{row.legacyAddressKey || "-"}</td>
                       <td className="p-3">{row.relationshipToMember || "-"}</td>
                       <td className="p-3 font-semibold">{row.fullName || "-"}</td>
                       <td className="p-3">{formatDate(row.birthDate)}</td>
@@ -224,7 +223,7 @@ export function ImportForm() {
                       <td className="p-3">{row.country || "-"}</td>
                       <td className="p-3"><span className="block">{row.bsn || "-"}</span><span className="block text-xs text-slate-500">{row.iban ? formatIban(row.iban) : "-"}</span></td>
                       <td className="p-3 font-semibold text-teal-800">Actief / volledig betaald</td>
-                      <td className="p-3 font-semibold">{actionLabel(row.detectedAction, true)}</td>
+                      <td className="p-3 font-semibold">{actionLabel(row.detectedAction, true, row.relationshipToMember)}</td>
                       <td className="p-3">{[...row.errors, ...row.reviewReasons, ...row.warnings].length ? [...row.errors, ...row.reviewReasons, ...row.warnings].join(" | ") : "-"}</td>
                     </tr>
                   ))}
