@@ -75,7 +75,7 @@ export function parseFixedSurveySettings(value: unknown): FixedSurveySettings {
   })) as FixedSurveySettings;
 }
 
-export const surveyQuestionTypes = ["SHORT_TEXT", "LONG_TEXT", "MULTIPLE_CHOICE", "CHECKBOXES", "DROPDOWN", "YES_NO", "EMAIL", "PHONE", "NUMBER", "DATE"] as const;
+export const surveyQuestionTypes = ["SHORT_TEXT", "LONG_TEXT", "MULTIPLE_CHOICE", "CHECKBOXES", "DROPDOWN", "YES_NO", "EMAIL", "PHONE", "NUMBER", "DATE", "FILE"] as const;
 export type SurveyQuestionType = (typeof surveyQuestionTypes)[number];
 export type SurveyQuestion = {
   id: string;
@@ -101,7 +101,8 @@ export const surveyQuestionTypeLabels: Record<SurveyQuestionType, string> = {
   EMAIL: "E-mailadres",
   PHONE: "Telefoonnummer",
   NUMBER: "Getal",
-  DATE: "Datum"
+  DATE: "Datum",
+  FILE: "Bestand uploaden"
 };
 
 export function parseSurveyQuestions(value: unknown): SurveyQuestion[] {
@@ -168,14 +169,15 @@ export function createSurveySlug() {
   return `donateurs-${randomBytes(6).toString("base64url").toLowerCase()}`;
 }
 
-export function surveyAvailability(survey: { isActive: boolean; startsAt: Date | null; endsAt: Date | null }, now = new Date()) {
+export function surveyAvailability(survey: { isActive: boolean; isDraft?: boolean; startsAt: Date | null; endsAt: Date | null }, now = new Date()) {
+  if (survey.isDraft) return "draft" as const;
   if (!survey.isActive) return "inactive" as const;
   if (survey.startsAt && survey.startsAt > now) return "scheduled" as const;
   if (survey.endsAt && survey.endsAt < now) return "closed" as const;
   return "open" as const;
 }
 
-export function surveyStatusLabel(survey: { isActive: boolean; startsAt: Date | null; endsAt: Date | null }) {
+export function surveyStatusLabel(survey: { isActive: boolean; isDraft?: boolean; startsAt: Date | null; endsAt: Date | null }) {
   const status = surveyAvailability(survey);
-  return status === "open" ? "Open" : status === "scheduled" ? "Ingepland" : status === "closed" ? "Gesloten" : "Uitgeschakeld";
+  return status === "open" ? "Open" : status === "draft" ? "Concept" : status === "scheduled" ? "Ingepland" : status === "closed" ? "Gesloten" : "Uitgeschakeld";
 }

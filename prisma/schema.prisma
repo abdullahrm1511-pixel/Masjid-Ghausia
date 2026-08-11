@@ -219,6 +219,8 @@ model DonorProfile {
   familyStatusHistory           FamilyMemberStatusHistory[]
   previousAdultChildTransitions AdultChildTransition[]      @relation("AdultTransitionPreviousDonor")
   newAdultChildTransitions      AdultChildTransition[]      @relation("AdultTransitionNewDonor")
+  surveyMemberAccesses          SurveyMemberAccess[]
+  surveyMemberRequests          SurveyMemberRequest[]
 
   @@index([registrationNumber])
   @@index([legacyMemberDetailKey])
@@ -611,12 +613,19 @@ model Survey {
   templateKey String           @default("DONOR_JOURNEY")
   questions   Json?
   isActive    Boolean          @default(true)
+  isDraft     Boolean          @default(true)
+  thankYouMessage String?
+  notificationEmail String?
+  maxResponses Int?
+  identityMode String          @default("REQUIRED")
   startsAt    DateTime?
   endsAt      DateTime?
   createdById String
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   responses   SurveyResponse[]
+  memberAccesses SurveyMemberAccess[]
+  memberRequests SurveyMemberRequest[]
 
   @@index([isActive])
   @@index([startsAt])
@@ -637,10 +646,60 @@ model SurveyResponse {
   userAgent       String?
   survey          Survey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   donationPayment DonationPayment?
+  documents       SurveyResponseDocument[]
 
   @@index([surveyId])
   @@index([email])
   @@index([submittedAt])
+}
+
+model SurveyResponseDocument {
+  id               String         @id @default(cuid())
+  surveyResponseId String
+  questionId       String
+  filename         String
+  contentType      String
+  fileSize         Int
+  data             Bytes
+  uploadedAt       DateTime       @default(now())
+  surveyResponse   SurveyResponse @relation(fields: [surveyResponseId], references: [id], onDelete: Cascade)
+
+  @@index([surveyResponseId])
+  @@index([questionId])
+}
+
+model SurveyMemberAccess {
+  id             String       @id @default(cuid())
+  surveyId       String
+  donorProfileId String
+  codeHash       String
+  tokenHash      String?
+  expiresAt      DateTime
+  verifiedAt     DateTime?
+  attempts       Int          @default(0)
+  createdAt      DateTime     @default(now())
+  survey         Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  donorProfile   DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@index([donorProfileId])
+  @@index([expiresAt])
+}
+
+model SurveyMemberRequest {
+  id                   String       @id @default(cuid())
+  surveyId             String
+  donorProfileId       String
+  requestType          String
+  requestedAmountCents Int?
+  status               String       @default("PENDING")
+  createdAt            DateTime     @default(now())
+  survey               Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  donorProfile         DonorProfile @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@index([donorProfileId])
+  @@index([status])
 }
 
 model DonationPayment {

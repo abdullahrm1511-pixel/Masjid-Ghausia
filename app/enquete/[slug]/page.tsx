@@ -11,10 +11,11 @@ export const metadata: Metadata = { title: "Enquete", description: "Enquete van 
 
 export default async function PublicSurveyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const survey = await prisma.survey.findUnique({ where: { slug }, select: { id: true, title: true, description: true, templateKey: true, questions: true, isActive: true, startsAt: true, endsAt: true } });
+  const survey = await prisma.survey.findUnique({ where: { slug }, select: { id: true, title: true, description: true, templateKey: true, questions: true, identityMode: true, isActive: true, isDraft: true, startsAt: true, endsAt: true, maxResponses: true, _count: { select: { responses: true } } } });
   if (!survey) notFound();
   const availability = surveyAvailability(survey);
-  if (availability !== "open") return <main className="survey-page"><section className="survey-card survey-finished"><p className="donor-eyebrow">Enquete niet beschikbaar</p><h1>{availability === "scheduled" ? "Deze enquete is nog niet geopend" : "Deze enquete is gesloten"}</h1><p>{availability === "scheduled" ? "Kom op een later moment terug via dezelfde link." : "Bedankt voor uw interesse."}</p></section></main>;
+  const limitReached = survey.maxResponses !== null && survey._count.responses >= survey.maxResponses;
+  if (availability !== "open" || limitReached) return <main className="survey-page"><section className="survey-card survey-finished"><p className="donor-eyebrow">Enquête niet beschikbaar</p><h1>{availability === "scheduled" ? "Deze enquête is nog niet geopend" : availability === "draft" ? "Deze enquête is nog niet gepubliceerd" : "Deze enquête is gesloten"}</h1><p>{availability === "scheduled" ? "Kom op een later moment terug via dezelfde link." : "Bedankt voor uw interesse."}</p></section></main>;
   if (survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY) return <main className="survey-page"><DynamicSurveyForm survey={{ ...survey, questions: parseSurveyQuestions(survey.questions) }} /></main>;
   return <main className="survey-page"><SurveyForm settings={parseFixedSurveySettings(survey.questions)} survey={survey} /></main>;
 }
