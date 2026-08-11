@@ -50,13 +50,13 @@ const oneTimeSchema = z.object({
   if (!Number.isFinite(amount) || amount < 1 || amount > 100000) ctx.addIssue({ code: "custom", path: ["oneTimeAmount"], message: "Kies een bedrag vanaf € 1." });
 });
 
-async function notifySurveyOwner(survey: { id: string; title: string; notificationEmail: string | null }, responseId: string) {
+async function notifySurveyOwner(survey: { id: string; title: string; notificationEmail: string | null }, entityId: string, entityType = "SurveyResponse") {
   if (!survey.notificationEmail) return;
   await prepareEmailLog({
     templateKey: "ADMIN_NOTIFICATION",
     recipient: survey.notificationEmail,
-    entityType: "SurveyResponse",
-    entityId: responseId,
+    entityType,
+    entityId,
     data: {
       naam: "beheerder",
       organisatie: "St. GBC Masjid Ghausia",
@@ -121,11 +121,8 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     if (!challenge || !person || !["CONFIRM", "INCREASE", "CANCEL"].includes(requestType)) return { success: false, message: "Uw beveiligde sessie is verlopen. Begin opnieuw." };
     const amount = requestType === "INCREASE" ? Number(String(formData.get("requestedAmount") ?? "").replace(",", ".")) : null;
     if (requestType === "INCREASE" && (!Number.isFinite(amount) || Number(amount) < 1 || Number(amount) > 10000)) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Vul een geldig nieuw maandbedrag in." };
-    const response = await prisma.$transaction(async (tx) => {
-      if (requestType !== "CONFIRM") await tx.surveyMemberRequest.create({ data: { surveyId: survey.id, donorProfileId: challenge.donorProfileId, surveyDonorId: challenge.surveyDonorId, requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } });
-      return tx.surveyResponse.create({ data: { surveyId: survey.id, firstName: person.firstName, lastName: person.lastName, phone: person.phone, email: person.email, answers: { isExistingDonor: true, memberAction: requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } } });
-    });
-    await notifySurveyOwner(survey, response.id);
+    const request = requestType === "CONFIRM" ? null : await prisma.surveyMemberRequest.create({ data: { surveyId: survey.id, donorProfileId: challenge.donorProfileId, surveyDonorId: challenge.surveyDonorId, requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } });
+    if (request) await notifySurveyOwner(survey, request.id, "SurveyMemberRequest");
     return { success: true, message: survey.thankYouMessage || (requestType === "CANCEL" ? "Uw verzoek tot beëindiging is ontvangen en wordt door een beheerder gecontroleerd." : requestType === "INCREASE" ? "Uw verzoek om het maandbedrag te verhogen is ontvangen. Er is nog niets automatisch gewijzigd." : "Dank voor uw bevestiging.") };
   }
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";

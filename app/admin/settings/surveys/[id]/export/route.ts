@@ -18,7 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const questions = parseSurveyQuestions(survey.questions);
   const dynamic = survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY;
   const headers = dynamic ? ["Datum", "Voornaam", "Achternaam", "Telefoon", "E-mail", ...questions.map((question) => question.title), "Bestanden"] : ["Datum", "Voornaam", "Achternaam", "Telefoon", "E-mail", "Antwoorden", "Betaalstatus"];
-  const rows = survey.responses.map((response) => {
+  const responses = survey.responses.filter((response) => !(response.answers && typeof response.answers === "object" && !Array.isArray(response.answers) && "memberAction" in response.answers));
+  const rows = responses.map((response) => {
     const answers = response.answers as Record<string, unknown>;
     return dynamic
       ? [response.submittedAt.toISOString(), response.firstName, response.lastName, response.phone, response.email, ...questions.map((question) => answers[question.id]), response.documents.map((document) => document.filename).join("; ")]
