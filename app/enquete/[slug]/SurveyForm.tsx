@@ -2,60 +2,42 @@
 
 import { useActionState, useState } from "react";
 import { submitSurvey, type SurveyState } from "./actions";
+import type { FixedSurveySettings } from "@/lib/survey";
 
 const initialState: SurveyState = { success: false, message: "" };
 function Choice({ name, value, label, onChange }: { name: string; value: string; label: string; onChange: () => void }) {
   return <label className="survey-choice"><input name={name} onChange={onChange} required type="radio" value={value} /><span>{label}</span></label>;
 }
+function donationSubject(title: string) { return title.replace(/^donatie\s+(voor\s+)?/i, "").trim() || title; }
 
-function donationSubject(title: string) {
-  return title.replace(/^donatie\s+(voor\s+)?/i, "").trim() || title;
-}
-
-export function SurveyForm({ survey }: { survey: { id: string; title: string; description: string | null; templateKey: string } }) {
+export function SurveyForm({ survey, settings }: { survey: { id: string; title: string; description: string | null; templateKey: string }; settings: FixedSurveySettings }) {
   const [state, action, pending] = useActionState(submitSurvey, initialState);
   const [existing, setExisting] = useState<"yes" | "no" | null>(null);
   const [join, setJoin] = useState<"yes" | "no" | null>(null);
   const [monthly, setMonthly] = useState<"yes" | "no" | null>(null);
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
-  if (state.success) return <section className="survey-card survey-finished" aria-live="polite"><div className="survey-check">✓</div><p className="donor-eyebrow">Enquete afgerond</p><h1>Hartelijk dank</h1><p>{state.message}</p></section>;
+  if (state.success) return <section className="survey-card survey-finished" aria-live="polite"><div className="survey-check">✓</div><p className="donor-eyebrow">Enquête afgerond</p><h1>Hartelijk dank</h1><p>{state.message}</p></section>;
   const error = (name: string) => state.errors?.[name] ? <p className="survey-error">{state.errors[name]}</p> : null;
   const canSubmit = isOneTime || existing === "yes" || join === "no" || monthly !== null;
 
-  return (
-    <form action={action} className="survey-card">
-      <input name="surveyId" type="hidden" value={survey.id} />
-      <div className="survey-heading"><p className="donor-eyebrow">Enquete van Masjid Ghausia</p><h1>{survey.title}</h1><p>{survey.description || (isOneTime ? "Via dit formulier kunt u uw eenmalige donatie doorgeven." : "Met uw antwoorden kunnen wij onze donateursadministratie verbeteren. Invullen duurt ongeveer 2 minuten.")}</p></div>
-      {!isOneTime ? <fieldset className="survey-section">
-        <legend>Uw gegevens</legend>
-        <div className="survey-grid">
-          <label>Voornaam<input autoComplete="given-name" maxLength={60} name="firstName" pattern="[A-Za-zÀ-ÖØ-öø-ÿĀ-ž' -]+" required title="Gebruik alleen letters, spaties, apostrofs en streepjes." /></label>
-          <label>Achternaam<input autoComplete="family-name" maxLength={60} name="lastName" pattern="[A-Za-zÀ-ÖØ-öø-ÿĀ-ž' -]+" required title="Gebruik alleen letters, spaties, apostrofs en streepjes." /></label>
-          <label>Mobiel nummer<input autoComplete="tel" inputMode="tel" maxLength={20} name="phone" pattern="\+?[0-9() .-]{8,20}" required title="Gebruik 8 tot maximaal 15 cijfers; spaties, haakjes, + en streepjes zijn toegestaan." type="tel" /></label>
-          <label>E-mailadres<input autoComplete="email" maxLength={200} name="email" required type="email" /></label>
-        </div>
-        {error("firstName")}{error("lastName")}{error("phone")}{error("email")}
-      </fieldset> : null}
+  return <form action={action} className="survey-card">
+    <input name="surveyId" type="hidden" value={survey.id} />
+    <div className="survey-heading"><p className="donor-eyebrow">Enquête van Masjid Ghausia</p><h1>{survey.title}</h1><p>{survey.description || (isOneTime ? "Via dit formulier kunt u uw eenmalige donatie doorgeven." : "Met uw antwoorden kunnen wij onze donateursadministratie verbeteren.")}</p></div>
+    {!isOneTime ? <fieldset className="survey-section"><legend>{settings.contactHeading}</legend><div className="survey-grid">
+      <label>{settings.firstNameLabel}<input autoComplete="given-name" maxLength={60} name="firstName" pattern="[A-Za-zÀ-ÖØ-öø-ÿĀ-ž' -]+" required /></label>
+      <label>{settings.lastNameLabel}<input autoComplete="family-name" maxLength={60} name="lastName" pattern="[A-Za-zÀ-ÖØ-öø-ÿĀ-ž' -]+" required /></label>
+      <label>{settings.phoneLabel}<input autoComplete="tel" inputMode="tel" maxLength={20} name="phone" pattern="\+?[0-9() .-]{8,20}" required type="tel" /></label>
+      <label>{settings.emailLabel}<input autoComplete="email" maxLength={200} name="email" required type="email" /></label>
+    </div>{error("firstName")}{error("lastName")}{error("phone")}{error("email")}</fieldset> : null}
 
-      {isOneTime ? (
-        <fieldset className="survey-section">
-          <legend>Eenmalige donatie voor {donationSubject(survey.title)}</legend>
-          <div className="survey-grid">
-            <label>Naam<input autoComplete="name" maxLength={120} name="fullName" required /></label>
-            <label>Bedrag (€)<input inputMode="decimal" min="1" max="100000" name="oneTimeAmount" placeholder="Bijvoorbeeld 25,00" required step="0.01" type="number" /></label>
-          </div>
-          {error("fullName")}{error("oneTimeAmount")}
-        </fieldset>
-      ) : (
-        <>
-          <fieldset className="survey-section"><legend><span>1</span> Bent u al donateur bij Masjid Ghausia?</legend><div className="survey-choices"><Choice label="Ja" name="isExistingDonor" onChange={() => { setExisting("yes"); setJoin(null); setMonthly(null); }} value="yes" /><Choice label="Nee" name="isExistingDonor" onChange={() => { setExisting("no"); setJoin(null); setMonthly(null); }} value="no" /></div>{existing === "yes" ? <p className="survey-note">Dank voor uw bevestiging. Dit is de laatste vraag; u kunt uw antwoord verzenden.</p> : null}{error("isExistingDonor")}</fieldset>
-          {existing === "no" ? <fieldset className="survey-section survey-reveal"><legend><span>2</span> Wilt u donateur worden van Masjid Ghausia?</legend><div className="survey-choices"><Choice label="Ja, ik wil donateur worden" name="wantsToBecomeDonor" onChange={() => { setJoin("yes"); setMonthly(null); }} value="yes" /><Choice label="Nee, op dit moment niet" name="wantsToBecomeDonor" onChange={() => { setJoin("no"); setMonthly(null); }} value="no" /></div>{join === "no" ? <p className="survey-note">Dank voor uw tijd. Dit is de laatste vraag; u kunt uw antwoord verzenden.</p> : null}{error("wantsToBecomeDonor")}</fieldset> : null}
-          {existing === "no" && join === "yes" ? <fieldset className="survey-section survey-reveal"><legend><span>3</span> Wilt u Masjid Ghausia steunen met een maandelijkse donatie?</legend><div className="survey-choices"><Choice label="Ja" name="wantsMonthlyDonation" onChange={() => setMonthly("yes")} value="yes" /><Choice label="Nee" name="wantsMonthlyDonation" onChange={() => setMonthly("no")} value="no" /></div>{error("wantsMonthlyDonation")}{monthly === "yes" ? <div className="survey-mandate survey-reveal"><label>Zelfgekozen bedrag per maand (€)<input inputMode="decimal" min="1" name="monthlyAmount" placeholder="Bijvoorbeeld 10,00" required step="0.01" type="number" /></label>{error("monthlyAmount")}<label className="survey-consent"><input name="directDebitConsent" required type="checkbox" /><span>Ik geef toestemming om na het afronden van de beveiligde machtigingsstap het gekozen bedrag maandelijks automatisch te laten afschrijven. Tot die definitieve machtiging is afgerond, wordt er niets afgeschreven.</span></label>{error("directDebitConsent")}</div> : monthly === "no" ? <p className="survey-note">Geen probleem. U kunt uw antwoord nu verzenden.</p> : null}</fieldset> : null}
-        </>
-      )}
-      {state.message ? <p className="survey-error" role="alert">{state.message}</p> : null}
-      {canSubmit ? <button className="donor-submit-button survey-submit" disabled={pending} type="submit">{pending ? (isOneTime ? "Betaalpagina openen..." : "Antwoorden verzenden...") : (isOneTime ? "Verder naar veilig betalen" : "Antwoorden verzenden")}</button> : null}
-      <p className="survey-privacy">{isOneTime ? "U wordt doorgestuurd naar de beveiligde betaalomgeving van Mollie." : "Uw gegevens worden alleen gebruikt voor deze enquete en de opvolging daarvan."}</p>
-    </form>
-  );
+    {isOneTime ? <fieldset className="survey-section"><legend>{settings.oneTimeHeading} voor {donationSubject(survey.title)}</legend><div className="survey-grid"><label>{settings.oneTimeNameLabel}<input autoComplete="name" maxLength={120} name="fullName" required /></label><label>{settings.oneTimeAmountLabel}<input inputMode="decimal" max="100000" min="1" name="oneTimeAmount" placeholder={settings.oneTimeAmountPlaceholder} required step="0.01" type="number" /></label></div>{error("fullName")}{error("oneTimeAmount")}</fieldset>
+    : <>
+      <fieldset className="survey-section"><legend><span>1</span> {settings.question1}</legend><div className="survey-choices"><Choice label={settings.yesLabel} name="isExistingDonor" onChange={() => { setExisting("yes"); setJoin(null); setMonthly(null); }} value="yes" /><Choice label={settings.noLabel} name="isExistingDonor" onChange={() => { setExisting("no"); setJoin(null); setMonthly(null); }} value="no" /></div>{existing === "yes" ? <p className="survey-note">{settings.existingDonorNote}</p> : null}{error("isExistingDonor")}</fieldset>
+      {existing === "no" ? <fieldset className="survey-section survey-reveal"><legend><span>2</span> {settings.question2}</legend><div className="survey-choices"><Choice label={settings.joinYesLabel} name="wantsToBecomeDonor" onChange={() => { setJoin("yes"); setMonthly(null); }} value="yes" /><Choice label={settings.joinNoLabel} name="wantsToBecomeDonor" onChange={() => { setJoin("no"); setMonthly(null); }} value="no" /></div>{join === "no" ? <p className="survey-note">{settings.noMembershipNote}</p> : null}{error("wantsToBecomeDonor")}</fieldset> : null}
+      {existing === "no" && join === "yes" ? <fieldset className="survey-section survey-reveal"><legend><span>3</span> {settings.question3}</legend><div className="survey-choices"><Choice label={settings.yesLabel} name="wantsMonthlyDonation" onChange={() => setMonthly("yes")} value="yes" /><Choice label={settings.noLabel} name="wantsMonthlyDonation" onChange={() => setMonthly("no")} value="no" /></div>{error("wantsMonthlyDonation")}{monthly === "yes" ? <div className="survey-mandate survey-reveal"><label>{settings.monthlyAmountLabel}<input inputMode="decimal" min="1" name="monthlyAmount" placeholder="Bijvoorbeeld 10,00" required step="0.01" type="number" /></label>{error("monthlyAmount")}<label className="survey-consent"><input name="directDebitConsent" required type="checkbox" /><span>{settings.consentText}</span></label>{error("directDebitConsent")}</div> : monthly === "no" ? <p className="survey-note">{settings.monthlyNoNote}</p> : null}</fieldset> : null}
+    </>}
+    {state.message ? <p className="survey-error" role="alert">{state.message}</p> : null}
+    {canSubmit ? <button className="donor-submit-button survey-submit" disabled={pending} type="submit">{pending ? (isOneTime ? "Betaalpagina openen..." : "Antwoorden verzenden...") : isOneTime ? settings.oneTimeSubmitLabel : settings.submitLabel}</button> : null}
+    <p className="survey-privacy">{settings.privacyText}</p>
+  </form>;
 }

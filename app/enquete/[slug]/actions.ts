@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { prepareEmailLog } from "@/lib/email/templates";
-import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
+import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, visibleSurveyQuestions, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
 import { createMolliePayment } from "@/lib/mollie";
 
@@ -59,12 +59,16 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
   if (survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY) {
     const questions = parseSurveyQuestions(survey.questions);
+    const submittedAnswers: Record<string, string | string[]> = {};
+    for (const question of questions) {
+      const values = formData.getAll(`answer_${question.id}`).map((value) => String(value).trim()).filter(Boolean);
+      submittedAnswers[question.id] = question.type === "CHECKBOXES" ? values : (values[0] ?? "");
+    }
+    const visibleQuestions = visibleSurveyQuestions(questions, submittedAnswers);
     const answers: Record<string, string | string[]> = {};
     const errors: Record<string, string> = {};
-    for (const question of questions) {
-      const fieldName = `answer_${question.id}`;
-      const values = formData.getAll(fieldName).map((value) => String(value).trim()).filter(Boolean);
-      const answer: string | string[] = question.type === "CHECKBOXES" ? values : (values[0] ?? "");
+    for (const question of visibleQuestions) {
+      const answer = submittedAnswers[question.id];
       const empty = Array.isArray(answer) ? answer.length === 0 : !answer;
       if (question.required && empty) errors[question.id] = "Deze vraag is verplicht.";
       if (!empty && question.type === "EMAIL" && !z.string().email().safeParse(answer).success) errors[question.id] = "Vul een geldig e-mailadres in.";

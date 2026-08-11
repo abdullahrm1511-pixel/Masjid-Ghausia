@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { canManageSettings } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { createSurveySlug, CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions } from "@/lib/survey";
+import { createSurveySlug, CUSTOM_SURVEY_TEMPLATE_KEY, parseFixedSurveySettings, parseSurveyQuestions } from "@/lib/survey";
 import { writeAuditLog } from "@/lib/audit";
 
 async function requireSettingsAdmin() {
@@ -54,6 +54,18 @@ export async function updateSurveyQuestions(formData: FormData) {
   if (questions.some((question) => ["MULTIPLE_CHOICE", "CHECKBOXES", "DROPDOWN"].includes(question.type) && !question.options?.length)) throw new Error("Iedere keuzevraag moet minimaal één antwoordoptie hebben");
   await prisma.survey.update({ where: { id }, data: { questions } });
   await writeAuditLog({ actorId: adminId, action: "UPDATE", entityType: "Survey", entityId: id, message: `Vragen aangepast: ${survey.title}` });
+  revalidatePath(`/admin/settings/surveys/${id}`);
+  revalidatePath(`/enquete`);
+}
+
+export async function updateFixedSurveySettings(formData: FormData) {
+  const adminId = await requireSettingsAdmin();
+  const id = String(formData.get("id") ?? "");
+  const survey = await prisma.survey.findUnique({ where: { id }, select: { templateKey: true, title: true } });
+  if (!survey || survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY) throw new Error("Dit formulier gebruikt geen vast sjabloon");
+  const settings = parseFixedSurveySettings(Object.fromEntries(formData));
+  await prisma.survey.update({ where: { id }, data: { questions: settings } });
+  await writeAuditLog({ actorId: adminId, action: "UPDATE", entityType: "Survey", entityId: id, message: `Vaste enquêteteksten aangepast: ${survey.title}` });
   revalidatePath(`/admin/settings/surveys/${id}`);
   revalidatePath(`/enquete`);
 }
