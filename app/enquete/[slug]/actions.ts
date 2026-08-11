@@ -18,6 +18,13 @@ const normalizePhone = (value: string) => {
   return digits.startsWith("31") ? `0${digits.slice(2)}` : digits;
 };
 const normalizeName = (value: string) => value.trim().toLocaleLowerCase("nl-NL").replace(/\s+/g, " ");
+function legacyTelephone(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const memberDetails = (value as Record<string, unknown>).memberDetails;
+  if (!memberDetails || typeof memberDetails !== "object" || Array.isArray(memberDetails)) return "";
+  const entry = Object.entries(memberDetails as Record<string, unknown>).find(([key]) => key.replace(/[^a-z]/gi, "").toLowerCase() === "telephone");
+  return typeof entry?.[1] === "string" || typeof entry?.[1] === "number" ? String(entry[1]) : "";
+}
 
 const namePattern = /^[\p{L}\p{M}]+(?:[ '\-][\p{L}\p{M}]+)*$/u;
 const phonePattern = /^\+?[0-9() .-]+$/;
@@ -86,8 +93,23 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const mode = String(formData.get("mode") ?? "");
   if (mode === "VERIFY_EXISTING") {
     const challengeId = String(formData.get("challengeId") ?? "");
-    const code = String(formData.get("verificationCode") ?? "").trim();
     const challenge = await prisma.surveyMemberAccess.findFirst({ where: { id: challengeId, surveyId: survey.id }, include: { donorProfile: { include: { user: true } } } });
+    if (formData.get("intent") === "RESEND_CODE") {
+      if (!challenge || challenge.verifiedAt) return { success: false, message: "Deze verificatie is niet meer geldig. Begin opnieuw." };
+      const sentLogs = await prisma.emailLog.findMany({ where: { entityType: "SurveyMemberAccess", entityId: challenge.id, templateKey: "REGISTRATION_VERIFICATION_CODE" }, orderBy: { createdAt: "desc" }, take: 4, select: { createdAt: true } });
+      if (sentLogs.length >= 4) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "Er zijn al meerdere codes verstuurd. Wacht vijftien minuten en begin daarna opnieuw." };
+      if (sentLogs[0] && Date.now() - sentLogs[0].createdAt.getTime() < 60_000) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "Wacht minimaal één minuut voordat u opnieuw een code aanvraagt." };
+      const newCode = String(randomInt(100000, 1000000));
+      try {
+        await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: challenge.donorProfile.user.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: challenge.donorProfile.firstName, verification_code: newCode }, throwOnSendError: true });
+        await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { codeHash: hashValue(newCode), expiresAt: new Date(Date.now() + 15 * 60 * 1000), attempts: 0 } });
+        return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "Er is een nieuwe verificatiecode verstuurd. De vorige code werkt niet meer." };
+      } catch (error) {
+        console.error("Nieuwe verificatiecode kon niet worden verstuurd", error);
+        return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "De nieuwe code kon niet worden verstuurd. Probeer het later opnieuw." };
+      }
+    }
+    const code = String(formData.get("verificationCode") ?? "").trim();
     if (!challenge || challenge.expiresAt < new Date() || challenge.attempts >= 5 || hashValue(code) !== challenge.codeHash) {
       if (challenge) await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } });
       return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: challenge ? maskEmail(challenge.donorProfile.user.email) : undefined, message: "De code is ongeldig of verlopen." };
@@ -200,13 +222,19 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     const donor = candidate
       && normalizeName(candidate.firstName) === normalizeName(data.firstName)
       && normalizeName(candidate.lastName) === normalizeName(data.lastName)
-      && normalizePhone(candidate.phone) === normalizePhone(data.phone)
+      && normalizePhone(candidate.phone || legacyTelephone(candidate.legacyData)) === normalizePhone(data.phone)
       ? candidate
       : null;
     if (!donor) return { success: false, step: "VERIFY_EXISTING", challengeId: randomBytes(12).toString("base64url"), message: "Als de gegevens bij ons bekend zijn, is een verificatiecode verstuurd." };
     const code = String(randomInt(100000, 1000000));
     const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: donor.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
-    await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: donor.user.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: donor.firstName, verification_code: code } });
+    try {
+      await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: donor.user.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: donor.firstName, verification_code: code }, throwOnSendError: true });
+    } catch (error) {
+      await prisma.surveyMemberAccess.delete({ where: { id: challenge.id } });
+      console.error("Verificatiecode voor bestaande donateur kon niet worden verstuurd", error);
+      return { success: false, message: "De verificatiecode kon niet worden verstuurd. Probeer het later opnieuw of neem contact op met de beheerder." };
+    }
     return { success: false, step: "VERIFY_EXISTING", challengeId: challenge.id, maskedEmail: maskEmail(donor.user.email), message: "Vul de verificatiecode in die naar uw geregistreerde e-mailadres is gestuurd." };
   }
   const wantsToBecomeDonor = isExistingDonor ? null : data.wantsToBecomeDonor === "yes";
