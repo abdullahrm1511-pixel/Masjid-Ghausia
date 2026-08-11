@@ -68,6 +68,15 @@ async function notifySurveyOwner(survey: { id: string; title: string; notificati
   });
 }
 
+function accessIdentity(challenge: {
+  donorProfile: ({ firstName: string; lastName: string; phone: string; user: { email: string } } | null);
+  surveyDonor: ({ firstName: string; lastName: string; phone: string; email: string } | null);
+}) {
+  if (challenge.surveyDonor) return challenge.surveyDonor;
+  if (challenge.donorProfile) return { firstName: challenge.donorProfile.firstName, lastName: challenge.donorProfile.lastName, phone: challenge.donorProfile.phone, email: challenge.donorProfile.user.email };
+  return null;
+}
+
 export async function submitSurvey(_previous: SurveyState, formData: FormData): Promise<SurveyState> {
   const raw = Object.fromEntries(formData);
   const surveyId = String(formData.get("surveyId") ?? "");
@@ -77,42 +86,44 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const mode = String(formData.get("mode") ?? "");
   if (mode === "VERIFY_EXISTING") {
     const challengeId = String(formData.get("challengeId") ?? "");
-    const challenge = await prisma.surveyMemberAccess.findFirst({ where: { id: challengeId, surveyId: survey.id }, include: { donorProfile: { include: { user: true } } } });
+    const challenge = await prisma.surveyMemberAccess.findFirst({ where: { id: challengeId, surveyId: survey.id }, include: { donorProfile: { include: { user: true } }, surveyDonor: true } });
+    const person = challenge ? accessIdentity(challenge) : null;
     if (formData.get("intent") === "RESEND_CODE") {
-      if (!challenge || challenge.verifiedAt) return { success: false, message: "Deze verificatie is niet meer geldig. Begin opnieuw." };
+      if (!challenge || !person || challenge.verifiedAt) return { success: false, message: "Deze verificatie is niet meer geldig. Begin opnieuw." };
       const sentLogs = await prisma.emailLog.findMany({ where: { entityType: "SurveyMemberAccess", entityId: challenge.id, templateKey: "REGISTRATION_VERIFICATION_CODE" }, orderBy: { createdAt: "desc" }, take: 4, select: { createdAt: true } });
-      if (sentLogs.length >= 4) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "Er zijn al meerdere codes verstuurd. Wacht vijftien minuten en begin daarna opnieuw." };
-      if (sentLogs[0] && Date.now() - sentLogs[0].createdAt.getTime() < 60_000) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "Wacht minimaal één minuut voordat u opnieuw een code aanvraagt." };
+      if (sentLogs.length >= 4) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "Er zijn al meerdere codes verstuurd. Wacht vijftien minuten en begin daarna opnieuw." };
+      if (sentLogs[0] && Date.now() - sentLogs[0].createdAt.getTime() < 60_000) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "Wacht minimaal één minuut voordat u opnieuw een code aanvraagt." };
       const newCode = String(randomInt(100000, 1000000));
       try {
-        await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: challenge.donorProfile.user.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: challenge.donorProfile.firstName, verification_code: newCode }, throwOnSendError: true });
+        await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: newCode }, throwOnSendError: true });
         await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { codeHash: hashValue(newCode), expiresAt: new Date(Date.now() + 15 * 60 * 1000), attempts: 0 } });
-        return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "Er is een nieuwe verificatiecode verstuurd. De vorige code werkt niet meer." };
+        return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "Er is een nieuwe verificatiecode verstuurd. De vorige code werkt niet meer." };
       } catch (error) {
         console.error("Nieuwe verificatiecode kon niet worden verstuurd", error);
-        return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(challenge.donorProfile.user.email), message: "De nieuwe code kon niet worden verstuurd. Probeer het later opnieuw." };
+        return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "De nieuwe code kon niet worden verstuurd. Probeer het later opnieuw." };
       }
     }
     const code = String(formData.get("verificationCode") ?? "").trim();
     if (!challenge || challenge.expiresAt < new Date() || challenge.attempts >= 5 || hashValue(code) !== challenge.codeHash) {
       if (challenge) await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } });
-      return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: challenge ? maskEmail(challenge.donorProfile.user.email) : undefined, message: "De code is ongeldig of verlopen." };
+      return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: person ? maskEmail(person.email) : undefined, message: "De code is ongeldig of verlopen." };
     }
     const token = randomBytes(32).toString("base64url");
     await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { verifiedAt: new Date(), tokenHash: hashValue(token) } });
-    return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken: token, message: `Lidmaatschap van ${challenge.donorProfile.firstName} is veilig herkend.` };
+    return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken: token, message: `Donateurschap van ${person?.firstName ?? "u"} is veilig herkend.` };
   }
   if (mode === "MEMBER_REQUEST") {
     const challengeId = String(formData.get("challengeId") ?? "");
     const accessToken = String(formData.get("accessToken") ?? "");
     const requestType = String(formData.get("memberAction") ?? "CONFIRM");
-    const challenge = await prisma.surveyMemberAccess.findFirst({ where: { id: challengeId, surveyId: survey.id, verifiedAt: { not: null }, tokenHash: hashValue(accessToken), expiresAt: { gt: new Date() } }, include: { donorProfile: { include: { user: true } } } });
-    if (!challenge || !["CONFIRM", "INCREASE", "CANCEL"].includes(requestType)) return { success: false, message: "Uw beveiligde sessie is verlopen. Begin opnieuw." };
+    const challenge = await prisma.surveyMemberAccess.findFirst({ where: { id: challengeId, surveyId: survey.id, verifiedAt: { not: null }, tokenHash: hashValue(accessToken), expiresAt: { gt: new Date() } }, include: { donorProfile: { include: { user: true } }, surveyDonor: true } });
+    const person = challenge ? accessIdentity(challenge) : null;
+    if (!challenge || !person || !["CONFIRM", "INCREASE", "CANCEL"].includes(requestType)) return { success: false, message: "Uw beveiligde sessie is verlopen. Begin opnieuw." };
     const amount = requestType === "INCREASE" ? Number(String(formData.get("requestedAmount") ?? "").replace(",", ".")) : null;
     if (requestType === "INCREASE" && (!Number.isFinite(amount) || Number(amount) < 1 || Number(amount) > 10000)) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Vul een geldig nieuw maandbedrag in." };
     const response = await prisma.$transaction(async (tx) => {
-      if (requestType !== "CONFIRM") await tx.surveyMemberRequest.create({ data: { surveyId: survey.id, donorProfileId: challenge.donorProfileId, requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } });
-      return tx.surveyResponse.create({ data: { surveyId: survey.id, firstName: challenge.donorProfile.firstName, lastName: challenge.donorProfile.lastName, phone: challenge.donorProfile.phone, email: challenge.donorProfile.user.email, answers: { isExistingDonor: true, memberAction: requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } } });
+      if (requestType !== "CONFIRM") await tx.surveyMemberRequest.create({ data: { surveyId: survey.id, donorProfileId: challenge.donorProfileId, surveyDonorId: challenge.surveyDonorId, requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } });
+      return tx.surveyResponse.create({ data: { surveyId: survey.id, firstName: person.firstName, lastName: person.lastName, phone: person.phone, email: person.email, answers: { isExistingDonor: true, memberAction: requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } } });
     });
     await notifySurveyOwner(survey, response.id);
     return { success: true, message: survey.thankYouMessage || (requestType === "CANCEL" ? "Uw verzoek tot beëindiging is ontvangen en wordt door een beheerder gecontroleerd." : requestType === "INCREASE" ? "Uw verzoek om het maandbedrag te verhogen is ontvangen. Er is nog niets automatisch gewijzigd." : "Dank voor uw bevestiging.") };
@@ -195,27 +206,37 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const common = { surveyId: survey.id, firstName: data.firstName, lastName: data.lastName, phone: data.phone, email: data.email.toLowerCase(), ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") };
   const isExistingDonor = data.isExistingDonor === "yes";
   if (isExistingDonor) {
+    const surveyDonor = await prisma.surveyDonor.findUnique({ where: { email: data.email.toLowerCase() } });
     const donor = await prisma.donorProfile.findFirst({
       where: { user: { email: data.email.toLowerCase(), isActive: true } },
       include: { user: true }
     });
-    if (!donor) return { success: false, step: "VERIFY_EXISTING", challengeId: randomBytes(12).toString("base64url"), message: "Als de gegevens bij ons bekend zijn, is een verificatiecode verstuurd." };
+    if (!surveyDonor && !donor) return { success: false, step: "VERIFY_EXISTING", challengeId: randomBytes(12).toString("base64url"), message: "Als de gegevens bij ons bekend zijn, is een verificatiecode verstuurd." };
+    const person = surveyDonor ?? { firstName: donor!.firstName, lastName: donor!.lastName, phone: donor!.phone, email: donor!.user.email };
     const code = String(randomInt(100000, 1000000));
-    const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: donor.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
+    const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: donor?.id, surveyDonorId: surveyDonor?.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
     try {
-      await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: donor.user.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: donor.firstName, verification_code: code }, throwOnSendError: true });
+      await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: code }, throwOnSendError: true });
     } catch (error) {
       await prisma.surveyMemberAccess.delete({ where: { id: challenge.id } });
       console.error("Verificatiecode voor bestaande donateur kon niet worden verstuurd", error);
       return { success: false, message: "De verificatiecode kon niet worden verstuurd. Probeer het later opnieuw of neem contact op met de beheerder." };
     }
-    return { success: false, step: "VERIFY_EXISTING", challengeId: challenge.id, maskedEmail: maskEmail(donor.user.email), message: "Vul de verificatiecode in die naar uw geregistreerde e-mailadres is gestuurd." };
+    return { success: false, step: "VERIFY_EXISTING", challengeId: challenge.id, maskedEmail: maskEmail(person.email), message: "Vul de verificatiecode in die naar uw geregistreerde e-mailadres is gestuurd." };
   }
   const wantsToBecomeDonor = isExistingDonor ? null : data.wantsToBecomeDonor === "yes";
   const wantsMonthlyDonation = wantsToBecomeDonor === true ? true : null;
   const amount = wantsMonthlyDonation ? Number(String(data.monthlyAmount).replace(",", ".")) : null;
   const answers: DonorSurveyAnswers = { isExistingDonor, wantsToBecomeDonor, wantsMonthlyDonation, monthlyAmountCents: amount === null ? null : Math.round(amount * 100), directDebitConsent: wantsMonthlyDonation === true && data.directDebitConsent === "on" };
-  const response = await prisma.surveyResponse.create({ data: { ...common, answers } });
+  const response = await prisma.$transaction(async (tx) => {
+    const created = await tx.surveyResponse.create({ data: { ...common, answers } });
+    if (wantsToBecomeDonor) await tx.surveyDonor.upsert({
+      where: { email: common.email },
+      update: { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" },
+      create: { email: common.email, firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" }
+    });
+    return created;
+  });
   await notifySurveyOwner(survey, response.id);
   const templateKey = isExistingDonor ? "SURVEY_EXISTING_DONOR_CONFIRMED" : wantsToBecomeDonor ? "SURVEY_MEMBERSHIP_INTEREST" : "SURVEY_NO_MEMBERSHIP";
   await prepareEmailLog({ templateKey, recipient: common.email, entityType: "SurveyResponse", entityId: response.id, data: { naam: `${common.firstName} ${common.lastName}` } });

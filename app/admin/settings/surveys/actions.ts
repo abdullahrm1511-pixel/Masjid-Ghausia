@@ -145,7 +145,13 @@ export async function updateSurveyMemberRequest(formData: FormData) {
   const status = formData.get("decision") === "APPROVE" ? "APPROVED_MANUAL_ACTION_REQUIRED" : "REJECTED";
   const request = await prisma.surveyMemberRequest.findFirst({ where: { id: requestId, surveyId } });
   if (!request) return;
-  await prisma.surveyMemberRequest.update({ where: { id: request.id }, data: { status } });
+  await prisma.$transaction(async (tx) => {
+    await tx.surveyMemberRequest.update({ where: { id: request.id }, data: { status } });
+    if (status.startsWith("APPROVED") && request.surveyDonorId) {
+      if (request.requestType === "INCREASE" && request.requestedAmountCents) await tx.surveyDonor.update({ where: { id: request.surveyDonorId }, data: { monthlyAmountCents: request.requestedAmountCents } });
+      if (request.requestType === "CANCEL") await tx.surveyDonor.update({ where: { id: request.surveyDonorId }, data: { status: "CANCELLED" } });
+    }
+  });
   await writeAuditLog({ actorId: adminId, action: status.startsWith("APPROVED") ? "APPROVE" : "REJECT", entityType: "SurveyMemberRequest", entityId: request.id, message: status.startsWith("APPROVED") ? "Ledenverzoek goedgekeurd; handmatige/Mollie-verwerking vereist" : "Ledenverzoek afgewezen", metadata: { surveyId, requestType: request.requestType } });
   revalidatePath(`/admin/settings/surveys/${surveyId}`);
 }
