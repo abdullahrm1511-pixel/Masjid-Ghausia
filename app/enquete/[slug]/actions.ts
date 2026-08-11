@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { prepareEmailLog } from "@/lib/email/templates";
-import { surveyAvailability, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
+import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
 import { createMolliePayment } from "@/lib/mollie";
 
@@ -57,6 +57,33 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const survey = await prisma.survey.findUnique({ where: { id: surveyId } });
   if (!survey || surveyAvailability(survey) !== "open") return { success: false, message: "Deze enquete is niet meer beschikbaar." };
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
+  if (survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY) {
+    const questions = parseSurveyQuestions(survey.questions);
+    const answers: Record<string, string | string[]> = {};
+    const errors: Record<string, string> = {};
+    for (const question of questions) {
+      const fieldName = `answer_${question.id}`;
+      const values = formData.getAll(fieldName).map((value) => String(value).trim()).filter(Boolean);
+      const answer: string | string[] = question.type === "CHECKBOXES" ? values : (values[0] ?? "");
+      const empty = Array.isArray(answer) ? answer.length === 0 : !answer;
+      if (question.required && empty) errors[question.id] = "Deze vraag is verplicht.";
+      if (!empty && question.type === "EMAIL" && !z.string().email().safeParse(answer).success) errors[question.id] = "Vul een geldig e-mailadres in.";
+      if (!empty && question.type === "PHONE") {
+        const phone = String(answer);
+        const digits = phone.replace(/\D/g, "").length;
+        if (!phonePattern.test(phone) || digits < 8 || digits > 15) errors[question.id] = "Vul een geldig telefoonnummer in.";
+      }
+      if (!empty && question.type === "NUMBER" && !Number.isFinite(Number(answer))) errors[question.id] = "Vul een geldig getal in.";
+      if (!empty && ["MULTIPLE_CHOICE", "DROPDOWN"].includes(question.type) && !question.options?.includes(String(answer))) errors[question.id] = "Kies een geldig antwoord.";
+      if (!empty && question.type === "CHECKBOXES" && (answer as string[]).some((value) => !question.options?.includes(value))) errors[question.id] = "Kies alleen geldige antwoorden.";
+      if (!empty && question.type === "YES_NO" && !["Ja", "Nee"].includes(String(answer))) errors[question.id] = "Kies ja of nee.";
+      answers[question.id] = answer;
+    }
+    if (Object.keys(errors).length) return { success: false, message: "Controleer de gemarkeerde antwoorden.", errors };
+    const requestHeaders = await headers();
+    await prisma.surveyResponse.create({ data: { surveyId: survey.id, firstName: "", lastName: "", phone: "", email: "", answers, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") } });
+    return { success: true, message: "Uw antwoorden zijn ontvangen." };
+  }
   const parsed = (isOneTime ? oneTimeSchema : donorSchema).safeParse(raw);
   if (!parsed.success) return { success: false, message: "Controleer de gemarkeerde antwoorden.", errors: Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])) };
   const requestHeaders = await headers();

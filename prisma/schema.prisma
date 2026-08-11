@@ -609,6 +609,7 @@ model Survey {
   title       String
   description String?
   templateKey String           @default("DONOR_JOURNEY")
+  questions   Json?
   isActive    Boolean          @default(true)
   startsAt    DateTime?
   endsAt      DateTime?
