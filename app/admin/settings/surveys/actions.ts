@@ -7,6 +7,9 @@ import { canManageSettings } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { createSurveySlug, CUSTOM_SURVEY_TEMPLATE_KEY, parseFixedSurveySettings, parseSurveyQuestions } from "@/lib/survey";
 import { writeAuditLog } from "@/lib/audit";
+import { compare } from "bcryptjs";
+
+export type DeleteSurveyState = { error: string };
 
 async function requireSettingsAdmin() {
   const session = await auth();
@@ -109,12 +112,16 @@ export async function updateSurvey(formData: FormData) {
   revalidatePath("/admin/settings/surveys");
 }
 
-export async function deleteSurvey(formData: FormData) {
-  const adminId = await requireSettingsAdmin();
+export async function deleteSurvey(_previous: DeleteSurveyState, formData: FormData): Promise<DeleteSurveyState> {
+  const session = await auth();
+  if (!session?.user.id || session.user.role !== "SUPER_ADMIN") return { error: "Alleen een superadmin kan een enquête verwijderen." };
+  const adminId = session.user.id;
   const id = String(formData.get("id") ?? "");
+  const password = String(formData.get("superAdminPassword") ?? "");
+  const superAdmin = await prisma.user.findFirst({ where: { id: adminId, role: "SUPER_ADMIN", isActive: true }, select: { passwordHash: true } });
+  if (!superAdmin?.passwordHash || !password || !(await compare(password, superAdmin.passwordHash))) return { error: "Het superadmin-wachtwoord is onjuist." };
   const survey = await prisma.survey.findUnique({ where: { id }, select: { title: true, templateKey: true } });
-  if (!survey) return;
-  if (survey.templateKey === "DONOR_JOURNEY") throw new Error("Het permanente lidmaatschapsformulier kan niet worden verwijderd");
+  if (!survey) return { error: "De enquête bestaat niet meer." };
   await prisma.survey.delete({ where: { id } });
   await writeAuditLog({ actorId: adminId, action: "DELETE", entityType: "Survey", entityId: id, message: `Enquete verwijderd: ${survey.title}` });
   redirect("/admin/settings/surveys");

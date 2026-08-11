@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/seo";
 import { formatCurrency, formatDate } from "@/lib/display";
 import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyStatusLabel, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
-import { deleteSurvey, deleteSurveyResponse, updateSurveyMemberRequest, updateSurveyQuestions } from "../actions";
+import { deleteSurveyResponse, updateSurveyMemberRequest, updateSurveyQuestions } from "../actions";
 import { CopySurveyLink, DeleteSurveyButton } from "../SurveyAdminControls";
 import { SurveyQuestionBuilder } from "../SurveyQuestionBuilder";
 import { FixedSurveyEditor } from "../FixedSurveyEditor";
 import { SurveySettingsForm } from "../SurveySettingsForm";
 import { SurveySummary } from "../SurveySummary";
 import { ResponseDeleteButton } from "../ResponseDeleteButton";
+import { auth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 function yesNo(value: boolean | null) { return value === null ? "-" : value ? "Ja" : "Nee"; }
@@ -17,12 +18,12 @@ function answerText(value: unknown) { return Array.isArray(value) ? value.join("
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await auth();
   const survey = await prisma.survey.findUnique({ where: { id }, include: { responses: { orderBy: { submittedAt: "desc" }, include: { donationPayment: true, documents: true } }, memberRequests: { orderBy: { createdAt: "desc" }, include: { donorProfile: { include: { user: true } } } } } });
   if (!survey) notFound();
   const url = absoluteUrl(`/enquete/${survey.slug}`);
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
   const isCustom = survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY;
-  const isPermanent = survey.templateKey === "DONOR_JOURNEY";
   const questions = parseSurveyQuestions(survey.questions);
   const typeLabel = isCustom ? "Zelfgemaakt formulier" : isOneTime ? "Eenmalige donatie" : "Permanent lidmaatschapsformulier";
 
@@ -38,6 +39,6 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
       : isOneTime ? <table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Datum</th><th className="p-3">Naam</th><th className="p-3">Bedrag</th><th className="p-3">Betaalstatus</th><th className="p-3">Actie</th></tr></thead><tbody>{survey.responses.map((response) => { const answers = response.answers as OneTimeDonationAnswers; return <tr className="border-t border-slate-200" key={response.id}><td className="p-3">{formatDate(response.submittedAt)}</td><td className="p-3 font-semibold">{response.firstName || "Anoniem"}</td><td className="p-3">{answers.oneTimeAmountCents === null ? "-" : formatCurrency(answers.oneTimeAmountCents)}</td><td className="p-3 font-semibold">{response.donationPayment?.status ?? "Niet gestart"}</td><td className="p-3"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>
       : <table className="w-full min-w-[1200px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Datum</th><th className="p-3">Persoon</th><th className="p-3">Contact</th><th className="p-3">Al donateur</th><th className="p-3">Wil donateur worden</th><th className="p-3">Maandelijks</th><th className="p-3">Bedrag</th><th className="p-3">Actie</th></tr></thead><tbody>{survey.responses.map((response) => { const answers = response.answers as DonorSurveyAnswers; return <tr className="border-t border-slate-200" key={response.id}><td className="p-3">{formatDate(response.submittedAt)}</td><td className="p-3 font-semibold">{response.firstName} {response.lastName}</td><td className="p-3">{response.email}<br />{response.phone}</td><td className="p-3">{yesNo(answers.isExistingDonor)}</td><td className="p-3">{yesNo(answers.wantsToBecomeDonor)}</td><td className="p-3">{yesNo(answers.wantsMonthlyDonation)}</td><td className="p-3">{answers.monthlyAmountCents === null ? "-" : formatCurrency(answers.monthlyAmountCents)}</td><td className="p-3"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>}
     </div> : <div className="mt-4 rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-600">Er zijn nog geen antwoorden ontvangen.</div>}</section>
-    {!isPermanent ? <form action={deleteSurvey} className="mt-10 border-t border-slate-200 pt-6"><input name="id" type="hidden" value={survey.id} /><DeleteSurveyButton /></form> : <p className="mt-10 border-t border-slate-200 pt-6 text-sm font-semibold text-slate-600">Het permanente lidmaatschapsformulier is beschermd tegen verwijderen.</p>}
+    {session?.user.role === "SUPER_ADMIN" ? <div className="mt-10 border-t border-slate-200 pt-6"><DeleteSurveyButton surveyId={survey.id} /></div> : null}
   </main>;
 }

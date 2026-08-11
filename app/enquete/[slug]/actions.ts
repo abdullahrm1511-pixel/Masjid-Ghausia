@@ -13,6 +13,11 @@ import { createHash, randomBytes, randomInt } from "crypto";
 export type SurveyState = { success: boolean; message: string; errors?: Record<string, string>; step?: "VERIFY_EXISTING" | "EXISTING_OPTIONS"; challengeId?: string; accessToken?: string; maskedEmail?: string };
 const hashValue = (value: string) => createHash("sha256").update(value).digest("hex");
 const maskEmail = (email: string) => { const [name, domain] = email.split("@"); return `${name.slice(0, 2)}***@${domain}`; };
+const normalizePhone = (value: string) => {
+  const digits = value.replace(/\D/g, "").replace(/^00/, "");
+  return digits.startsWith("31") ? `0${digits.slice(2)}` : digits;
+};
+const normalizeName = (value: string) => value.trim().toLocaleLowerCase("nl-NL").replace(/\s+/g, " ");
 
 const namePattern = /^[\p{L}\p{M}]+(?:[ '\-][\p{L}\p{M}]+)*$/u;
 const phonePattern = /^\+?[0-9() .-]+$/;
@@ -191,7 +196,13 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const common = { surveyId: survey.id, firstName: data.firstName, lastName: data.lastName, phone: data.phone, email: data.email.toLowerCase(), ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") };
   const isExistingDonor = data.isExistingDonor === "yes";
   if (isExistingDonor) {
-    const donor = await prisma.donorProfile.findFirst({ where: { OR: [{ user: { email: data.email.toLowerCase() } }, { phone: data.phone }] }, include: { user: true } });
+    const candidate = await prisma.donorProfile.findFirst({ where: { user: { email: data.email.toLowerCase() } }, include: { user: true } });
+    const donor = candidate
+      && normalizeName(candidate.firstName) === normalizeName(data.firstName)
+      && normalizeName(candidate.lastName) === normalizeName(data.lastName)
+      && normalizePhone(candidate.phone) === normalizePhone(data.phone)
+      ? candidate
+      : null;
     if (!donor) return { success: false, step: "VERIFY_EXISTING", challengeId: randomBytes(12).toString("base64url"), message: "Als de gegevens bij ons bekend zijn, is een verificatiecode verstuurd." };
     const code = String(randomInt(100000, 1000000));
     const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: donor.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
