@@ -1,13 +1,11 @@
 "use server";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { prepareEmailLog } from "@/lib/email/templates";
 import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, visibleSurveyQuestions, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
-import { createMolliePayment } from "@/lib/mollie";
 import { createHash, randomBytes, randomInt } from "crypto";
 
 export type SurveyState = { success: boolean; message: string; errors?: Record<string, string>; step?: "VERIFY_EXISTING" | "EXISTING_OPTIONS"; challengeId?: string; accessToken?: string; maskedEmail?: string };
@@ -44,14 +42,12 @@ const donorSchema = z.object({
   ...contactFields,
   isExistingDonor: z.enum(["yes", "no"]),
   wantsToBecomeDonor: z.enum(["yes", "no"]).optional(),
-  wantsMonthlyDonation: z.enum(["yes", "no"]).optional(),
   monthlyAmount: z.string().optional(),
   directDebitConsent: z.string().optional()
 }).superRefine((data, ctx) => {
   validatePhone(data.phone, ctx);
   if (data.isExistingDonor === "no" && !data.wantsToBecomeDonor) ctx.addIssue({ code: "custom", path: ["wantsToBecomeDonor"], message: "Kies ja of nee." });
-  if (data.wantsToBecomeDonor === "yes" && !data.wantsMonthlyDonation) ctx.addIssue({ code: "custom", path: ["wantsMonthlyDonation"], message: "Kies ja of nee." });
-  if (data.wantsMonthlyDonation === "yes") {
+  if (data.wantsToBecomeDonor === "yes") {
     const amount = Number(String(data.monthlyAmount ?? "").replace(",", "."));
     if (!Number.isFinite(amount) || amount < 1 || amount > 10000) ctx.addIssue({ code: "custom", path: ["monthlyAmount"], message: "Kies een bedrag vanaf € 1." });
     if (data.directDebitConsent !== "on") ctx.addIssue({ code: "custom", path: ["directDebitConsent"], message: "Uw toestemming is nodig." });
@@ -204,14 +200,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     const answers: OneTimeDonationAnswers = { wantsOneTimeDonation: true, oneTimeAmountCents: amountCents };
     const response = await prisma.surveyResponse.create({ data: { surveyId: survey.id, firstName: data.fullName, lastName: "", phone: "", email: "", answers, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") } });
     await notifySurveyOwner(survey, response.id);
-    try {
-      const payment = await createMolliePayment({ amountCents, description: `${survey.title} - ${data.fullName}`, responseId: response.id, redirectUrl: absoluteUrl(`/enquete/${survey.slug}/betaling?response=${response.id}`), webhookUrl: absoluteUrl("/api/mollie/webhook") });
-      await prisma.donationPayment.create({ data: { surveyResponseId: response.id, molliePaymentId: payment.id, amountCents, status: payment.status, checkoutUrl: payment.checkoutUrl } });
-      redirect(payment.checkoutUrl);
-    } catch (error) {
-      if (error && typeof error === "object" && "digest" in error) throw error;
-      return { success: false, message: error instanceof Error ? error.message : "De Mollie-betaalpagina kon niet worden geopend. Probeer het opnieuw." };
-    }
+    return { success: true, message: survey.thankYouMessage || "Dank u. Uw naam en donatiebedrag zijn opgeslagen. De online betaling is tijdens deze test tijdelijk uitgeschakeld." };
   }
 
   const data = donorSchema.parse(raw);
@@ -238,7 +227,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     return { success: false, step: "VERIFY_EXISTING", challengeId: challenge.id, maskedEmail: maskEmail(donor.user.email), message: "Vul de verificatiecode in die naar uw geregistreerde e-mailadres is gestuurd." };
   }
   const wantsToBecomeDonor = isExistingDonor ? null : data.wantsToBecomeDonor === "yes";
-  const wantsMonthlyDonation = wantsToBecomeDonor === true ? data.wantsMonthlyDonation === "yes" : null;
+  const wantsMonthlyDonation = wantsToBecomeDonor === true ? true : null;
   const amount = wantsMonthlyDonation ? Number(String(data.monthlyAmount).replace(",", ".")) : null;
   const answers: DonorSurveyAnswers = { isExistingDonor, wantsToBecomeDonor, wantsMonthlyDonation, monthlyAmountCents: amount === null ? null : Math.round(amount * 100), directDebitConsent: wantsMonthlyDonation === true && data.directDebitConsent === "on" };
   const response = await prisma.surveyResponse.create({ data: { ...common, answers } });
