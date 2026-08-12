@@ -11,6 +11,15 @@ import { createHash, randomBytes, randomInt } from "crypto";
 export type SurveyState = { success: boolean; message: string; errors?: Record<string, string>; step?: "VERIFY_EXISTING" | "EXISTING_OPTIONS"; challengeId?: string; accessToken?: string; maskedEmail?: string };
 const hashValue = (value: string) => createHash("sha256").update(value).digest("hex");
 const maskEmail = (email: string) => { const [name, domain] = email.split("@"); return `${name.slice(0, 2)}***@${domain}`; };
+const normalizeIdentityText = (value: string) => value.trim().toLocaleLowerCase("nl-NL").replace(/\s+/g, " ");
+const normalizePhone = (value: string) => value.replace(/\D/g, "").replace(/^00/, "");
+const identityMatches = (
+  submitted: { firstName: string; lastName: string; phone: string; email: string },
+  stored: { firstName: string; lastName: string; phone: string; email: string }
+) => normalizeIdentityText(submitted.firstName) === normalizeIdentityText(stored.firstName)
+  && normalizeIdentityText(submitted.lastName) === normalizeIdentityText(stored.lastName)
+  && normalizePhone(submitted.phone) === normalizePhone(stored.phone)
+  && submitted.email.trim().toLowerCase() === stored.email.trim().toLowerCase();
 
 const namePattern = /^[\p{L}\p{M}]+(?:[ '\-][\p{L}\p{M}]+)*$/u;
 const phonePattern = /^\+?[0-9() .-]+$/;
@@ -208,15 +217,20 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const common = { surveyId: survey.id, firstName: data.firstName, lastName: data.lastName, phone: data.phone, email: data.email.toLowerCase(), ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") };
   const isExistingDonor = data.isExistingDonor === "yes";
   if (isExistingDonor) {
-    const surveyDonor = await prisma.surveyDonor.findUnique({ where: { email: data.email.toLowerCase() } });
+    const submittedIdentity = { firstName: data.firstName, lastName: data.lastName, phone: data.phone, email: data.email.toLowerCase() };
+    const surveyDonorCandidate = await prisma.surveyDonor.findUnique({ where: { email: submittedIdentity.email } });
+    const surveyDonor = surveyDonorCandidate?.status === "ACTIVE" && identityMatches(submittedIdentity, surveyDonorCandidate)
+      ? surveyDonorCandidate
+      : null;
     const donor = await prisma.donorProfile.findFirst({
-      where: { user: { email: data.email.toLowerCase(), isActive: true } },
+      where: { status: "ACTIVE", user: { email: submittedIdentity.email, isActive: true } },
       include: { user: true }
     });
-    if (!surveyDonor && !donor) return { success: false, step: "VERIFY_EXISTING", challengeId: randomBytes(12).toString("base64url"), message: "Als de gegevens bij ons bekend zijn, is een verificatiecode verstuurd." };
-    const person = surveyDonor ?? { firstName: donor!.firstName, lastName: donor!.lastName, phone: donor!.phone, email: donor!.user.email };
+    const matchedDonor = donor && identityMatches(submittedIdentity, { firstName: donor.firstName, lastName: donor.lastName, phone: donor.phone, email: donor.user.email }) ? donor : null;
+    if (!surveyDonor && !matchedDonor) return { success: false, message: "Deze gegevens zijn niet herkend als een actief donateurschap. Controleer uw naam, mobiele nummer en e-mailadres, of kies dat u nog geen donateur bent." };
+    const person = surveyDonor ?? { firstName: matchedDonor!.firstName, lastName: matchedDonor!.lastName, phone: matchedDonor!.phone, email: matchedDonor!.user.email };
     const code = String(randomInt(100000, 1000000));
-    const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: donor?.id, surveyDonorId: surveyDonor?.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
+    const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: matchedDonor?.id, surveyDonorId: surveyDonor?.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
     try {
       await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: code }, throwOnSendError: true });
     } catch (error) {
