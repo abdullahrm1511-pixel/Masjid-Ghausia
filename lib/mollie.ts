@@ -24,6 +24,7 @@ async function mollieRequest(path: string, init?: RequestInit): Promise<MolliePa
 export async function createMolliePayment(input: { amountCents: number; description: string; redirectUrl: string; webhookUrl: string; responseId: string }) {
   const payment = await mollieRequest("/payments", {
     method: "POST",
+    headers: { "Idempotency-Key": `donation-${input.responseId}` },
     body: JSON.stringify({
       amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) },
       description: input.description.slice(0, 255),

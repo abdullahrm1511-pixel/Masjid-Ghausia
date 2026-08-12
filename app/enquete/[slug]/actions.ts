@@ -6,8 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { prepareEmailLog } from "@/lib/email/templates";
 import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, visibleSurveyQuestions, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
+import { createMolliePayment } from "@/lib/mollie";
 import { createHash, randomBytes, randomInt } from "crypto";
 import type { Prisma } from "@prisma/client";
+import { redirect } from "next/navigation";
 
 export type SurveyState = { success: boolean; message: string; errors?: Record<string, string>; step?: "VERIFY_EXISTING" | "EXISTING_OPTIONS"; challengeId?: string; accessToken?: string; maskedEmail?: string };
 const hashValue = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -239,8 +241,32 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     const isAnonymous = data.anonymousDonation === "on";
     const answers: OneTimeDonationAnswers = { wantsOneTimeDonation: true, oneTimeAmountCents: amountCents, isAnonymous };
     const response = await prisma.surveyResponse.create({ data: { surveyId: survey.id, firstName: isAnonymous ? "" : data.fullName, lastName: "", phone: "", email: "", answers, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") } });
+    let checkoutUrl: string;
+    try {
+      const payment = await createMolliePayment({
+        amountCents,
+        description: `Donatie ${survey.title}`,
+        redirectUrl: absoluteUrl(`/enquete/${survey.slug}/betaling?response=${response.id}`),
+        webhookUrl: absoluteUrl("/api/mollie/webhook"),
+        responseId: response.id
+      });
+      checkoutUrl = payment.checkoutUrl;
+      await prisma.donationPayment.create({
+        data: {
+          surveyResponseId: response.id,
+          molliePaymentId: payment.id,
+          amountCents,
+          status: payment.status,
+          checkoutUrl
+        }
+      });
+    } catch (error) {
+      await prisma.surveyResponse.delete({ where: { id: response.id } }).catch(() => undefined);
+      console.error("Eenmalige Mollie-donatie kon niet worden aangemaakt", error);
+      return { success: false, message: "De betaalpagina kon niet worden geopend. Probeer het opnieuw.", errors: {} };
+    }
     await notifySurveyOwner(survey, response.id);
-    return { success: true, message: survey.thankYouMessage || "Dank u. Uw naam en donatiebedrag zijn opgeslagen. De online betaling is tijdens deze test tijdelijk uitgeschakeld." };
+    redirect(checkoutUrl);
   }
 
   const data = donorSchema.parse(raw);

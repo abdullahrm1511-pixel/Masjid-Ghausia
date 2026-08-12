@@ -83,7 +83,7 @@ export function SurveyForm({ survey, settings, preview = false }: { survey: { id
       </div> : join === "no" ? <p className="survey-note">{settings.noMembershipNote}</p> : null}</fieldset> : null}
     </>}
     {state.message ? <p className="survey-error" role="alert">{state.message}</p> : null}
-    {(canSubmit || preview) ? <button className="donor-submit-button survey-submit" disabled={pending || preview} type={preview ? "button" : "submit"}>{preview ? "Voorbeeld – verzenden uitgeschakeld" : pending ? (isOneTime ? "Donatie opslaan..." : "Aanmelding verzenden...") : isOneTime ? "Donatie opslaan (test)" : settings.submitLabel}</button> : null}
+    {(canSubmit || preview) ? <button className="donor-submit-button survey-submit" disabled={pending || preview} type={preview ? "button" : "submit"}>{preview ? "Voorbeeld – verzenden uitgeschakeld" : pending ? (isOneTime ? "Betaalpagina openen..." : "Aanmelding verzenden...") : isOneTime ? "Verder naar betalen" : settings.submitLabel}</button> : null}
     {!isOneTime ? <p className="survey-privacy">{settings.privacyText}</p> : null}
   </form>;
 }
