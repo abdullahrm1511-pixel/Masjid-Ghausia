@@ -61,8 +61,8 @@ function groups(showSuperAdminItems: boolean) {
       },
       ...(showSuperAdminItems
         ? [{
-            title: "Enquetes",
-            description: "Enquetes maken, unieke links delen en antwoorden bekijken.",
+            title: "Donatiebeheer",
+            description: "Maandelijks donateurschap en eenmalige donatiecampagnes beheren.",
             href: "/admin/settings/surveys"
           }]
         : []),

@@ -58,13 +58,13 @@ export const defaultFixedSurveySettings: FixedSurveySettings = {
   monthlyNoNote: "Geen probleem. U kunt uw antwoord nu verzenden.",
   monthlyAmountLabel: "Zelfgekozen bedrag per maand (€)",
   consentText: "Ik geef toestemming om na het afronden van de beveiligde machtigingsstap het gekozen bedrag maandelijks automatisch te laten afschrijven. Tot die definitieve machtiging is afgerond, wordt er niets afgeschreven.",
-  submitLabel: "Antwoorden verzenden",
+  submitLabel: "Aanmelding verzenden",
   oneTimeHeading: "Eenmalige donatie",
   oneTimeNameLabel: "Naam",
   oneTimeAmountLabel: "Bedrag (€)",
   oneTimeAmountPlaceholder: "Bijvoorbeeld 25,00",
   oneTimeSubmitLabel: "Verder naar veilig betalen",
-  privacyText: "Uw gegevens worden alleen gebruikt voor deze enquête en de opvolging daarvan."
+  privacyText: "Uw gegevens worden alleen gebruikt voor uw donatie of donateurschap en de opvolging daarvan."
 };
 
 export function parseFixedSurveySettings(value: unknown): FixedSurveySettings {
