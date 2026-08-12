@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@/lib/seo";
 
 const contactSeo = {
-  title: "Contact Masjid Ghausia Donateursportaal",
+  title: "Contact St. Ghausia Begrafeniscommissie",
   description:
-    "Contactgegevens van St. GBC Masjid Ghausia Rotterdam en links naar het donateursportaal.",
+    "Contactgegevens van St. Ghausia Begrafeniscommissie en links naar het donateursportaal.",
   path: "/contact",
   keywords: ["Masjid Ghausia contact", "St. GBC contact", "Masjid Ghausia Rotterdam adres"]
 };
@@ -29,9 +29,9 @@ export default function ContactPage() {
       />
       <header className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="donor-eyebrow">Contact</p>
-        <h1 className="mt-2 text-4xl font-black text-slate-950">Contact Masjid Ghausia Donateursportaal</h1>
+        <h1 className="mt-2 text-4xl font-black text-slate-950">Contact St. Ghausia Begrafeniscommissie</h1>
         <p className="mt-4 text-lg leading-8 text-slate-700">
-          Voor donateurszaken gebruikt St. GBC Masjid Ghausia Rotterdam dit online portaal.
+          Voor donateurszaken gebruikt St. Ghausia Begrafeniscommissie dit online portaal.
         </p>
       </header>
 
@@ -40,7 +40,7 @@ export default function ContactPage() {
         <dl className="mt-5 grid gap-4 text-slate-700 sm:grid-cols-2">
           <div>
             <dt className="font-bold text-slate-950">Naam</dt>
-            <dd className="mt-1">St. GBC Masjid Ghausia</dd>
+            <dd className="mt-1">St. Ghausia Begrafeniscommissie</dd>
           </div>
           <div>
             <dt className="font-bold text-slate-950">Plaats</dt>

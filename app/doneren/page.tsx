@@ -5,7 +5,7 @@ import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@
 const donateSeo = {
   title: "Doneren Masjid Ghausia Rotterdam",
   description:
-    "Doneer aan St. GBC Masjid Ghausia Rotterdam of schrijf u in als donateur via het officiele donateursportaal.",
+    "Doneer via St. Ghausia Begrafeniscommissie of schrijf u in als donateur via het officiële donateursportaal.",
   path: "/doneren",
   keywords: ["Doneren Masjid Ghausia", "donatie moskee Rotterdam", "St. GBC doneren", "Masjid Ghausia donateur"]
 };
@@ -40,7 +40,7 @@ export default function DonatePage() {
         <p className="donor-eyebrow">Doneren Masjid Ghausia</p>
         <h1 className="mt-2 text-4xl font-black text-slate-950">Doneren aan Masjid Ghausia Rotterdam</h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-700">
-          Via het St. GBC donateursportaal kunt u zich inschrijven als donateur van Masjid Ghausia Rotterdam en uw gegevens veilig beheren.
+          Via het donateursportaal van St. Ghausia Begrafeniscommissie kunt u zich inschrijven en uw gegevens veilig beheren.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link className="donor-primary-link" href="/register">
@@ -68,7 +68,7 @@ export default function DonatePage() {
         <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">Voor Rotterdam</h2>
           <p className="mt-3 leading-7 text-slate-700">
-            Het portaal is bedoeld voor de donateursadministratie van St. GBC Masjid Ghausia in Rotterdam.
+            Het portaal is bedoeld voor de donateursadministratie van St. Ghausia Begrafeniscommissie in Rotterdam.
           </p>
         </article>
       </section>

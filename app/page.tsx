@@ -8,7 +8,7 @@ import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@
 
 const homeSeo = {
   title: "Donateursportaal Masjid Ghausia Rotterdam",
-  description: "Welkom bij het St. GBC Masjid Ghausia donateursportaal voor registratie, inloggen en doneren in Rotterdam.",
+  description: "Welkom bij het donateursportaal van St. Ghausia Begrafeniscommissie voor registratie, inloggen en doneren in Rotterdam.",
   path: "/",
   keywords: ["GBC donateursportaal", "moskee donateursportaal", "St. GBC Rotterdam"]
 };
@@ -38,10 +38,10 @@ export default async function HomePage() {
         <div className="donor-hero-copy">
           <div className="mb-6 flex items-center gap-4">
             <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/15 p-1 ring-1 ring-white/25">
-              <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={64} src="/masjid-ghausia-logo.png" width={64} priority />
+              <Image alt="Logo Ghausia uitvaart commissie" className="h-full w-full object-contain" height={64} src="/ghausia-uitvaart-commissie-logo.png" width={64} priority />
             </span>
             <div>
-              <p className="donor-eyebrow">St. GBC Masjid Ghausia</p>
+              <p className="donor-eyebrow">St. Ghausia Begrafeniscommissie · BC</p>
               <p className="mt-1 text-sm font-semibold text-slate-600">Rotterdam</p>
             </div>
           </div>

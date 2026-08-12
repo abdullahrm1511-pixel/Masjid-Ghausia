@@ -36,17 +36,20 @@ export function Navbar({ session }: { session: Session | null }) {
   const dropdownClass =
     "invisible absolute right-0 top-full z-20 min-w-60 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
   const navLink = "shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-white/90 hover:bg-white/10 hover:text-white";
+  const headerClass = admin
+    ? "border-[#0f5f9f] bg-[#1483d6]"
+    : "border-[#c99a2e]/60 bg-[#07583f]";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#0f5f9f] bg-[#1483d6] shadow-sm">
+    <header className={`sticky top-0 z-30 border-b shadow-sm ${headerClass}`}>
       <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-3 lg:flex lg:items-center lg:justify-between">
         <Link href={homeHref} className="flex min-w-0 items-center gap-3 leading-tight">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-transparent">
-            <Image alt="Masjid Ghausia logo" className="h-full w-full object-contain" height={48} src="/masjid-ghausia-logo.png" width={48} />
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/95 p-1">
+            <Image alt="Logo Ghausia uitvaart commissie" className="h-full w-full object-contain" height={56} src="/ghausia-uitvaart-commissie-logo.png" width={56} priority />
           </span>
-          <span className="grid min-w-0">
-            <span className="truncate text-lg font-black text-white">Masjid Ghausia</span>
-            <span className="text-xs font-semibold text-[#f0c08d]">Donateursportaal</span>
+          <span className="grid min-w-0 text-white">
+            <span className="flex items-baseline gap-1 leading-none"><span className="text-[0.65rem] font-bold uppercase tracking-wider text-[#e8c267]">St.</span><span className="truncate text-xl font-black tracking-tight">Ghausia</span></span>
+            <span className="mt-1 flex items-end gap-1.5 text-[0.68rem] font-semibold tracking-wide text-[#f2d789]"><span>Begrafeniscommissie</span><span className="text-[0.52rem] font-black uppercase tracking-[0.18em] text-white/75">BC</span></span>
           </span>
         </Link>
         <div className="mobile-nav-scroll -mx-4 flex gap-2 overflow-x-auto overflow-y-hidden px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">

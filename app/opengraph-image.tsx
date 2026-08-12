@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { organizationName, siteName } from "@/lib/seo";
 
 export const runtime = "edge";
-export const alt = "Masjid Ghausia Donateursportaal";
+export const alt = "St. Ghausia Begrafeniscommissie";
 export const size = {
   width: 1200,
   height: 630

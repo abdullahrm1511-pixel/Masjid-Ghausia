@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@/lib/seo";
 
 const stgbcSeo = {
-  title: "St. GBC Masjid Ghausia Rotterdam",
+  title: "St. Ghausia Begrafeniscommissie",
   description:
-    "St. GBC Masjid Ghausia Rotterdam beheert het donateursportaal voor inschrijvingen, donateursgegevens en administratieve opvolging.",
+    "St. Ghausia Begrafeniscommissie beheert het donateursportaal voor inschrijvingen, donateursgegevens en administratieve opvolging.",
   path: "/stgbc",
   keywords: ["St. GBC", "Ghausia Begrafenis Commissie", "stGBC Masjid Ghausia", "St. GBC Rotterdam"]
 };
@@ -23,15 +23,15 @@ export default function StGbcPage() {
           webPageJsonLd(stgbcSeo),
           breadcrumbJsonLd([
             { name: "Donateursportaal", path: "/" },
-            { name: "St. GBC", path: "/stgbc" }
+            { name: "St. Ghausia Begrafeniscommissie", path: "/stgbc" }
           ])
         ])}
       />
       <header className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="donor-eyebrow">St. GBC</p>
-        <h1 className="mt-2 text-4xl font-black text-slate-950">St. GBC Masjid Ghausia Rotterdam</h1>
+        <p className="donor-eyebrow">St. Ghausia · BC</p>
+        <h1 className="mt-2 text-4xl font-black text-slate-950">St. Ghausia Begrafeniscommissie</h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-700">
-          St. GBC gebruikt dit portaal voor de online registratie en administratie van donateurs van Masjid Ghausia Rotterdam.
+          St. Ghausia Begrafeniscommissie gebruikt dit portaal voor de online registratie en administratie van donateurs.
         </p>
       </header>
 

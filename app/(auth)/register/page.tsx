@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const registerSeo = {
   title: "Inschrijven en Doneren Masjid Ghausia Rotterdam",
-  description: "Schrijf u in als donateur van St. GBC Masjid Ghausia Rotterdam via het officiele donateursportaal.",
+  description: "Schrijf u in als donateur van St. Ghausia Begrafeniscommissie via het officiële donateursportaal.",
   path: "/register",
   keywords: ["Doneren Masjid Ghausia", "inschrijven Masjid Ghausia", "donateur worden moskee Rotterdam"]
 };
@@ -46,7 +46,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
       <header>
         <p className="donor-eyebrow">Doneren Masjid Ghausia</p>
         <h1 className="mt-2 text-3xl font-bold text-slate-900">Nieuwe inschrijving</h1>
-        <p className="mt-3 text-slate-700">Vul de gegevens volledig in om donateur te worden van St. GBC Masjid Ghausia Rotterdam. Het bestuur beoordeelt uw aanvraag.</p>
+        <p className="mt-3 text-slate-700">Vul de gegevens volledig in om donateur te worden van St. Ghausia Begrafeniscommissie. Het bestuur beoordeelt uw aanvraag.</p>
       </header>
       <div className="mt-8">
         <RegisterForm error={params.error} />

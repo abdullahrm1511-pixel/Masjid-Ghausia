@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const loginSeo = {
   title: "Inloggen Donateursportaal Masjid Ghausia",
-  description: "Log in op het beveiligde donateursportaal van St. GBC Masjid Ghausia Rotterdam.",
+  description: "Log in op het beveiligde donateursportaal van St. Ghausia Begrafeniscommissie.",
   path: "/login",
   keywords: ["Masjid Ghausia login", "GBC inloggen", "donateursportaal inloggen"]
 };
@@ -127,7 +127,7 @@ export default async function LoginPage({
       <section className="donor-auth-card">
       <p className="donor-eyebrow">Masjid Ghausia</p>
       <h1 className="mt-2 text-3xl font-black text-slate-950">Inloggen donateursportaal</h1>
-      <p className="mt-2 text-sm leading-6 text-slate-600">Log in om uw gegevens, lidnummer en betalingen bij St. GBC Masjid Ghausia Rotterdam te bekijken.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">Log in om uw gegevens, lidnummer en betalingen bij St. Ghausia Begrafeniscommissie te bekijken.</p>
       {params.registered === "1" ? (
         <div className="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-900">
           Uw registratie is succesvol ontvangen. U kunt inloggen zodra uw account is goedgekeurd door het bestuur.

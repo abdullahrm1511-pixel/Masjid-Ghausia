@@ -91,7 +91,7 @@ export default async function DashboardPage() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-950">Dashboard</h1>
-            <p className="mt-2 text-sm text-slate-600">Uw gegevens en betalingen bij St. GBC Masjid Ghausia.</p>
+            <p className="mt-2 text-sm text-slate-600">Uw gegevens en betalingen bij St. Ghausia Begrafeniscommissie.</p>
           </div>
           {profile.registrationNumber ? (
             <div className="donor-member-badge rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">

@@ -9,7 +9,7 @@ import { breadcrumbJsonLd, createPublicMetadata, jsonLd, webPageJsonLd } from "@
 
 const forgotPasswordSeo = {
   title: "Wachtwoord Vergeten Masjid Ghausia Donateursportaal",
-  description: "Vraag een nieuw wachtwoord aan voor het St. GBC Masjid Ghausia donateursportaal.",
+  description: "Vraag een nieuw wachtwoord aan voor het donateursportaal van St. Ghausia Begrafeniscommissie.",
   path: "/forgot-password",
   keywords: ["Masjid Ghausia wachtwoord", "GBC account herstellen", "donateursportaal wachtwoord vergeten"]
 };

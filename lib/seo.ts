@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://stgbc.masjidghausia.nl";
 
-export const siteName = "Masjid Ghausia Donateursportaal";
-export const organizationName = "St. GBC Masjid Ghausia";
+export const siteName = "St. Ghausia Begrafeniscommissie";
+export const organizationName = "St. Ghausia Begrafeniscommissie";
 export const defaultDescription =
-  "Het donateursportaal van St. GBC Masjid Ghausia in Rotterdam voor inschrijven, inloggen en doneren.";
+  "Het donateursportaal van St. Ghausia Begrafeniscommissie in Rotterdam voor inschrijven, inloggen en doneren.";
 
 export const seoKeywords = [
   "Masjid Ghausia",
@@ -64,7 +64,7 @@ export function createPublicMetadata({ title, description, path, keywords = [] }
           url: absoluteUrl("/opengraph-image"),
           width: 1200,
           height: 630,
-          alt: "Masjid Ghausia Donateursportaal"
+          alt: "St. Ghausia Begrafeniscommissie"
         }
       ]
     },
@@ -103,9 +103,9 @@ export function organizationJsonLd() {
     "@type": ["Organization", "NGO"],
     "@id": `${siteUrl}/#organization`,
     name: organizationName,
-    alternateName: ["Masjid Ghausia", "GBC", "St. GBC"],
+    alternateName: ["Ghausia Begrafeniscommissie", "GBC", "St. Ghausia BC"],
     url: siteUrl,
-    logo: absoluteUrl("/masjid-ghausia-logo.png"),
+    logo: absoluteUrl("/ghausia-uitvaart-commissie-logo.png"),
     telephone: "+31 10 484 5149",
     address: {
       "@type": "PostalAddress",
