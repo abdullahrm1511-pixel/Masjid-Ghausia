@@ -66,8 +66,8 @@ export function SurveyForm({ survey, settings, preview = false }: { survey: { id
     </div>{error("firstName")}{error("lastName")}{error("phone")}{error("email")}</fieldset> : null}
 
     {isOneTime ? <fieldset className="survey-section"><div className="survey-grid">
-      <label>Bedrag (€)<input inputMode="decimal" max="100000" name="oneTimeAmount" onChange={(event) => setOneTimeAmount(event.target.value)} placeholder="Bijvoorbeeld 25,00" required step="0.01" type="number" value={oneTimeAmount} /></label>
-      {!anonymousDonation ? <label>Naam<input autoComplete="name" maxLength={120} name="fullName" onChange={(event) => setFullName(event.target.value)} required value={fullName} /></label> : null}
+      <label>{settings.oneTimeAmountLabel}<input inputMode="decimal" max="100000" name="oneTimeAmount" onChange={(event) => setOneTimeAmount(event.target.value)} placeholder={settings.oneTimeAmountPlaceholder} required step="0.01" type="number" value={oneTimeAmount} /></label>
+      {!anonymousDonation ? <label>{settings.oneTimeNameLabel}<input autoComplete="name" maxLength={120} name="fullName" onChange={(event) => setFullName(event.target.value)} required value={fullName} /></label> : null}
     </div><label className="survey-consent"><input checked={anonymousDonation} className="w-auto" name="anonymousDonation" onChange={(event) => setAnonymousDonation(event.target.checked)} type="checkbox" /><span>Anoniem doneren</span></label>{error("fullName")}{error("oneTimeAmount")}</fieldset>
     : <>
       <fieldset className="survey-section"><legend><span>1</span> {settings.question1}</legend><div className="survey-choices">

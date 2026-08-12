@@ -1,45 +1,79 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/seo";
 import { formatCurrency, formatDate } from "@/lib/display";
-import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyStatusLabel, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
-import { deleteSurveyResponse, updateSurveyMemberRequest, updateSurveyQuestions } from "../actions";
+import { surveyStatusLabel, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
+import { deleteSurveyResponse } from "../actions";
 import { CopySurveyLink, DeleteSurveyButton } from "../SurveyAdminControls";
-import { SurveyQuestionBuilder } from "../SurveyQuestionBuilder";
 import { FixedSurveyEditor } from "../FixedSurveyEditor";
 import { SurveySettingsForm } from "../SurveySettingsForm";
 import { SurveySummary } from "../SurveySummary";
 import { ResponseDeleteButton } from "../ResponseDeleteButton";
-import { auth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-function yesNo(value: boolean | null) { return value === null ? "-" : value ? "Ja" : "Nee"; }
-function answerText(value: unknown) { return Array.isArray(value) ? value.join(", ") : value === null || value === undefined || value === "" ? "-" : String(value); }
+
+function yesNo(value: boolean | null) {
+  return value === null ? "-" : value ? "Ja" : "Nee";
+}
+
+const paymentLabels: Record<string, { label: string; className: string }> = {
+  paid: { label: "Betaald", className: "bg-emerald-100 text-emerald-800" },
+  open: { label: "Openstaand", className: "bg-amber-100 text-amber-800" },
+  pending: { label: "In verwerking", className: "bg-sky-100 text-sky-800" },
+  failed: { label: "Mislukt", className: "bg-red-100 text-red-800" },
+  canceled: { label: "Geannuleerd", className: "bg-slate-200 text-slate-700" },
+  expired: { label: "Verlopen", className: "bg-slate-200 text-slate-700" }
+};
+
+function PaymentStatus({ status }: { status: string | null | undefined }) {
+  const value = status ? paymentLabels[status] ?? { label: status, className: "bg-slate-100 text-slate-700" } : { label: "Niet gestart", className: "bg-slate-100 text-slate-600" };
+  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${value.className}`}>{value.label}</span>;
+}
+
+function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  return <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm font-semibold text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>{hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}</article>;
+}
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
-  const survey = await prisma.survey.findUnique({ where: { id }, include: { responses: { orderBy: { submittedAt: "desc" }, include: { donationPayment: true, documents: true } }, memberRequests: { orderBy: { createdAt: "desc" }, include: { donorProfile: { include: { user: true } }, surveyDonor: true } } } });
-  if (!survey) notFound();
+  const survey = await prisma.survey.findUnique({
+    where: { id },
+    include: { responses: { orderBy: { submittedAt: "desc" }, include: { donationPayment: true, documents: true } } }
+  });
+  if (!survey || !["DONOR_JOURNEY", "ONE_TIME_DONATION"].includes(survey.templateKey)) notFound();
+
   const url = absoluteUrl(`/enquete/${survey.slug}`);
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
-  const isCustom = survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY;
-  const questions = parseSurveyQuestions(survey.questions);
-  const responses = survey.responses.filter((response) => !(response.answers && typeof response.answers === "object" && !Array.isArray(response.answers) && "memberAction" in response.answers));
-  const typeLabel = isCustom ? "Zelfgemaakt formulier" : isOneTime ? "Eenmalige donatie" : "Permanent lidmaatschapsformulier";
+  const typeLabel = isOneTime ? "Eenmalige donatiecampagne" : "Maandelijks donateurschap";
+  const paidResponses = isOneTime ? survey.responses.filter((response) => response.donationPayment?.status === "paid") : [];
+  const paidTotal = paidResponses.reduce((total, response) => total + (response.donationPayment?.amountCents ?? 0), 0);
 
   return <main className="mx-auto max-w-7xl px-4 py-10">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-bold text-[#0f766e]">Enquête beheren</p><h1 className="text-3xl font-bold text-slate-900">{survey.title}</h1><p className="mt-2 text-slate-700">{typeLabel} · <strong>{surveyStatusLabel(survey)}</strong> · {responses.length} antwoorden{survey.maxResponses ? ` van maximaal ${survey.maxResponses}` : ""}</p></div><div className="flex flex-wrap gap-3"><CopySurveyLink url={url} /><a className="rounded-md border border-[#1483d6] px-4 py-3 font-semibold text-[#0f5f9f]" href={`/admin/settings/surveys/${survey.id}/preview`} target="_blank">Voorbeeld</a><a className="rounded-md border border-emerald-600 px-4 py-3 font-semibold text-emerald-800" href={`/admin/settings/surveys/${survey.id}/export`}>CSV downloaden</a><a className="rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" download href={`/admin/settings/surveys/${survey.id}/qr`}>QR-code</a></div></div>
-    <section className={`mt-6 rounded-lg border p-4 ${survey.isDraft ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}><p className="text-sm font-bold">{survey.isDraft ? "Concept: de openbare link is nog gesloten" : "Openbare link"}</p><a className="mt-1 block break-all font-semibold text-[#0f5f9f] underline" href={url} rel="noreferrer" target="_blank">{url}</a></section>
+    <Link className="text-sm font-bold text-[#0f5f9f]" href="/admin/settings/surveys">← Terug naar Donatiebeheer</Link>
+    <header className="mt-5 flex flex-wrap items-start justify-between gap-5">
+      <div><p className="text-sm font-bold text-[#0f766e]">{typeLabel}</p><h1 className="mt-1 text-3xl font-bold text-slate-900">{survey.title}</h1><p className="mt-2 text-slate-600"><strong>{surveyStatusLabel(survey)}</strong> · {survey.responses.length} {isOneTime ? "betaalpogingen" : "inzendingen"}</p></div>
+      <div className="flex flex-wrap gap-2"><CopySurveyLink url={url} /><a className="rounded-md border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700" href={`/admin/settings/surveys/${survey.id}/preview`} rel="noreferrer" target="_blank">Voorbeeld</a><a className="rounded-md border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700" download href={`/admin/settings/surveys/${survey.id}/qr`}>QR-code</a><a className="rounded-md border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700" href={`/admin/settings/surveys/${survey.id}/export`}>CSV</a></div>
+    </header>
+
+    <section className={`mt-6 rounded-xl border p-4 ${survey.isDraft ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold">{survey.isDraft ? "Concept – openbare link gesloten" : "Openbare donatielink"}</p><a className="mt-1 block break-all text-sm font-semibold text-[#0f5f9f] underline" href={url} rel="noreferrer" target="_blank">{url}</a></div>{!survey.isDraft ? <a className="rounded-md bg-[#0f766e] px-4 py-2 text-sm font-bold text-white" href={url} rel="noreferrer" target="_blank">Open formulier</a> : null}</div></section>
+
+    {isOneTime ? <section className="mt-6 grid gap-4 sm:grid-cols-3"><StatCard label="Betaalpogingen" value={survey.responses.length} /><StatCard label="Geslaagde donaties" value={paidResponses.length} /><StatCard label="Totaal ontvangen" value={formatCurrency(paidTotal)} hint="Alleen betalingen met status Betaald" /></section> : null}
+
     <SurveySettingsForm survey={survey} />
-    {isCustom ? <form action={updateSurveyQuestions} className="mt-8 grid gap-4"><input name="id" type="hidden" value={survey.id} /><div><h2 className="text-2xl font-bold">Vragen bewerken</h2><p className="text-sm text-slate-600">Bestaande antwoorden blijven bewaard wanneer u de vragen aanpast.</p></div><SurveyQuestionBuilder initialQuestions={questions} /><button className="w-fit rounded-md bg-[#1483d6] px-5 py-3 font-bold text-white" type="submit">Vragen opslaan</button></form> : isOneTime ? <FixedSurveyEditor id={survey.id} templateKey={survey.templateKey} value={survey.questions} /> : <section className="mt-8 rounded-lg border border-sky-200 bg-sky-50 p-5"><h2 className="text-xl font-bold">Vaste lidmaatschapslogica actief</h2><p className="mt-2 text-sm text-slate-700">De vragen, verificatiecode, opnieuw versturen, donatie verhogen en opzeggen staan vast en hoeven niet ingesteld te worden.</p></section>}
-    <SurveySummary questions={questions} responses={responses} templateKey={survey.templateKey} />
-    {survey.memberRequests.length ? <section className="mt-8"><h2 className="text-2xl font-bold">Donateursverzoeken</h2><div className="mt-4 overflow-x-auto rounded-lg border border-amber-200 bg-white"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-amber-50"><tr><th className="p-3">Datum</th><th className="p-3">Donateur</th><th className="p-3">Verzoek</th><th className="p-3">Bedrag</th><th className="p-3">Status/actie</th></tr></thead><tbody>{survey.memberRequests.map((request) => { const person = request.surveyDonor ?? (request.donorProfile ? { firstName: request.donorProfile.firstName, lastName: request.donorProfile.lastName, email: request.donorProfile.user.email } : null); return <tr className="border-t" key={request.id}><td className="p-3">{formatDate(request.createdAt)}</td><td className="p-3 font-semibold">{person ? `${person.firstName} ${person.lastName}` : "Onbekend"}<span className="block text-xs font-normal text-slate-500">{person?.email ?? "-"}</span></td><td className="p-3">{request.requestType === "CANCEL" ? "Donateurschap opzeggen" : "Maandbedrag verhogen"}</td><td className="p-3">{request.requestedAmountCents ? formatCurrency(request.requestedAmountCents) : "-"}</td><td className="p-3"><strong>{request.status}</strong>{request.status === "PENDING" ? <form action={updateSurveyMemberRequest} className="mt-2 flex gap-2"><input name="surveyId" type="hidden" value={survey.id} /><input name="requestId" type="hidden" value={request.id} /><button className="rounded bg-emerald-700 px-2 py-1 text-xs font-bold text-white" name="decision" type="submit" value="APPROVE">Goedkeuren</button><button className="rounded bg-red-700 px-2 py-1 text-xs font-bold text-white" name="decision" type="submit" value="REJECT">Afwijzen</button></form> : null}</td></tr>; })}</tbody></table></div><p className="mt-2 text-xs text-amber-800">De enquêtedonateurslijst staat los van STGBC. Mollie is nog tijdelijk uitgeschakeld.</p></section> : null}
-    <section className="mt-8"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-bold">Antwoorden</h2><p className="mt-1 text-sm text-slate-600">Verwijderde antwoorden en uploads worden definitief verwijderd en in het auditlog vermeld.</p></div><a className="font-bold text-emerald-800 underline" href={`/admin/settings/surveys/${survey.id}/export`}>Download alles als CSV</a></div>{responses.length ? <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-      {isCustom ? <table className="w-full min-w-[1100px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Datum/persoon</th>{questions.map((question) => <th className="p-3" key={question.id}>{question.title}</th>)}<th className="p-3">Actie</th></tr></thead><tbody>{responses.map((response) => { const answers = response.answers as Record<string, unknown>; return <tr className="border-t border-slate-200 align-top" key={response.id}><td className="p-3"><span className="block whitespace-nowrap">{formatDate(response.submittedAt)}</span><span className="block font-semibold">{[response.firstName, response.lastName].filter(Boolean).join(" ") || "Anoniem"}</span><span className="block text-xs text-slate-500">{response.email || response.phone || "-"}</span></td>{questions.map((question) => <td className="p-3" key={question.id}>{question.type === "FILE" ? response.documents.filter((document) => document.questionId === question.id).map((document) => <a className="block font-bold text-[#0f5f9f] underline" href={`/admin/settings/surveys/${survey.id}/responses/${response.id}/documents/${document.id}`} key={document.id}>{document.filename}</a>) : answerText(answers[question.id])}</td>)}<td className="p-3"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>
-      : isOneTime ? <table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Datum</th><th className="p-3">Naam</th><th className="p-3">Bedrag</th><th className="p-3">Betaalstatus</th><th className="p-3">Actie</th></tr></thead><tbody>{responses.map((response) => { const answers = response.answers as OneTimeDonationAnswers; return <tr className="border-t border-slate-200" key={response.id}><td className="p-3">{formatDate(response.submittedAt)}</td><td className="p-3 font-semibold">{response.firstName || "Anoniem"}</td><td className="p-3">{typeof answers.oneTimeAmountCents === "number" ? formatCurrency(answers.oneTimeAmountCents) : "-"}</td><td className="p-3 font-semibold">{response.donationPayment?.status ?? "Mollie tijdelijk uitgeschakeld"}</td><td className="p-3"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>
-      : <table className="w-full min-w-[1200px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Datum</th><th className="p-3">Persoon</th><th className="p-3">Contact</th><th className="p-3">Al donateur</th><th className="p-3">Wil donateur worden</th><th className="p-3">Maandelijks</th><th className="p-3">Bedrag</th><th className="p-3">Actie</th></tr></thead><tbody>{responses.map((response) => { const answers = response.answers as DonorSurveyAnswers; return <tr className="border-t border-slate-200" key={response.id}><td className="p-3">{formatDate(response.submittedAt)}</td><td className="p-3 font-semibold">{response.firstName} {response.lastName}</td><td className="p-3">{response.email}<br />{response.phone}</td><td className="p-3">{yesNo(answers.isExistingDonor)}</td><td className="p-3">{yesNo(answers.wantsToBecomeDonor)}</td><td className="p-3">{yesNo(answers.wantsMonthlyDonation)}</td><td className="p-3">{typeof answers.monthlyAmountCents === "number" ? formatCurrency(answers.monthlyAmountCents) : "-"}</td><td className="p-3"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>}
-    </div> : <div className="mt-4 rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-600">Er zijn nog geen antwoorden ontvangen.</div>}</section>
+    {isOneTime ? <FixedSurveyEditor id={survey.id} templateKey={survey.templateKey} value={survey.questions} /> : <section className="mt-6 rounded-xl border border-sky-200 bg-sky-50 p-5"><h2 className="font-bold text-sky-950">Vaste donateurslogica</h2><p className="mt-1 text-sm text-sky-900">Herkenning, verificatiecode, bedrag aanpassen en opzeggen worden automatisch geregeld.</p></section>}
+    {!isOneTime ? <SurveySummary questions={[]} responses={survey.responses} templateKey={survey.templateKey} /> : null}
+
+    <section className="mt-8">
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-bold">{isOneTime ? "Donaties" : "Aanmeldingen"}</h2><p className="mt-1 text-sm text-slate-600">{isOneTime ? "Alle betaalpogingen en hun actuele Mollie-status." : "Ingevulde donateursgegevens en gekozen maandbedragen."}</p></div><a className="font-bold text-emerald-800 underline" href={`/admin/settings/surveys/${survey.id}/export`}>Download als CSV</a></div>
+      {survey.responses.length ? <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        {isOneTime ? <table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-4">Datum</th><th className="p-4">Naam</th><th className="p-4">Bedrag</th><th className="p-4">Betaalstatus</th><th className="p-4 text-right">Actie</th></tr></thead><tbody>{survey.responses.map((response) => { const answers = response.answers as OneTimeDonationAnswers; return <tr className="border-t border-slate-200" key={response.id}><td className="p-4 whitespace-nowrap">{formatDate(response.submittedAt)}</td><td className="p-4 font-semibold">{response.firstName || "Anoniem"}</td><td className="p-4 font-bold">{typeof answers.oneTimeAmountCents === "number" ? formatCurrency(answers.oneTimeAmountCents) : "-"}</td><td className="p-4"><PaymentStatus status={response.donationPayment?.status} /></td><td className="p-4 text-right"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>
+        : <table className="w-full min-w-[1050px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-4">Datum</th><th className="p-4">Donateur</th><th className="p-4">Contact</th><th className="p-4">Bestaand</th><th className="p-4">Aanmelden</th><th className="p-4">Maandbedrag</th><th className="p-4 text-right">Actie</th></tr></thead><tbody>{survey.responses.map((response) => { const answers = response.answers as DonorSurveyAnswers; return <tr className="border-t border-slate-200 align-top" key={response.id}><td className="p-4 whitespace-nowrap">{formatDate(response.submittedAt)}</td><td className="p-4 font-semibold">{response.firstName} {response.lastName}</td><td className="p-4">{response.email}<span className="block text-slate-500">{response.phone}</span></td><td className="p-4">{yesNo(answers.isExistingDonor)}</td><td className="p-4">{yesNo(answers.wantsToBecomeDonor)}</td><td className="p-4 font-bold">{typeof answers.monthlyAmountCents === "number" ? formatCurrency(answers.monthlyAmountCents) : "-"}</td><td className="p-4 text-right"><form action={deleteSurveyResponse}><input name="surveyId" type="hidden" value={survey.id} /><input name="responseId" type="hidden" value={response.id} /><ResponseDeleteButton /></form></td></tr>; })}</tbody></table>}
+      </div> : <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-600">Nog geen {isOneTime ? "donaties" : "aanmeldingen"} ontvangen.</div>}
+    </section>
+
     {session?.user.role === "SUPER_ADMIN" ? <div className="mt-10 border-t border-slate-200 pt-6"><DeleteSurveyButton surveyId={survey.id} /></div> : null}
   </main>;
 }
