@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { canManageSettings } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { createSurveySlug, CUSTOM_SURVEY_TEMPLATE_KEY, parseFixedSurveySettings, parseSurveyQuestions } from "@/lib/survey";
+import { createSurveySlug, CUSTOM_SURVEY_TEMPLATE_KEY, defaultFixedSurveySettings, parseFixedSurveySettings, parseSurveyQuestions } from "@/lib/survey";
 import { writeAuditLog } from "@/lib/audit";
 import { compare } from "bcryptjs";
 
@@ -43,20 +43,21 @@ export async function createSurvey(formData: FormData) {
   const adminId = await requireSettingsAdmin();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const templateKey = "ONE_TIME_DONATION";
-  const questions: never[] = [];
+  const templateKey = formData.get("templateKey") === "DONOR_JOURNEY" ? "DONOR_JOURNEY" : "ONE_TIME_DONATION";
+  if (templateKey === "DONOR_JOURNEY" && await prisma.survey.count({ where: { templateKey: "DONOR_JOURNEY" } })) throw new Error("De vaste lidmaatschapsenquête bestaat al");
+  const questions = templateKey === "DONOR_JOURNEY" ? defaultFixedSurveySettings : {};
   const unlimited = formData.get("unlimited") === "on";
   const thankYouMessage = String(formData.get("thankYouMessage") ?? "").trim().slice(0, 1000);
   const notificationEmail = String(formData.get("notificationEmail") ?? "").trim().toLowerCase().slice(0, 200);
   if (notificationEmail && !/^\S+@\S+\.\S+$/.test(notificationEmail)) throw new Error("Vul een geldig notificatie-e-mailadres in");
-  const maxResponses = optionalPositiveInt(formData.get("maxResponses"));
+  const maxResponses = templateKey === "DONOR_JOURNEY" ? null : optionalPositiveInt(formData.get("maxResponses"));
   if (title.length < 3 || title.length > 140) throw new Error("Vul een geldige titel in");
   const startsAt = unlimited ? null : optionalDate(formData.get("startsAt"));
   const endsAt = unlimited ? null : optionalDate(formData.get("endsAt"), true);
   if (startsAt && endsAt && endsAt < startsAt) throw new Error("De einddatum moet na de begindatum liggen");
 
   const survey = await prisma.survey.create({
-    data: { slug: createSurveySlug(), title, description: description || null, templateKey, questions, startsAt, endsAt, createdById: adminId, isDraft: true, thankYouMessage: thankYouMessage || null, notificationEmail: notificationEmail || null, maxResponses, identityMode: identityMode(formData.get("identityMode"), templateKey) }
+    data: { slug: createSurveySlug(), title, description: description || null, templateKey, questions, startsAt: templateKey === "DONOR_JOURNEY" ? null : startsAt, endsAt: templateKey === "DONOR_JOURNEY" ? null : endsAt, createdById: adminId, isActive: true, isDraft: templateKey !== "DONOR_JOURNEY", thankYouMessage: thankYouMessage || null, notificationEmail: notificationEmail || null, maxResponses, identityMode: identityMode(formData.get("identityMode"), templateKey) }
   });
   await writeAuditLog({ actorId: adminId, action: "CREATE", entityType: "Survey", entityId: survey.id, message: `Enquete aangemaakt: ${title}` });
   redirect(`/admin/settings/surveys/${survey.id}`);
