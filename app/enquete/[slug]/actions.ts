@@ -37,7 +37,7 @@ const donorSchema = z.object({
   if (data.isExistingDonor === "no" && !data.wantsToBecomeDonor) ctx.addIssue({ code: "custom", path: ["wantsToBecomeDonor"], message: "Kies ja of nee." });
   if (data.wantsToBecomeDonor === "yes") {
     const amount = Number(String(data.monthlyAmount ?? "").replace(",", "."));
-    if (!Number.isFinite(amount) || amount < 1 || amount > 10000) ctx.addIssue({ code: "custom", path: ["monthlyAmount"], message: "Kies een bedrag vanaf € 1." });
+    if (!Number.isFinite(amount) || amount < 5 || amount > 10000) ctx.addIssue({ code: "custom", path: ["monthlyAmount"], message: "Het minimale maandbedrag is € 5." });
     if (data.directDebitConsent !== "on") ctx.addIssue({ code: "custom", path: ["directDebitConsent"], message: "Uw toestemming is nodig." });
   }
 });
@@ -50,7 +50,7 @@ const oneTimeSchema = z.object({
   if (data.anonymousDonation !== "on" && data.fullName.length < 2) ctx.addIssue({ code: "custom", path: ["fullName"], message: "Vul uw naam in of kies anoniem doneren." });
   if (data.fullName && !namePattern.test(data.fullName)) ctx.addIssue({ code: "custom", path: ["fullName"], message: "Naam mag alleen letters, spaties, apostrofs en streepjes bevatten." });
   const amount = Number(data.oneTimeAmount.replace(",", "."));
-  if (!Number.isFinite(amount) || amount < 1 || amount > 100000) ctx.addIssue({ code: "custom", path: ["oneTimeAmount"], message: "Kies een bedrag vanaf € 1." });
+  if (!Number.isFinite(amount) || amount < 5 || amount > 100000) ctx.addIssue({ code: "custom", path: ["oneTimeAmount"], message: "Het minimale donatiebedrag is € 5." });
 });
 
 async function notifySurveyOwner(survey: { id: string; title: string; notificationEmail: string | null }, entityId: string, entityType = "SurveyResponse") {
@@ -121,12 +121,13 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     const requestType = String(formData.get("memberAction") ?? "CONFIRM");
     const challenge = await prisma.surveyMemberAccess.findFirst({ where: { id: challengeId, surveyId: survey.id, verifiedAt: { not: null }, tokenHash: hashValue(accessToken), expiresAt: { gt: new Date() } }, include: { donorProfile: { include: { user: true } }, surveyDonor: true } });
     const person = challenge ? accessIdentity(challenge) : null;
-    if (!challenge || !person || !["CONFIRM", "INCREASE", "CANCEL"].includes(requestType)) return { success: false, message: "Uw beveiligde sessie is verlopen. Begin opnieuw." };
-    const amount = requestType === "INCREASE" ? Number(String(formData.get("requestedAmount") ?? "").replace(",", ".")) : null;
-    if (requestType === "INCREASE" && (!Number.isFinite(amount) || Number(amount) < 1 || Number(amount) > 10000)) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Vul een geldig nieuw maandbedrag in." };
-    const request = requestType === "CONFIRM" ? null : await prisma.surveyMemberRequest.create({ data: { surveyId: survey.id, donorProfileId: challenge.donorProfileId, surveyDonorId: challenge.surveyDonorId, requestType, requestedAmountCents: amount === null ? null : Math.round(Number(amount) * 100) } });
-    if (request) await notifySurveyOwner(survey, request.id, "SurveyMemberRequest");
-    return { success: true, message: survey.thankYouMessage || (requestType === "CANCEL" ? "Uw verzoek tot beëindiging is ontvangen en wordt door een beheerder gecontroleerd." : requestType === "INCREASE" ? "Uw verzoek om het maandbedrag te verhogen is ontvangen. Er is nog niets automatisch gewijzigd." : "Dank voor uw bevestiging.") };
+    if (!challenge || !person || !["CONFIRM", "CHANGE_AMOUNT", "CANCEL"].includes(requestType)) return { success: false, message: "Uw beveiligde sessie is verlopen. Begin opnieuw." };
+    const amount = requestType === "CHANGE_AMOUNT" ? Number(String(formData.get("requestedAmount") ?? "").replace(",", ".")) : null;
+    if (requestType === "CHANGE_AMOUNT" && (!Number.isFinite(amount) || Number(amount) < 5 || Number(amount) > 10000)) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Het minimale maandbedrag is € 5." };
+    if (requestType !== "CONFIRM" && !challenge.surveyDonorId) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Dit donateurschap kan hier nog niet automatisch worden aangepast." };
+    if (requestType === "CHANGE_AMOUNT" && challenge.surveyDonorId) await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { monthlyAmountCents: Math.round(Number(amount) * 100), status: challenge.surveyDonor?.status === "CANCELLED" ? "PENDING_MOLLIE" : challenge.surveyDonor?.status } });
+    if (requestType === "CANCEL" && challenge.surveyDonorId) await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { status: "CANCELLED" } });
+    return { success: true, message: requestType === "CANCEL" ? "Uw donateurschap is opgezegd." : requestType === "CHANGE_AMOUNT" ? `Uw maandbedrag is aangepast naar € ${Number(amount).toFixed(2).replace(".", ",")}.` : "Dank voor uw bevestiging." };
   }
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
   if (survey.templateKey === CUSTOM_SURVEY_TEMPLATE_KEY) {
