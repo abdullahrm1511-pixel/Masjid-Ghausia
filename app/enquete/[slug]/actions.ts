@@ -7,6 +7,7 @@ import { prepareEmailLog } from "@/lib/email/templates";
 import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, visibleSurveyQuestions, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
 import { createHash, randomBytes, randomInt } from "crypto";
+import type { Prisma } from "@prisma/client";
 
 export type SurveyState = { success: boolean; message: string; errors?: Record<string, string>; step?: "VERIFY_EXISTING" | "EXISTING_OPTIONS"; challengeId?: string; accessToken?: string; maskedEmail?: string };
 const hashValue = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -140,7 +141,30 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     if (requestType === "CHANGE_AMOUNT" && Number(amount) < 5) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Het minimale maandbedrag is € 5." };
     if (requestType === "CHANGE_AMOUNT" && Number(amount) > 10000) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Het maandbedrag mag maximaal € 10.000 zijn." };
     if (requestType !== "CONFIRM" && !challenge.surveyDonorId) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Dit donateurschap kan hier nog niet automatisch worden aangepast." };
-    if (requestType === "CHANGE_AMOUNT" && challenge.surveyDonorId) await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { monthlyAmountCents: Math.round(Number(amount) * 100), status: challenge.surveyDonor?.status === "CANCELLED" ? "PENDING_MOLLIE" : challenge.surveyDonor?.status } });
+    if (requestType === "CHANGE_AMOUNT" && challenge.surveyDonorId) {
+      const amountCents = Math.round(Number(amount) * 100);
+      await prisma.$transaction(async (tx) => {
+        await tx.surveyDonor.update({
+          where: { id: challenge.surveyDonorId! },
+          data: { monthlyAmountCents: amountCents, status: challenge.surveyDonor?.status === "CANCELLED" ? "PENDING_MOLLIE" : challenge.surveyDonor?.status }
+        });
+        const signupResponse = await tx.surveyResponse.findFirst({
+          where: {
+            email: person.email.toLowerCase(),
+            answers: { path: ["wantsToBecomeDonor"], equals: true }
+          },
+          orderBy: { submittedAt: "desc" },
+          select: { id: true, answers: true }
+        });
+        if (signupResponse) {
+          const answers = signupResponse.answers as Prisma.JsonObject;
+          await tx.surveyResponse.update({
+            where: { id: signupResponse.id },
+            data: { answers: { ...answers, monthlyAmountCents: amountCents } }
+          });
+        }
+      });
+    }
     if (requestType === "CANCEL" && challenge.surveyDonorId) await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { status: "CANCELLED" } });
     return { success: true, message: requestType === "CANCEL" ? "Uw donateurschap is opgezegd." : requestType === "CHANGE_AMOUNT" ? `Uw maandbedrag is aangepast naar € ${Number(amount).toFixed(2).replace(".", ",")}.` : "Dank voor uw bevestiging." };
   }
@@ -225,8 +249,17 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   if (isExistingDonor) {
     const submittedIdentity = { firstName: data.firstName, lastName: data.lastName, phone: data.phone, email: data.email.toLowerCase() };
     const surveyDonorCandidate = await prisma.surveyDonor.findUnique({ where: { email: submittedIdentity.email } });
+    const hasExistingSignup = surveyDonorCandidate?.status === "PENDING_MOLLIE"
+      ? Boolean(await prisma.surveyResponse.findFirst({
+          where: {
+            email: submittedIdentity.email,
+            answers: { path: ["wantsToBecomeDonor"], equals: true }
+          },
+          select: { id: true }
+        }))
+      : false;
     const surveyDonor = surveyDonorCandidate
-      && ["ACTIVE", "PENDING_MOLLIE"].includes(surveyDonorCandidate.status)
+      && (surveyDonorCandidate.status === "ACTIVE" || hasExistingSignup)
       && identityMatches(submittedIdentity, surveyDonorCandidate)
       ? surveyDonorCandidate
       : null;
