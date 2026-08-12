@@ -43,9 +43,12 @@ const donorSchema = z.object({
 });
 const oneTimeSchema = z.object({
   surveyId: z.string().min(1),
-  fullName: z.string().trim().min(2, "Vul uw naam in.").max(120, "Naam mag maximaal 120 tekens bevatten."),
+  fullName: z.string().trim().max(120, "Naam mag maximaal 120 tekens bevatten.").optional().default(""),
+  anonymousDonation: z.string().optional(),
   oneTimeAmount: z.string().min(1, "Vul een bedrag in.")
 }).superRefine((data, ctx) => {
+  if (data.anonymousDonation !== "on" && data.fullName.length < 2) ctx.addIssue({ code: "custom", path: ["fullName"], message: "Vul uw naam in of kies anoniem doneren." });
+  if (data.fullName && !namePattern.test(data.fullName)) ctx.addIssue({ code: "custom", path: ["fullName"], message: "Naam mag alleen letters, spaties, apostrofs en streepjes bevatten." });
   const amount = Number(data.oneTimeAmount.replace(",", "."));
   if (!Number.isFinite(amount) || amount < 1 || amount > 100000) ctx.addIssue({ code: "custom", path: ["oneTimeAmount"], message: "Kies een bedrag vanaf € 1." });
 });
@@ -193,8 +196,9 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   if (isOneTime) {
     const data = oneTimeSchema.parse(raw);
     const amountCents = Math.round(Number(data.oneTimeAmount.replace(",", ".")) * 100);
-    const answers: OneTimeDonationAnswers = { wantsOneTimeDonation: true, oneTimeAmountCents: amountCents };
-    const response = await prisma.surveyResponse.create({ data: { surveyId: survey.id, firstName: data.fullName, lastName: "", phone: "", email: "", answers, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") } });
+    const isAnonymous = data.anonymousDonation === "on";
+    const answers: OneTimeDonationAnswers = { wantsOneTimeDonation: true, oneTimeAmountCents: amountCents, isAnonymous };
+    const response = await prisma.surveyResponse.create({ data: { surveyId: survey.id, firstName: isAnonymous ? "" : data.fullName, lastName: "", phone: "", email: "", answers, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: requestHeaders.get("user-agent") } });
     await notifySurveyOwner(survey, response.id);
     return { success: true, message: survey.thankYouMessage || "Dank u. Uw naam en donatiebedrag zijn opgeslagen. De online betaling is tijdens deze test tijdelijk uitgeschakeld." };
   }

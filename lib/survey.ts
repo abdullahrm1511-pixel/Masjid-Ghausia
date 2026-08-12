@@ -163,6 +163,7 @@ export type DonorSurveyAnswers = {
 export type OneTimeDonationAnswers = {
   wantsOneTimeDonation: boolean;
   oneTimeAmountCents: number | null;
+  isAnonymous?: boolean;
 };
 
 export function createSurveySlug() {
