@@ -5,7 +5,7 @@ export const DONOR_SURVEY_TEMPLATE = {
   name: "Donateurstraject",
   questions: [
     "Bent u al donateur bij Masjid Ghausia?",
-    "Wilt u donateur worden van Masjid Ghausia?",
+    "Wilt u maandelijkse donateur worden van Masjid Ghausia?",
     "Wilt u Masjid Ghausia steunen met een maandelijkse donatie?"
   ]
 } as const;
@@ -47,7 +47,7 @@ export const defaultFixedSurveySettings: FixedSurveySettings = {
   phoneLabel: "Mobiel nummer",
   emailLabel: "E-mailadres",
   question1: "Bent u al donateur bij Masjid Ghausia?",
-  question2: "Wilt u donateur worden van Masjid Ghausia?",
+  question2: "Wilt u maandelijkse donateur worden van Masjid Ghausia?",
   question3: "Wilt u Masjid Ghausia steunen met een maandelijkse donatie?",
   yesLabel: "Ja",
   noLabel: "Nee",
@@ -69,10 +69,12 @@ export const defaultFixedSurveySettings: FixedSurveySettings = {
 
 export function parseFixedSurveySettings(value: unknown): FixedSurveySettings {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  return Object.fromEntries(Object.entries(defaultFixedSurveySettings).map(([key, fallback]) => {
+  const settings = Object.fromEntries(Object.entries(defaultFixedSurveySettings).map(([key, fallback]) => {
     const entered = String(raw[key] ?? "").trim();
     return [key, entered ? entered.slice(0, key === "consentText" ? 1000 : 500) : fallback];
   })) as FixedSurveySettings;
+  if (settings.question2 === "Wilt u donateur worden van Masjid Ghausia?") settings.question2 = defaultFixedSurveySettings.question2;
+  return settings;
 }
 
 export const surveyQuestionTypes = ["SHORT_TEXT", "LONG_TEXT", "MULTIPLE_CHOICE", "CHECKBOXES", "DROPDOWN", "YES_NO", "EMAIL", "PHONE", "NUMBER", "DATE", "FILE"] as const;
