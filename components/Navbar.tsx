@@ -44,12 +44,12 @@ export function Navbar({ session }: { session: Session | null }) {
     <header className={`sticky top-0 z-30 border-b shadow-sm ${headerClass}`}>
       <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-3 lg:flex lg:items-center lg:justify-between">
         <Link href={homeHref} className="flex min-w-0 items-center gap-3 leading-tight">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/95 p-1">
-            <Image alt="Logo Ghausia uitvaart commissie" className="h-full w-full object-contain" height={56} src="/ghausia-uitvaart-commissie-logo.png" width={56} priority />
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-transparent">
+            <Image alt="Logo Ghausia uitvaart commissie" className="h-full w-full rounded-full object-contain mix-blend-multiply" height={56} src="/ghausia-uitvaart-commissie-logo.png" width={56} priority />
           </span>
           <span className="grid min-w-0 text-white">
-            <span className="flex items-baseline gap-1 leading-none"><span className="text-[0.65rem] font-bold uppercase tracking-wider text-[#e8c267]">St.</span><span className="truncate text-xl font-black tracking-tight">Ghausia</span></span>
-            <span className="mt-1 flex items-end gap-1.5 text-[0.68rem] font-semibold tracking-wide text-[#f2d789]"><span>Begrafeniscommissie</span><span className="text-[0.52rem] font-black uppercase tracking-[0.18em] text-white/75">BC</span></span>
+            <span className="flex items-baseline gap-1 leading-none"><span className="text-[0.65rem] font-bold uppercase tracking-wider text-white">St.</span><span className="truncate text-xl font-black tracking-tight">Ghausia</span></span>
+            <span className="mt-1 text-[0.68rem] font-semibold tracking-wide text-[#f2d789]">Begrafeniscommissie</span>
           </span>
         </Link>
         <div className="mobile-nav-scroll -mx-4 flex gap-2 overflow-x-auto overflow-y-hidden px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">
