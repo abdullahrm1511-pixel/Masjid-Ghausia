@@ -42,6 +42,7 @@ export async function retryMonthlyMandate(_state: RetryMandateState, formData: F
     return { success: true, message: `Status bijgewerkt: ${result.donor?.status ?? "onbekend"}.` };
   } catch (error) {
     console.error("Mollie-mandaat handmatig controleren mislukt", error);
-    return { success: false, message: "Controleren bij Mollie is niet gelukt. Probeer het later opnieuw." };
+    const detail = error instanceof Error ? error.message : String(error);
+    return { success: false, message: `Controleren bij Mollie is niet gelukt: ${detail}` };
   }
 }
