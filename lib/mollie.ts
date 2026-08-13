@@ -77,7 +77,7 @@ export async function listMollieMandates(customerId: string) {
 export function createMollieSubscription(input: { customerId: string; mandateId: string; amountCents: number; startDate: string; webhookUrl: string; donorId: string }) {
   return mollieRequest<MollieSubscription>(`/customers/${input.customerId}/subscriptions`, {
     method: "POST",
-    headers: { "Idempotency-Key": `monthly-subscription-${input.donorId}-${input.amountCents}-${input.startDate}` },
+    headers: { "Idempotency-Key": `monthly-subscription-${input.donorId}-${input.mandateId}-${input.amountCents}-${input.startDate}` },
     body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, interval: "1 month", startDate: input.startDate, description: `Maanddonatie Masjid Ghausia ${input.donorId.slice(-8)}`, mandateId: input.mandateId, webhookUrl: input.webhookUrl, metadata: { kind: "monthly_donation", surveyDonorId: input.donorId } })
   });
 }
