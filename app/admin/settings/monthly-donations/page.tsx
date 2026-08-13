@@ -1,6 +1,23 @@
 import Link from "next/link";
 import { getSepaConfig, sepaConfigComplete } from "@/lib/monthly-donation-agreement";
-import { saveSepaSettings } from "./actions";
+import { SepaSettingsForm } from "./SepaSettingsForm";
+
 export const dynamic = "force-dynamic";
 
-export default async function Page() { const c = await getSepaConfig(); return <main className="mx-auto max-w-4xl px-4 py-10"><Link className="font-bold text-[#0f5f9f]" href="/admin/settings">← Instellingen</Link><header className="mt-4"><p className="font-bold text-[#0f766e]">Masjid Ghausia</p><h1 className="text-3xl font-bold">SEPA-instellingen</h1><p className="mt-2 text-slate-600">Deze officiële gegevens komen letterlijk op iedere digitale machtiging.</p></header><div className={`mt-6 rounded-lg border p-4 font-semibold ${sepaConfigComplete(c) ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>{sepaConfigComplete(c) ? "Compleet – machtigingen kunnen veilig worden opgesteld." : "Nog niet compleet – maandelijkse machtigingen blijven geblokkeerd."}</div><form action={saveSepaSettings} className="mt-6 grid gap-5 rounded-xl border bg-white p-6 shadow-sm"><label>Officiële juridische naam<input defaultValue={c.legalName} name="legalName" required /></label><label>SEPA Creditor Identifier (Incassant-ID)<input defaultValue={c.creditorIdentifier} name="creditorIdentifier" placeholder="Bijvoorbeeld NL00ZZZ..." required /></label><label>Volledig vestigingsadres<textarea defaultValue={c.address} name="address" required rows={3} /></label><label>Contact-e-mailadres<input defaultValue={c.email} name="email" required type="email" /></label><div className="grid gap-4 sm:grid-cols-2"><label>Vooraankondiging (dagen)<input defaultValue={c.noticeDays} max="14" min="1" name="noticeDays" required type="number" /></label><label>Versie voorwaarden<input defaultValue={c.termsVersion} name="termsVersion" required /></label></div><p className="text-sm text-slate-600">Wijzig het versienummer zodra de juridische tekst inhoudelijk verandert. Bestaande machtigingen houden altijd hun oorspronkelijke tekst.</p><button className="rounded-md bg-[#0f766e] px-5 py-3 font-bold text-white">SEPA-instellingen opslaan</button></form></main>; }
+export default async function Page() {
+  const config = await getSepaConfig();
+  const complete = sepaConfigComplete(config);
+
+  return <main className="mx-auto max-w-4xl px-4 py-10">
+    <Link className="font-bold text-[#0f5f9f]" href="/admin/settings">← Instellingen</Link>
+    <header className="mt-4">
+      <p className="font-bold text-[#0f766e]">Masjid Ghausia</p>
+      <h1 className="text-3xl font-bold">SEPA-instellingen</h1>
+      <p className="mt-2 text-slate-600">Deze officiële gegevens komen letterlijk op iedere digitale machtiging.</p>
+    </header>
+    <div className={`mt-6 rounded-lg border p-4 font-semibold ${complete ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
+      {complete ? "Compleet – machtigingen kunnen veilig worden opgesteld." : "Nog niet compleet – maandelijkse machtigingen blijven geblokkeerd."}
+    </div>
+    <SepaSettingsForm config={config} />
+  </main>;
+}

@@ -5,7 +5,19 @@ export const defaultSepaConfig: SepaConfig = { legalName: "", creditorIdentifier
 
 export async function getSepaConfig() {
   const item = await prisma.appConfig.findUnique({ where: { key: "MASJID_MONTHLY_SEPA" } });
-  return { ...defaultSepaConfig, ...(item?.value && typeof item.value === "object" ? item.value : {}) } as SepaConfig;
+  const value = item?.value && typeof item.value === "object" && !Array.isArray(item.value)
+    ? item.value as Record<string, unknown>
+    : {};
+  const parsedNoticeDays = Number(value.noticeDays);
+
+  return {
+    legalName: typeof value.legalName === "string" ? value.legalName : defaultSepaConfig.legalName,
+    creditorIdentifier: typeof value.creditorIdentifier === "string" ? value.creditorIdentifier : defaultSepaConfig.creditorIdentifier,
+    address: typeof value.address === "string" ? value.address : defaultSepaConfig.address,
+    email: typeof value.email === "string" ? value.email : defaultSepaConfig.email,
+    noticeDays: Number.isFinite(parsedNoticeDays) ? Math.min(14, Math.max(1, parsedNoticeDays)) : defaultSepaConfig.noticeDays,
+    termsVersion: typeof value.termsVersion === "string" ? value.termsVersion : defaultSepaConfig.termsVersion
+  };
 }
 
 export function sepaConfigComplete(config: SepaConfig) {
