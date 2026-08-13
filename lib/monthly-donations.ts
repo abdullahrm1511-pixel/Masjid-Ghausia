@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/seo";
 import { prepareEmailLog } from "@/lib/email/templates";
 import { createMollieSubscription, getMolliePayment, listMollieMandates, type MolliePayment } from "@/lib/mollie";
+import { monthlyAgreementPdf } from "@/lib/pdf/monthly-donation-agreement";
+import { createHash } from "crypto";
 
 export function nextMonthDate(from = new Date()) {
   const year = from.getUTCFullYear();
@@ -19,13 +21,14 @@ function centsFromPayment(payment: MolliePayment) {
 
 export async function syncMonthlyMolliePayment(paymentId: string) {
   const payment = await getMolliePayment(paymentId);
+  const effectiveStatus = Number(payment.amountChargedBack?.value ?? "0") > 0 ? "charged_back" : payment.status;
   let record = await prisma.monthlyDonationPayment.findUnique({ where: { molliePaymentId: payment.id }, include: { surveyDonor: true, surveyResponse: { include: { survey: true } } } });
 
   if (!record && payment.subscriptionId) {
     const donor = await prisma.surveyDonor.findUnique({ where: { mollieSubscriptionId: payment.subscriptionId } });
     if (donor) {
       record = await prisma.monthlyDonationPayment.create({
-        data: { surveyDonorId: donor.id, molliePaymentId: payment.id, mollieSubscriptionId: payment.subscriptionId, amountCents: centsFromPayment(payment), sequenceType: payment.sequenceType ?? "recurring", status: payment.status, paidAt: payment.status === "paid" && payment.paidAt ? new Date(payment.paidAt) : null },
+        data: { surveyDonorId: donor.id, molliePaymentId: payment.id, mollieSubscriptionId: payment.subscriptionId, amountCents: centsFromPayment(payment), sequenceType: payment.sequenceType ?? "recurring", status: effectiveStatus, paidAt: payment.status === "paid" && payment.paidAt ? new Date(payment.paidAt) : null },
         include: { surveyDonor: true, surveyResponse: { include: { survey: true } } }
       });
     }
@@ -34,7 +37,7 @@ export async function syncMonthlyMolliePayment(paymentId: string) {
 
   record = await prisma.monthlyDonationPayment.update({
     where: { id: record.id },
-    data: { status: payment.status, paidAt: payment.status === "paid" && payment.paidAt ? new Date(payment.paidAt) : null, mollieSubscriptionId: payment.subscriptionId ?? record.mollieSubscriptionId },
+    data: { status: effectiveStatus, paidAt: payment.status === "paid" && payment.paidAt ? new Date(payment.paidAt) : null, mollieSubscriptionId: payment.subscriptionId ?? record.mollieSubscriptionId },
     include: { surveyDonor: true, surveyResponse: { include: { survey: true } } }
   });
 
@@ -48,8 +51,14 @@ export async function syncMonthlyMolliePayment(paymentId: string) {
     }
     const subscription = await createMollieSubscription({ customerId: donor.mollieCustomerId, mandateId: mandate.id, amountCents: donor.monthlyAmountCents!, startDate: nextMonthDate(payment.paidAt ? new Date(payment.paidAt) : new Date()), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: donor.id });
     const activated = await prisma.surveyDonor.update({ where: { id: donor.id }, data: { mollieMandateId: mandate.id, mollieSubscriptionId: subscription.id, subscriptionStartedAt: new Date(), status: "ACTIVE", cancelledAt: null } });
+    const agreement = await prisma.monthlyDonationAgreement.findFirst({ where: { surveyDonorId: donor.id, status: "PENDING_MOLLIE" }, orderBy: { acceptedAt: "desc" } });
+    let pdf: Buffer | undefined;
+    if (agreement) {
+      pdf = await monthlyAgreementPdf({ agreementNumber: agreement.agreementNumber, termsText: agreement.termsText, signerName: agreement.signerName, acceptedAt: agreement.acceptedAt, email: donor.email, phone: donor.phone, amountCents: agreement.amountCents, mollieCustomerId: donor.mollieCustomerId, mollieMandateId: mandate.id, mollieSubscriptionId: subscription.id });
+      await prisma.monthlyDonationAgreement.update({ where: { id: agreement.id }, data: { status: "ACTIVE", mollieCustomerId: donor.mollieCustomerId, mollieMandateId: mandate.id, mollieSubscriptionId: subscription.id, pdfData: Uint8Array.from(pdf), documentSha256: createHash("sha256").update(pdf).digest("hex") } });
+    }
     const alreadyMailed = await prisma.emailLog.findFirst({ where: { templateKey: "SURVEY_MEMBERSHIP_ACTIVE", entityType: "SurveyDonor", entityId: donor.id } });
-    if (!alreadyMailed) await prepareEmailLog({ templateKey: "SURVEY_MEMBERSHIP_ACTIVE", recipient: donor.email, entityType: "SurveyDonor", entityId: donor.id, data: { naam: `${donor.firstName} ${donor.lastName}`, bedrag: `€ ${(donor.monthlyAmountCents! / 100).toFixed(2).replace(".", ",")}` } });
+    if (!alreadyMailed) await prepareEmailLog({ templateKey: "SURVEY_MEMBERSHIP_ACTIVE", recipient: donor.email, entityType: "SurveyDonor", entityId: donor.id, data: { naam: `${donor.firstName} ${donor.lastName}`, bedrag: `€ ${(donor.monthlyAmountCents! / 100).toFixed(2).replace(".", ",")}` }, attachments: pdf && agreement ? [{ filename: `SEPA-machtiging-${agreement.agreementNumber}.pdf`, content: pdf }] : undefined });
     if (record.surveyResponse?.survey.notificationEmail) await prepareEmailLog({ templateKey: "ADMIN_NOTIFICATION", recipient: record.surveyResponse.survey.notificationEmail, entityType: "SurveyDonor", entityId: donor.id, data: { naam: "beheerder", organisatie: "Masjid Ghausia", status: `Nieuwe actieve maanddonateur: ${donor.firstName} ${donor.lastName}`, loginlink: absoluteUrl(`/admin/settings/surveys/${record.surveyResponse.survey.id}`), enquete_titel: record.surveyResponse.survey.title, enquete_antwoord: "Mollie-machtiging voltooid" } });
     return { payment, donor: activated };
   }

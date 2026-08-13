@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { submitSurvey, type SurveyState } from "./actions";
 import type { FixedSurveySettings } from "@/lib/survey";
+import type { SepaConfig } from "@/lib/monthly-donation-agreement";
 
 const initialState: SurveyState = { success: false, message: "" };
 
@@ -10,7 +11,7 @@ function Choice({ name, value, label, checked, onChange }: { name: string; value
   return <label className="survey-choice"><input checked={checked} name={name} onChange={onChange} required type="radio" value={value} /><span>{label}</span></label>;
 }
 
-export function SurveyForm({ survey, settings, preview = false }: { survey: { id: string; title: string; description: string | null; templateKey: string }; settings: FixedSurveySettings; preview?: boolean }) {
+export function SurveyForm({ survey, settings, sepaConfig, preview = false }: { survey: { id: string; title: string; description: string | null; templateKey: string }; settings: FixedSurveySettings; sepaConfig: SepaConfig; preview?: boolean }) {
   const [state, action, pending] = useActionState(submitSurvey, initialState);
   const [existing, setExisting] = useState<"yes" | "no" | null>(null);
   const [join, setJoin] = useState<"yes" | "no" | null>(null);
@@ -23,6 +24,7 @@ export function SurveyForm({ survey, settings, preview = false }: { survey: { id
   const [monthlyAmount, setMonthlyAmount] = useState("");
   const [requestedAmount, setRequestedAmount] = useState("");
   const [directDebitConsent, setDirectDebitConsent] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false); const [signatureAccepted,setSignatureAccepted]=useState(false); const [signerName,setSignerName]=useState("");
   const [oneTimeAmount, setOneTimeAmount] = useState("");
   const [fullName, setFullName] = useState("");
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
@@ -79,7 +81,12 @@ export function SurveyForm({ survey, settings, preview = false }: { survey: { id
         <Choice checked={join === "no"} label={settings.joinNoLabel} name="wantsToBecomeDonor" onChange={() => setJoin("no")} value="no" />
       </div>{error("wantsToBecomeDonor")}{join === "yes" ? <div className="survey-mandate survey-reveal">
         <label>{settings.monthlyAmountLabel}<input inputMode="decimal" name="monthlyAmount" onChange={(event) => setMonthlyAmount(event.target.value)} placeholder="Bijvoorbeeld 10,00" required step="0.01" type="number" value={monthlyAmount} /></label>{error("monthlyAmount")}
-        <label className="survey-consent"><input checked={directDebitConsent} name="directDebitConsent" onChange={(event) => setDirectDebitConsent(event.target.checked)} required type="checkbox" /><span>{settings.consentText}</span></label>{error("directDebitConsent")}
+        <details className="rounded-lg border border-emerald-200 bg-white p-4"><summary className="cursor-pointer font-bold text-[#0f5f9f]">Bekijk de volledige machtiging en voorwaarden</summary><div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700"><p><strong>Incassant:</strong> {sepaConfig.legalName || "Nog niet ingesteld"}</p><p><strong>Incassant-ID:</strong> {sepaConfig.creditorIdentifier || "Nog niet ingesteld"}</p><p>U machtigt de organisatie om het gekozen bedrag maandelijks via Mollie/SEPA af te schrijven. De eerste donatie wordt direct via Mollie betaald; de volgende volgt ongeveer een maand later.</p><p>De donatie is vrijwillig, zonder boete of vaste einddatum. U kunt het bedrag altijd wijzigen en kosteloos opzeggen. Uw wettelijke SEPA-terugboekingsrechten blijven bestaan: binnen acht weken zonder reden en bij een niet-toegestane incasso mogelijk tot dertien maanden.</p><p>Na ondertekening wordt een versievaste machtiging opgesteld en per e-mail toegezonden. Versie: {sepaConfig.termsVersion}</p></div></details>
+        <input name="termsVersion" type="hidden" value={sepaConfig.termsVersion}/>
+        <label className="survey-consent"><input checked={directDebitConsent} name="directDebitConsent" onChange={(event) => setDirectDebitConsent(event.target.checked)} required type="checkbox" /><span>Ik geef toestemming voor de maandelijkse donatie en automatische SEPA-incasso via Mollie.</span></label>{error("directDebitConsent")}
+        <label className="survey-consent"><input checked={termsAccepted} name="termsAccepted" onChange={e=>setTermsAccepted(e.target.checked)} required type="checkbox"/><span>Ik heb het bedrag, de frequentie, mijn opzegmogelijkheid en de volledige voorwaarden gelezen en begrepen.</span></label>{error("termsAccepted")}
+        <label>Volledige naam als digitale ondertekening<input name="signerName" onChange={e=>setSignerName(e.target.value)} required value={signerName}/></label>{error("signerName")}
+        <label className="survey-consent"><input checked={signatureAccepted} name="signatureAccepted" onChange={e=>setSignatureAccepted(e.target.checked)} required type="checkbox"/><span>Ik bevestig dat bovenstaande naam mijn digitale ondertekening is en dat het systeem een machtigingsdocument met datum en akkoordgegevens opstelt.</span></label>{error("signatureAccepted")}
       </div> : join === "no" ? <p className="survey-note">{settings.noMembershipNote}</p> : null}</fieldset> : null}
     </>}
     {state.message ? <p className="survey-error" role="alert">{state.message}</p> : null}

@@ -46,6 +46,7 @@ export type EmailTemplateKey =
   | "SURVEY_MEMBERSHIP_ACTIVE"
   | "SURVEY_MEMBERSHIP_AMOUNT_CHANGED"
   | "SURVEY_MEMBERSHIP_CANCELLED"
+  | "SURVEY_MONTHLY_PRENOTIFICATION"
   | "SURVEY_ONE_TIME_DONATION"
   | "FUNERAL_APPLICATION_RECEIVED"
   | "PASSWORD_RESET";
@@ -391,6 +392,19 @@ Masjid Ghausia`
     bodyText: `Assalamu alaikum {{naam}},
 
 Uw maandelijkse donatie aan Masjid Ghausia is aangepast naar {{bedrag}}.
+
+Met vriendelijke groet,
+Masjid Ghausia`
+  },
+  {
+    key: "SURVEY_MONTHLY_PRENOTIFICATION",
+    name: "Masjid Ghausia: vooraankondiging maandincasso",
+    subject: "Vooraankondiging maandelijkse donatie Masjid Ghausia",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Rond {{betaaldatum}} wordt uw maandelijkse donatie van {{bedrag}} aan Masjid Ghausia via Mollie/SEPA geïncasseerd.
+
+Wilt u het bedrag aanpassen of de donatie stopzetten? Gebruik dan vóór de incassodatum het vaste donatieformulier en kies dat u al donateur bent.
 
 Met vriendelijke groet,
 Masjid Ghausia`

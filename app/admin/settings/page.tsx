@@ -61,9 +61,13 @@ function groups(showSuperAdminItems: boolean) {
       },
       ...(showSuperAdminItems
         ? [{
-            title: "Donatiebeheer",
+          title: "Donatiebeheer",
             description: "Maandelijks donateurschap en eenmalige donatiecampagnes beheren.",
             href: "/admin/settings/surveys"
+          }, {
+            title: "Maanddonateurs & SEPA",
+            description: "Beheer maanddonateurs, machtigingen, betalingen en officiële SEPA-gegevens.",
+            href: "/admin/settings/monthly-donors"
           }]
         : []),
       {

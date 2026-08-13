@@ -6,6 +6,7 @@ export type MolliePayment = {
   subscriptionId?: string | null;
   sequenceType?: string | null;
   amount?: { currency: string; value: string };
+  amountChargedBack?: { currency: string; value: string };
   metadata?: Record<string, unknown> | null;
   _links: { checkout?: { href: string } };
 };

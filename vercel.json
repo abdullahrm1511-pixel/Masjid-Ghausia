@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/monthly-donation-notices", "schedule": "0 8 * * *" }
+  ]
+}

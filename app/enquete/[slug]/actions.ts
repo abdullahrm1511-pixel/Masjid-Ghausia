@@ -8,6 +8,7 @@ import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, v
 import { absoluteUrl } from "@/lib/seo";
 import { cancelMollieSubscription, createMollieCustomer, createMollieFirstPayment, createMolliePayment, createMollieSubscription, getMollieSubscription } from "@/lib/mollie";
 import { nextMonthDate } from "@/lib/monthly-donations";
+import { agreementTerms, getSepaConfig, sepaConfigComplete } from "@/lib/monthly-donation-agreement";
 import { createHash, randomBytes, randomInt } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -45,6 +46,7 @@ const donorSchema = z.object({
   wantsToBecomeDonor: z.enum(["yes", "no"]).optional(),
   monthlyAmount: z.string().optional(),
   directDebitConsent: z.string().optional()
+  ,termsAccepted: z.string().optional(), signatureAccepted: z.string().optional(), signerName: z.string().optional(), termsVersion: z.string().optional()
 }).superRefine((data, ctx) => {
   validatePhone(data.phone, ctx);
   if (data.isExistingDonor === "no" && !data.wantsToBecomeDonor) ctx.addIssue({ code: "custom", path: ["wantsToBecomeDonor"], message: "Kies ja of nee." });
@@ -54,6 +56,9 @@ const donorSchema = z.object({
     else if (amount < 5) ctx.addIssue({ code: "custom", path: ["monthlyAmount"], message: "Het minimale maandbedrag is € 5." });
     else if (amount > 10000) ctx.addIssue({ code: "custom", path: ["monthlyAmount"], message: "Het maandbedrag mag maximaal € 10.000 zijn." });
     if (data.directDebitConsent !== "on") ctx.addIssue({ code: "custom", path: ["directDebitConsent"], message: "Uw toestemming is nodig." });
+    if (data.termsAccepted !== "on") ctx.addIssue({ code: "custom", path: ["termsAccepted"], message: "Bevestig dat u de voorwaarden heeft gelezen." });
+    if (data.signatureAccepted !== "on") ctx.addIssue({ code: "custom", path: ["signatureAccepted"], message: "Bevestig uw digitale ondertekening." });
+    if (!data.signerName || !namePattern.test(data.signerName.trim())) ctx.addIssue({ code: "custom", path: ["signerName"], message: "Vul uw volledige naam als digitale ondertekening in." });
   }
 });
 const oneTimeSchema = z.object({
@@ -183,6 +188,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
         catch (error) { console.error("Maanddonatie opzeggen bij Mollie mislukt", error); return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Opzeggen bij Mollie is niet gelukt. Probeer het later opnieuw; uw incasso is nog actief." }; }
       }
       await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { status: "CANCELLED", cancelledAt: new Date(), mollieSubscriptionId: null } });
+      await prisma.monthlyDonationAgreement.updateMany({ where: { surveyDonorId: challenge.surveyDonorId, status: "ACTIVE" }, data: { status: "CANCELLED", cancelledAt: new Date() } });
       await prepareEmailLog({ templateKey: "SURVEY_MEMBERSHIP_CANCELLED", recipient: person.email, entityType: "SurveyDonor", entityId: donor!.id, data: { naam: `${person.firstName} ${person.lastName}` } });
     }
     return { success: true, message: requestType === "CANCEL" ? "Uw donateurschap is opgezegd." : requestType === "CHANGE_AMOUNT" ? `Uw maandbedrag is aangepast naar € ${Number(amount).toFixed(2).replace(".", ",")}.` : "Dank voor uw bevestiging." };
@@ -314,6 +320,10 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const wantsMonthlyDonation = wantsToBecomeDonor === true ? true : null;
   const amount = wantsMonthlyDonation ? Number(String(data.monthlyAmount).replace(",", ".")) : null;
   const answers: DonorSurveyAnswers = { isExistingDonor, wantsToBecomeDonor, wantsMonthlyDonation, monthlyAmountCents: amount === null ? null : Math.round(amount * 100), directDebitConsent: wantsMonthlyDonation === true && data.directDebitConsent === "on" };
+  const sepaConfig = await getSepaConfig();
+  if (wantsToBecomeDonor && !sepaConfigComplete(sepaConfig)) return { success: false, message: "De officiële SEPA-gegevens worden nog ingesteld. Probeer het later opnieuw." };
+  if (wantsToBecomeDonor && data.termsVersion !== sepaConfig.termsVersion) return { success: false, message: "De voorwaarden zijn gewijzigd. Vernieuw de pagina en lees de actuele versie." };
+  if (wantsToBecomeDonor && normalizeIdentityText(data.signerName ?? "") !== normalizeIdentityText(`${common.firstName} ${common.lastName}`)) return { success: false, message: "De digitale ondertekening moet gelijk zijn aan uw ingevulde voor- en achternaam.", errors: { signerName: "Gebruik exact uw ingevulde voor- en achternaam." } };
   if (wantsToBecomeDonor) {
     const existingByEmail = await prisma.surveyDonor.findUnique({ where: { email: common.email } });
     if (existingByEmail?.status === "ACTIVE") return { success: false, message: "Er bestaat al een actief maanddonateurschap met dit e-mailadres. Kies bij de eerste vraag dat u al donateur bent." };
@@ -325,7 +335,8 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
       update: { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE", cancelledAt: null },
       create: { email: common.email, firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" }
     }) : null;
-    return { response: created, donor };
+    const agreement = donor && answers.monthlyAmountCents ? await tx.monthlyDonationAgreement.create({ data: { agreementNumber: `MG-${new Date().getUTCFullYear()}-${randomBytes(6).toString("hex").toUpperCase()}`, surveyDonorId: donor.id, surveyResponseId: created.id, termsVersion: sepaConfig.termsVersion, termsText: agreementTerms(sepaConfig, answers.monthlyAmountCents), signerName: data.signerName!.trim(), amountCents: answers.monthlyAmountCents, mandateConsent: true, termsAccepted: true, signatureAccepted: true, acceptedAt: new Date(), ipAddress: common.ipAddress, userAgent: common.userAgent, creditorLegalName: sepaConfig.legalName, creditorIdentifier: sepaConfig.creditorIdentifier, creditorAddress: sepaConfig.address, creditorEmail: sepaConfig.email } }) : null;
+    return { response: created, donor, agreement };
   });
   if (wantsToBecomeDonor && result.donor && answers.monthlyAmountCents) {
     try {
@@ -334,6 +345,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
         const customer = await createMollieCustomer({ name: `${common.firstName} ${common.lastName}`, email: common.email, donorId: result.donor.id });
         customerId = customer.id;
         await prisma.surveyDonor.update({ where: { id: result.donor.id }, data: { mollieCustomerId: customerId } });
+        if (result.agreement) await prisma.monthlyDonationAgreement.update({ where: { id: result.agreement.id }, data: { mollieCustomerId: customerId } });
       }
       const payment = await createMollieFirstPayment({ customerId, amountCents: answers.monthlyAmountCents, redirectUrl: absoluteUrl(`/enquete/${survey.slug}/machtiging?donor=${result.donor.id}`), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: result.donor.id, responseId: result.response.id });
       await prisma.monthlyDonationPayment.create({ data: { surveyDonorId: result.donor.id, surveyResponseId: result.response.id, molliePaymentId: payment.id, amountCents: answers.monthlyAmountCents, sequenceType: "first", status: payment.status, checkoutUrl: payment.checkoutUrl } });
