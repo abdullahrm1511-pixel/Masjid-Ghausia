@@ -125,15 +125,19 @@ export async function deleteSurvey(_previous: DeleteSurveyState, formData: FormD
   redirect("/admin/settings/surveys");
 }
 
-export async function deleteSurveyResponse(formData: FormData) {
+export type DeleteResponseState = { error: string };
+
+export async function deleteSurveyResponse(_previous: DeleteResponseState, formData: FormData): Promise<DeleteResponseState> {
   const adminId = await requireSettingsAdmin();
   const surveyId = String(formData.get("surveyId") ?? "");
   const responseId = String(formData.get("responseId") ?? "");
-  const response = await prisma.surveyResponse.findFirst({ where: { id: responseId, surveyId }, select: { id: true } });
-  if (!response) return;
+  const response = await prisma.surveyResponse.findFirst({ where: { id: responseId, surveyId }, select: { id: true, monthlyDonationAgreement: { select: { id: true } } } });
+  if (!response) return { error: "" };
+  if (response.monthlyDonationAgreement) return { error: "Deze aanmelding heeft een ondertekende SEPA-machtiging en kan niet worden verwijderd. Zeg de donateur op via Maanddonateurs; het machtigingsbewijs blijft dan bewaard." };
   await prisma.surveyResponse.delete({ where: { id: response.id } });
   await writeAuditLog({ actorId: adminId, action: "DELETE", entityType: "SurveyResponse", entityId: response.id, message: "Enquêteantwoord handmatig verwijderd", metadata: { surveyId } });
   revalidatePath(`/admin/settings/surveys/${surveyId}`);
+  return { error: "" };
 }
 
 export async function updateSurveyMemberRequest(formData: FormData) {
