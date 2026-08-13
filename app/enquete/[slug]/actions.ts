@@ -9,6 +9,7 @@ import { absoluteUrl } from "@/lib/seo";
 import { cancelMollieSubscription, createMollieCustomer, createMollieFirstPayment, createMolliePayment, createMollieSubscription, getMollieSubscription } from "@/lib/mollie";
 import { nextMonthDate } from "@/lib/monthly-donations";
 import { agreementTerms, getSepaConfig, sepaConfigComplete } from "@/lib/monthly-donation-agreement";
+import { donationReturnPath } from "@/lib/donation-form-url";
 import { createHash, randomBytes, randomInt } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -269,7 +270,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
       const payment = await createMolliePayment({
         amountCents,
         description: `Donatie ${survey.title}`,
-        redirectUrl: absoluteUrl(`/enquete/${survey.slug}/betaling?response=${response.id}`),
+        redirectUrl: absoluteUrl(`${donationReturnPath(survey.templateKey, survey.slug, "betaling")}?response=${response.id}`),
         webhookUrl: absoluteUrl("/api/mollie/webhook"),
         responseId: response.id
       });
@@ -347,7 +348,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
         await prisma.surveyDonor.update({ where: { id: result.donor.id }, data: { mollieCustomerId: customerId } });
         if (result.agreement) await prisma.monthlyDonationAgreement.update({ where: { id: result.agreement.id }, data: { mollieCustomerId: customerId } });
       }
-      const payment = await createMollieFirstPayment({ customerId, amountCents: answers.monthlyAmountCents, redirectUrl: absoluteUrl(`/enquete/${survey.slug}/machtiging?donor=${result.donor.id}`), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: result.donor.id, responseId: result.response.id });
+      const payment = await createMollieFirstPayment({ customerId, amountCents: answers.monthlyAmountCents, redirectUrl: absoluteUrl(`${donationReturnPath(survey.templateKey, survey.slug, "machtiging")}?donor=${result.donor.id}`), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: result.donor.id, responseId: result.response.id });
       await prisma.monthlyDonationPayment.create({ data: { surveyDonorId: result.donor.id, surveyResponseId: result.response.id, molliePaymentId: payment.id, amountCents: answers.monthlyAmountCents, sequenceType: "first", status: payment.status, checkoutUrl: payment.checkoutUrl } });
       redirect(payment.checkoutUrl);
     } catch (error) {

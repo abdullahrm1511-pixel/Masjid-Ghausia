@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getMolliePayment } from "@/lib/mollie";
+import { donationFormPath } from "@/lib/donation-form-url";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +33,13 @@ export default async function DonationReturnPage({ params, searchParams }: { par
 
   const paid = status === "paid";
   const retry = ["failed", "canceled", "expired"].includes(status);
+  const formPath = donationFormPath(paymentRecord.surveyResponse.survey.templateKey, slug);
   return <main className="survey-page"><section className="survey-card survey-finished">
     <div className="survey-check">{paid ? "✓" : "i"}</div>
     <p className="donor-eyebrow">{paymentRecord.surveyResponse.survey.title}</p>
     <h1>{paid ? "Donatie ontvangen" : retry ? "Betaling niet afgerond" : "Betaling wordt verwerkt"}</h1>
     <p>{paid ? "Hartelijk dank voor uw donatie. De betaling is succesvol ontvangen." : retry ? "De betaling is niet gelukt of geannuleerd. U kunt het opnieuw proberen." : "Mollie verwerkt de betaling nog. U kunt deze pagina later opnieuw openen."}</p>
-    {retry ? <Link className="donor-submit-button survey-submit mt-5 inline-block" href={`/enquete/${slug}`}>Opnieuw proberen</Link> : null}
-    <Link className="mt-5 block font-semibold text-[#0f5f9f] underline" href={`/enquete/${slug}`}>Terug naar de actie</Link>
+    {retry ? <Link className="donor-submit-button survey-submit mt-5 inline-block" href={formPath}>Opnieuw proberen</Link> : null}
+    <Link className="mt-5 block font-semibold text-[#0f5f9f] underline" href={formPath}>Terug naar de actie</Link>
   </section></main>;
 }

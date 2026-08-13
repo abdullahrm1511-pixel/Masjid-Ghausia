@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { syncMonthlyMolliePayment } from "@/lib/monthly-donations";
+import { donationFormPath } from "@/lib/donation-form-url";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function MandateReturnPage({ params, searchParams }: { para
   const active = current?.status === "ACTIVE";
   const failed = ["failed", "canceled", "expired"].includes(status);
   const pendingMandate = status === "paid" && !active;
+  const formPath = donationFormPath(firstPayment.surveyResponse!.survey.templateKey, slug);
 
   return <main className="survey-page"><section className="survey-card survey-finished">
     {pendingMandate ? <meta content="5" httpEquiv="refresh" /> : null}
@@ -31,7 +33,7 @@ export default async function MandateReturnPage({ params, searchParams }: { para
     <p className="donor-eyebrow">Maandelijkse donatie · Masjid Ghausia</p>
     <h1>{active ? "Uw maanddonatie is actief" : failed ? "Machtiging niet afgerond" : "Machtiging wordt verwerkt"}</h1>
     <p>{active ? `Hartelijk dank. Uw eerste donatie is ontvangen en vervolgens wordt € ${((current?.monthlyAmountCents ?? 0) / 100).toFixed(2).replace(".", ",")} iedere maand via Mollie geïncasseerd.` : failed ? "De eerste betaling of machtiging is niet afgerond. U kunt het formulier opnieuw openen en het nogmaals proberen." : "Mollie verwerkt uw betaling en SEPA-machtiging. Deze pagina controleert de status automatisch opnieuw."}</p>
-    {failed ? <Link className="donor-submit-button survey-submit mt-5 inline-block" href={`/enquete/${slug}`}>Opnieuw proberen</Link> : null}
-    <Link className="mt-5 block font-semibold text-[#0f5f9f] underline" href={`/enquete/${slug}`}>Terug naar het donatieformulier</Link>
+    {failed ? <Link className="donor-submit-button survey-submit mt-5 inline-block" href={formPath}>Opnieuw proberen</Link> : null}
+    <Link className="mt-5 block font-semibold text-[#0f5f9f] underline" href={formPath}>Terug naar het donatieformulier</Link>
   </section></main>;
 }

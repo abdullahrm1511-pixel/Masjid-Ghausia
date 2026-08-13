@@ -11,6 +11,7 @@ import { FixedSurveyEditor } from "../FixedSurveyEditor";
 import { SurveySettingsForm } from "../SurveySettingsForm";
 import { SurveySummary } from "../SurveySummary";
 import { ResponseDeleteButton } from "../ResponseDeleteButton";
+import { donationFormPath } from "@/lib/donation-form-url";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
   });
   if (!survey || !["DONOR_JOURNEY", "ONE_TIME_DONATION"].includes(survey.templateKey)) notFound();
 
-  const url = absoluteUrl(`/enquete/${survey.slug}`);
+  const url = absoluteUrl(donationFormPath(survey.templateKey, survey.slug));
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
   const monthlyDonors = isOneTime ? [] : await prisma.surveyDonor.findMany({ orderBy: { createdAt: "desc" } });
   const monthlyDonorByEmail = new Map(monthlyDonors.map((donor) => [donor.email.toLowerCase(), donor]));
