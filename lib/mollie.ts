@@ -30,7 +30,9 @@ async function mollieRequest<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const details = await response.text().catch(() => "");
     console.error(`Mollie API ${response.status} ${path}`, details.slice(0, 1000));
-    throw new Error(`Mollie kon de aanvraag niet verwerken (${response.status}).`);
+    let detailMessage = "";
+    try { detailMessage = JSON.parse(details)?.detail ?? ""; } catch { /* geen JSON-body */ }
+    throw new Error(`Mollie kon de aanvraag niet verwerken (${response.status})${detailMessage ? `: ${detailMessage}` : ""}.`);
   }
   return response.json() as Promise<T>;
 }
