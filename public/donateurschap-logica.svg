@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1900" viewBox="0 0 1400 1900" role="img" aria-labelledby="title desc">
+  <title id="title">Donateurschap logica</title>
+  <desc id="desc">Beslisboom voor het maandelijkse donateurschap van Masjid Ghausia.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#092f29" flood-opacity=".12"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 Z" fill="#56706b"/></marker>
+    <style>
+      text{font-family:Arial,Helvetica,sans-serif;fill:#153b36} .title{font-size:54px;font-weight:700;fill:#fff}.subtitle{font-size:25px;fill:#d8eee9}.box-title{font-size:27px;font-weight:700}.body{font-size:22px}.small{font-size:19px}.tag{font-size:18px;font-weight:700}.white{fill:#fff}.muted{fill:#58706c}.gold{fill:#f2c76e}.line{fill:none;stroke:#56706b;stroke-width:4;marker-end:url(#arrow)}.box{fill:#fff;stroke:#c8d8d4;stroke-width:2;filter:url(#shadow)}.decision{fill:#eef8f5;stroke:#17806e;stroke-width:3;filter:url(#shadow)}.success{fill:#e9f7ed;stroke:#2b8a4b;stroke-width:3;filter:url(#shadow)}.warning{fill:#fff8e6;stroke:#d29b22;stroke-width:3;filter:url(#shadow)}.stop{fill:#fff0ef;stroke:#c44c43;stroke-width:3;filter:url(#shadow)}
+    </style>
+  </defs>
+  <rect width="1400" height="1900" fill="#f4f8f7"/>
+  <rect width="1400" height="180" fill="#0f766e"/>
+  <text x="700" y="78" text-anchor="middle" class="title">Donateurschap logica</text>
+  <text x="700" y="125" text-anchor="middle" class="subtitle">Maandelijkse donatie · Masjid Ghausia · minimaal € 5 per maand</text>
+
+  <rect x="410" y="220" width="580" height="105" rx="24" class="box"/>
+  <text x="700" y="263" text-anchor="middle" class="box-title">1. Open link of scan QR-code</text>
+  <text x="700" y="298" text-anchor="middle" class="body muted">Vul naam, mobiel nummer en e-mailadres in</text>
+  <path d="M700 325 V380" class="line"/>
+
+  <path d="M700 380 L930 500 L700 620 L470 500 Z" class="decision"/>
+  <text x="700" y="487" text-anchor="middle" class="box-title">Al maandelijkse donateur</text>
+  <text x="700" y="522" text-anchor="middle" class="box-title">bij Masjid Ghausia?</text>
+
+  <text x="385" y="485" text-anchor="middle" class="tag" fill="#0f766e">NEE</text>
+  <path d="M470 500 H245 V665" class="line"/>
+  <rect x="65" y="665" width="360" height="120" rx="22" class="decision"/>
+  <text x="245" y="710" text-anchor="middle" class="box-title">Donateur worden?</text>
+  <text x="245" y="747" text-anchor="middle" class="body">Ja of nee</text>
+
+  <text x="77" y="835" class="tag" fill="#c44c43">NEE</text>
+  <path d="M155 785 V885" class="line"/>
+  <rect x="35" y="885" width="300" height="135" rx="22" class="stop"/>
+  <text x="185" y="930" text-anchor="middle" class="box-title">Bedankt</text>
+  <text x="185" y="966" text-anchor="middle" class="small">Antwoord wordt opgeslagen;</text>
+  <text x="185" y="994" text-anchor="middle" class="small">geen incasso</text>
+
+  <text x="327" y="835" class="tag" fill="#0f766e">JA</text>
+  <path d="M335 785 V885" class="line"/>
+  <rect x="370" y="865" width="450" height="175" rx="22" class="box"/>
+  <text x="595" y="910" text-anchor="middle" class="box-title">Kies maandbedrag</text>
+  <text x="595" y="946" text-anchor="middle" class="body">Minimaal € 5</text>
+  <text x="595" y="980" text-anchor="middle" class="small">Geef toestemming voor automatische</text>
+  <text x="595" y="1008" text-anchor="middle" class="small">maandelijkse afschrijving</text>
+  <path d="M595 1040 V1100" class="line"/>
+  <rect x="370" y="1100" width="450" height="175" rx="22" class="warning"/>
+  <text x="595" y="1142" text-anchor="middle" class="box-title">Mollie / SEPA-machtiging</text>
+  <text x="595" y="1178" text-anchor="middle" class="small">Beveiligde machtigingsstap bij Mollie</text>
+  <text x="595" y="1210" text-anchor="middle" class="small">Na succes: status wordt ACTIEF</text>
+  <text x="595" y="1243" text-anchor="middle" class="tag" fill="#9a6711">NOG AF TE RONDEN KOPPELING</text>
+  <path d="M595 1275 V1340" class="line"/>
+  <rect x="370" y="1340" width="450" height="150" rx="22" class="success"/>
+  <text x="595" y="1385" text-anchor="middle" class="box-title">Nieuwe maanddonateur</text>
+  <text x="595" y="1422" text-anchor="middle" class="small">Profiel, bedrag en toestemming opgeslagen</text>
+  <text x="595" y="1452" text-anchor="middle" class="small">Bevestigingsmail + melding beheerder</text>
+
+  <text x="1012" y="485" class="tag" fill="#0f766e">JA</text>
+  <path d="M930 500 H1155 V665" class="line"/>
+  <rect x="975" y="665" width="360" height="155" rx="22" class="box"/>
+  <text x="1155" y="707" text-anchor="middle" class="box-title">Backend controleert</text>
+  <text x="1155" y="744" text-anchor="middle" class="small">Naam + mobiel + e-mail moeten</text>
+  <text x="1155" y="774" text-anchor="middle" class="small">exact bij een actieve donateur horen</text>
+  <path d="M1155 820 V875" class="line"/>
+
+  <path d="M1155 875 L1325 965 L1155 1055 L985 965 Z" class="decision"/>
+  <text x="1155" y="956" text-anchor="middle" class="box-title">Herkend?</text>
+  <text x="1155" y="990" text-anchor="middle" class="small">Actief profiel gevonden</text>
+
+  <text x="917" y="947" class="tag" fill="#c44c43">NEE</text>
+  <path d="M985 965 H900 V1090" class="line"/>
+  <rect x="835" y="1090" width="300" height="175" rx="22" class="stop"/>
+  <text x="985" y="1132" text-anchor="middle" class="box-title">Niet herkend</text>
+  <text x="985" y="1168" text-anchor="middle" class="small">Gegevens blijven ingevuld</text>
+  <text x="985" y="1200" text-anchor="middle" class="small">Corrigeren of kiezen:</text>
+  <text x="985" y="1232" text-anchor="middle" class="small">“Ik ben nog geen donateur”</text>
+
+  <text x="1270" y="1093" class="tag" fill="#0f766e">JA</text>
+  <path d="M1235 1008 V1100" class="line"/>
+  <rect x="1145" y="1100" width="220" height="165" rx="22" class="box"/>
+  <text x="1255" y="1142" text-anchor="middle" class="box-title">Verificatie</text>
+  <text x="1255" y="1178" text-anchor="middle" class="small">6-cijferige code</text>
+  <text x="1255" y="1208" text-anchor="middle" class="small">per e-mail</text>
+  <text x="1255" y="1238" text-anchor="middle" class="small">15 min. geldig</text>
+  <path d="M1255 1265 V1320 H1055 V1370" class="line"/>
+  <rect x="845" y="1370" width="420" height="190" rx="22" class="decision"/>
+  <text x="1055" y="1415" text-anchor="middle" class="box-title">Wat wilt u doen?</text>
+  <text x="1055" y="1455" text-anchor="middle" class="body">✓ Donateurschap bevestigen</text>
+  <text x="1055" y="1493" text-anchor="middle" class="body">€ Maandbedrag aanpassen (min. € 5)</text>
+  <text x="1055" y="1531" text-anchor="middle" class="body">× Donateurschap direct opzeggen</text>
+  <path d="M1055 1560 V1620" class="line"/>
+  <rect x="785" y="1620" width="540" height="155" rx="22" class="success"/>
+  <text x="1055" y="1665" text-anchor="middle" class="box-title">Wijziging verwerkt</text>
+  <text x="1055" y="1702" text-anchor="middle" class="small">Database wordt bijgewerkt</text>
+  <text x="1055" y="1733" text-anchor="middle" class="small">Na Mollie-koppeling ook automatisch bij Mollie</text>
+
+  <rect x="70" y="1815" width="1260" height="2" fill="#c8d8d4"/>
+  <text x="700" y="1860" text-anchor="middle" class="small muted">STGBC staat volledig los van deze maandelijkse Masjid Ghausia-donaties.</text>
+</svg>
