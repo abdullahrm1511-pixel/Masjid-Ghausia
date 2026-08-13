@@ -10,6 +10,7 @@ export async function POST(request: Request) {
 
   try {
     const monthly = await syncMonthlyMolliePayment(paymentId);
+    if (monthly.mandatePending) return new NextResponse("Mandate not ready yet, please retry", { status: 503 });
     if (monthly.donor) return new NextResponse("OK", { status: 200 });
 
     const payment = monthly.payment ?? await getMolliePayment(paymentId);

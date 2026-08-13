@@ -47,11 +47,11 @@ export async function syncMonthlyMolliePayment(paymentId: string) {
     const mandate = mandates.find((item) => item.status === "valid" && item.method === "directdebit") ?? mandates.find((item) => item.status === "pending" || item.status === "valid");
     if (!mandate) {
       await prisma.surveyDonor.update({ where: { id: donor.id }, data: { status: "MANDATE_PENDING" } });
-      return { payment, donor };
+      return { payment, donor, mandatePending: true };
     }
     const subscription = await createMollieSubscription({ customerId: donor.mollieCustomerId, mandateId: mandate.id, amountCents: donor.monthlyAmountCents!, startDate: nextMonthDate(payment.paidAt ? new Date(payment.paidAt) : new Date()), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: donor.id });
     const activated = await prisma.surveyDonor.update({ where: { id: donor.id }, data: { mollieMandateId: mandate.id, mollieSubscriptionId: subscription.id, subscriptionStartedAt: new Date(), status: "ACTIVE", cancelledAt: null } });
-    const agreement = await prisma.monthlyDonationAgreement.findFirst({ where: { surveyDonorId: donor.id, status: "PENDING_MOLLIE" }, orderBy: { acceptedAt: "desc" } });
+    const agreement = record.surveyResponseId ? await prisma.monthlyDonationAgreement.findUnique({ where: { surveyResponseId: record.surveyResponseId } }) : null;
     let pdf: Buffer | undefined;
     if (agreement) {
       pdf = await monthlyAgreementPdf({ agreementNumber: agreement.agreementNumber, termsText: agreement.termsText, signerName: agreement.signerName, acceptedAt: agreement.acceptedAt, email: donor.email, phone: donor.phone, amountCents: agreement.amountCents, mollieCustomerId: donor.mollieCustomerId, mollieMandateId: mandate.id, mollieSubscriptionId: subscription.id });
