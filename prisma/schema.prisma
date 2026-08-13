@@ -606,26 +606,26 @@ model EmailLog {
 }
 
 model Survey {
-  id          String           @id @default(cuid())
-  slug        String           @unique
-  title       String
-  description String?
-  templateKey String           @default("DONOR_JOURNEY")
-  questions   Json?
-  isActive    Boolean          @default(true)
-  isDraft     Boolean          @default(true)
-  thankYouMessage String?
+  id                String                @id @default(cuid())
+  slug              String                @unique
+  title             String
+  description       String?
+  templateKey       String                @default("DONOR_JOURNEY")
+  questions         Json?
+  isActive          Boolean               @default(true)
+  isDraft           Boolean               @default(true)
+  thankYouMessage   String?
   notificationEmail String?
-  maxResponses Int?
-  identityMode String          @default("REQUIRED")
-  startsAt    DateTime?
-  endsAt      DateTime?
-  createdById String
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  responses   SurveyResponse[]
-  memberAccesses SurveyMemberAccess[]
-  memberRequests SurveyMemberRequest[]
+  maxResponses      Int?
+  identityMode      String                @default("REQUIRED")
+  startsAt          DateTime?
+  endsAt            DateTime?
+  createdById       String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  responses         SurveyResponse[]
+  memberAccesses    SurveyMemberAccess[]
+  memberRequests    SurveyMemberRequest[]
 
   @@index([isActive])
   @@index([startsAt])
@@ -634,19 +634,20 @@ model Survey {
 }
 
 model SurveyResponse {
-  id              String           @id @default(cuid())
-  surveyId        String
-  firstName       String
-  lastName        String
-  phone           String
-  email           String
-  answers         Json
-  submittedAt     DateTime         @default(now())
-  ipAddress       String?
-  userAgent       String?
-  survey          Survey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  donationPayment DonationPayment?
-  documents       SurveyResponseDocument[]
+  id                      String                   @id @default(cuid())
+  surveyId                String
+  firstName               String
+  lastName                String
+  phone                   String
+  email                   String
+  answers                 Json
+  submittedAt             DateTime                 @default(now())
+  ipAddress               String?
+  userAgent               String?
+  survey                  Survey                   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  donationPayment         DonationPayment?
+  monthlyDonationPayments MonthlyDonationPayment[]
+  documents               SurveyResponseDocument[]
 
   @@index([surveyId])
   @@index([email])
@@ -669,7 +670,7 @@ model SurveyResponseDocument {
 }
 
 model SurveyMemberAccess {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   surveyId       String
   donorProfileId String?
   surveyDonorId  String?
@@ -677,9 +678,9 @@ model SurveyMemberAccess {
   tokenHash      String?
   expiresAt      DateTime
   verifiedAt     DateTime?
-  attempts       Int          @default(0)
-  createdAt      DateTime     @default(now())
-  survey         Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  attempts       Int           @default(0)
+  createdAt      DateTime      @default(now())
+  survey         Survey        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   donorProfile   DonorProfile? @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
   surveyDonor    SurveyDonor?  @relation(fields: [surveyDonorId], references: [id], onDelete: Cascade)
 
@@ -690,15 +691,15 @@ model SurveyMemberAccess {
 }
 
 model SurveyMemberRequest {
-  id                   String       @id @default(cuid())
+  id                   String        @id @default(cuid())
   surveyId             String
   donorProfileId       String?
   surveyDonorId        String?
   requestType          String
   requestedAmountCents Int?
-  status               String       @default("PENDING")
-  createdAt            DateTime     @default(now())
-  survey               Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  status               String        @default("PENDING")
+  createdAt            DateTime      @default(now())
+  survey               Survey        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   donorProfile         DonorProfile? @relation(fields: [donorProfileId], references: [id], onDelete: Cascade)
   surveyDonor          SurveyDonor?  @relation(fields: [surveyDonorId], references: [id], onDelete: Cascade)
 
@@ -709,19 +710,48 @@ model SurveyMemberRequest {
 }
 
 model SurveyDonor {
-  id                 String                @id @default(cuid())
-  email              String                @unique
-  firstName          String
-  lastName           String
-  phone              String
-  monthlyAmountCents Int?
-  directDebitConsent Boolean               @default(false)
-  status             String                @default("PENDING_MOLLIE")
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  memberAccesses     SurveyMemberAccess[]
-  memberRequests     SurveyMemberRequest[]
+  id                    String                   @id @default(cuid())
+  email                 String                   @unique
+  firstName             String
+  lastName              String
+  phone                 String
+  monthlyAmountCents    Int?
+  directDebitConsent    Boolean                  @default(false)
+  status                String                   @default("PENDING_MOLLIE")
+  mollieCustomerId      String?                  @unique
+  mollieMandateId       String?
+  mollieSubscriptionId  String?                  @unique
+  subscriptionStartedAt DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  memberAccesses        SurveyMemberAccess[]
+  memberRequests        SurveyMemberRequest[]
+  monthlyPayments       MonthlyDonationPayment[]
 
+  @@index([status])
+  @@index([createdAt])
+}
+
+model MonthlyDonationPayment {
+  id                   String          @id @default(cuid())
+  surveyDonorId        String
+  surveyResponseId     String?
+  molliePaymentId      String          @unique
+  mollieSubscriptionId String?
+  amountCents          Int
+  sequenceType         String
+  status               String          @default("open")
+  checkoutUrl          String?
+  paidAt               DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  surveyDonor          SurveyDonor     @relation(fields: [surveyDonorId], references: [id], onDelete: Cascade)
+  surveyResponse       SurveyResponse? @relation(fields: [surveyResponseId], references: [id], onDelete: SetNull)
+
+  @@index([surveyDonorId])
+  @@index([surveyResponseId])
+  @@index([mollieSubscriptionId])
   @@index([status])
   @@index([createdAt])
 }

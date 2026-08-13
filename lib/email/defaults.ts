@@ -40,8 +40,12 @@ export type EmailTemplateKey =
   | "MOSQUE_DONATION_REMINDER"
   | "ADMIN_NOTIFICATION"
   | "SURVEY_EXISTING_DONOR_CONFIRMED"
+  | "SURVEY_VERIFICATION_CODE"
   | "SURVEY_NO_MEMBERSHIP"
   | "SURVEY_MEMBERSHIP_INTEREST"
+  | "SURVEY_MEMBERSHIP_ACTIVE"
+  | "SURVEY_MEMBERSHIP_AMOUNT_CHANGED"
+  | "SURVEY_MEMBERSHIP_CANCELLED"
   | "SURVEY_ONE_TIME_DONATION"
   | "FUNERAL_APPLICATION_RECEIVED"
   | "PASSWORD_RESET";
@@ -316,6 +320,21 @@ Met vriendelijke groet,
 St. GBC Masjid Ghausia`
   },
   {
+    key: "SURVEY_VERIFICATION_CODE",
+    name: "Masjid Ghausia: verificatiecode donateur",
+    subject: "Uw verificatiecode voor Masjid Ghausia",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Gebruik onderstaande code om uw maandelijkse donateurschap bij Masjid Ghausia veilig te beheren:
+
+{{verification_code}}
+
+Deze code is 15 minuten geldig. Als u dit niet heeft aangevraagd, kunt u deze e-mail negeren.
+
+Met vriendelijke groet,
+Masjid Ghausia`
+  },
+  {
     key: "SURVEY_EXISTING_DONOR_CONFIRMED",
     name: "Enquete: bestaand donateurschap bevestigd",
     subject: "Dank voor uw bevestiging",
@@ -349,6 +368,43 @@ Zodra de beveiligde betaal- en machtigingslink beschikbaar is, informeren wij u 
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`
+  },
+  {
+    key: "SURVEY_MEMBERSHIP_ACTIVE",
+    name: "Masjid Ghausia: maanddonatie actief",
+    subject: "Uw maandelijkse donatie aan Masjid Ghausia is actief",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Hartelijk dank voor uw maandelijkse steun aan Masjid Ghausia.
+
+Uw machtiging is succesvol afgerond. Uw maandelijkse donatie van {{bedrag}} is nu actief. De eerste donatie is via Mollie verwerkt; de volgende incasso vindt ongeveer een maand later plaats.
+
+U kunt uw bedrag later via hetzelfde donatieformulier aanpassen of uw donateurschap opzeggen.
+
+Met vriendelijke groet,
+Masjid Ghausia`
+  },
+  {
+    key: "SURVEY_MEMBERSHIP_AMOUNT_CHANGED",
+    name: "Masjid Ghausia: maandbedrag gewijzigd",
+    subject: "Uw maandelijkse donatie is aangepast",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Uw maandelijkse donatie aan Masjid Ghausia is aangepast naar {{bedrag}}.
+
+Met vriendelijke groet,
+Masjid Ghausia`
+  },
+  {
+    key: "SURVEY_MEMBERSHIP_CANCELLED",
+    name: "Masjid Ghausia: maanddonatie opgezegd",
+    subject: "Uw maandelijkse donatie is stopgezet",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Uw maandelijkse donatie aan Masjid Ghausia is stopgezet. Er worden geen nieuwe maandelijkse incasso's meer aangemaakt.
+
+Met vriendelijke groet,
+Masjid Ghausia`
   },
   {
     key: "SURVEY_ONE_TIME_DONATION",

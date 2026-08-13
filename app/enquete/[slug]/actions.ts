@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { prepareEmailLog } from "@/lib/email/templates";
 import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, visibleSurveyQuestions, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
-import { createMolliePayment } from "@/lib/mollie";
+import { cancelMollieSubscription, createMollieCustomer, createMollieFirstPayment, createMolliePayment, createMollieSubscription, getMollieSubscription } from "@/lib/mollie";
+import { nextMonthDate } from "@/lib/monthly-donations";
 import { createHash, randomBytes, randomInt } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -109,12 +110,12 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     const person = challenge ? accessIdentity(challenge) : null;
     if (formData.get("intent") === "RESEND_CODE") {
       if (!challenge || !person || challenge.verifiedAt) return { success: false, message: "Deze verificatie is niet meer geldig. Begin opnieuw." };
-      const sentLogs = await prisma.emailLog.findMany({ where: { entityType: "SurveyMemberAccess", entityId: challenge.id, templateKey: "REGISTRATION_VERIFICATION_CODE" }, orderBy: { createdAt: "desc" }, take: 4, select: { createdAt: true } });
+      const sentLogs = await prisma.emailLog.findMany({ where: { entityType: "SurveyMemberAccess", entityId: challenge.id, templateKey: "SURVEY_VERIFICATION_CODE" }, orderBy: { createdAt: "desc" }, take: 4, select: { createdAt: true } });
       if (sentLogs.length >= 4) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "Er zijn al meerdere codes verstuurd. Wacht vijftien minuten en begin daarna opnieuw." };
       if (sentLogs[0] && Date.now() - sentLogs[0].createdAt.getTime() < 60_000) return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "Wacht minimaal één minuut voordat u opnieuw een code aanvraagt." };
       const newCode = String(randomInt(100000, 1000000));
       try {
-        await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: newCode }, throwOnSendError: true });
+        await prepareEmailLog({ templateKey: "SURVEY_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: newCode }, throwOnSendError: true });
         await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { codeHash: hashValue(newCode), expiresAt: new Date(Date.now() + 15 * 60 * 1000), attempts: 0 } });
         return { success: false, step: "VERIFY_EXISTING", challengeId, maskedEmail: maskEmail(person.email), message: "Er is een nieuwe verificatiecode verstuurd. De vorige code werkt niet meer." };
       } catch (error) {
@@ -145,11 +146,18 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     if (requestType !== "CONFIRM" && !challenge.surveyDonorId) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Dit donateurschap kan hier nog niet automatisch worden aangepast." };
     if (requestType === "CHANGE_AMOUNT" && challenge.surveyDonorId) {
       const amountCents = Math.round(Number(amount) * 100);
+      const donor = challenge.surveyDonor;
+      if (!donor?.mollieCustomerId || !donor.mollieMandateId || !donor.mollieSubscriptionId || donor.status !== "ACTIVE") return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Uw actieve Mollie-incasso kon niet worden gevonden. Neem contact op met de beheerder." };
+      try {
+        const current = await getMollieSubscription(donor.mollieCustomerId, donor.mollieSubscriptionId);
+        await cancelMollieSubscription(donor.mollieCustomerId, donor.mollieSubscriptionId);
+        const replacement = await createMollieSubscription({ customerId: donor.mollieCustomerId, mandateId: donor.mollieMandateId, amountCents, startDate: current.nextPaymentDate ?? nextMonthDate(), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: donor.id });
+        await prisma.surveyDonor.update({ where: { id: donor.id }, data: { monthlyAmountCents: amountCents, mollieSubscriptionId: replacement.id } });
+      } catch (error) {
+        console.error("Maandbedrag aanpassen bij Mollie mislukt", error);
+        return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Het maandbedrag kon niet veilig bij Mollie worden aangepast. Probeer het later opnieuw." };
+      }
       await prisma.$transaction(async (tx) => {
-        await tx.surveyDonor.update({
-          where: { id: challenge.surveyDonorId! },
-          data: { monthlyAmountCents: amountCents, status: challenge.surveyDonor?.status === "CANCELLED" ? "PENDING_MOLLIE" : challenge.surveyDonor?.status }
-        });
         const signupResponse = await tx.surveyResponse.findFirst({
           where: {
             email: person.email.toLowerCase(),
@@ -166,8 +174,17 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
           });
         }
       });
+      await prepareEmailLog({ templateKey: "SURVEY_MEMBERSHIP_AMOUNT_CHANGED", recipient: person.email, entityType: "SurveyDonor", entityId: donor.id, data: { naam: `${person.firstName} ${person.lastName}`, bedrag: `€ ${(amountCents / 100).toFixed(2).replace(".", ",")}` } });
     }
-    if (requestType === "CANCEL" && challenge.surveyDonorId) await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { status: "CANCELLED" } });
+    if (requestType === "CANCEL" && challenge.surveyDonorId) {
+      const donor = challenge.surveyDonor;
+      if (donor?.mollieCustomerId && donor.mollieSubscriptionId) {
+        try { await cancelMollieSubscription(donor.mollieCustomerId, donor.mollieSubscriptionId); }
+        catch (error) { console.error("Maanddonatie opzeggen bij Mollie mislukt", error); return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Opzeggen bij Mollie is niet gelukt. Probeer het later opnieuw; uw incasso is nog actief." }; }
+      }
+      await prisma.surveyDonor.update({ where: { id: challenge.surveyDonorId }, data: { status: "CANCELLED", cancelledAt: new Date(), mollieSubscriptionId: null } });
+      await prepareEmailLog({ templateKey: "SURVEY_MEMBERSHIP_CANCELLED", recipient: person.email, entityType: "SurveyDonor", entityId: donor!.id, data: { naam: `${person.firstName} ${person.lastName}` } });
+    }
     return { success: true, message: requestType === "CANCEL" ? "Uw donateurschap is opgezegd." : requestType === "CHANGE_AMOUNT" ? `Uw maandbedrag is aangepast naar € ${Number(amount).toFixed(2).replace(".", ",")}.` : "Dank voor uw bevestiging." };
   }
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
@@ -275,31 +292,17 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   if (isExistingDonor) {
     const submittedIdentity = { firstName: data.firstName, lastName: data.lastName, phone: data.phone, email: data.email.toLowerCase() };
     const surveyDonorCandidate = await prisma.surveyDonor.findUnique({ where: { email: submittedIdentity.email } });
-    const hasExistingSignup = surveyDonorCandidate?.status === "PENDING_MOLLIE"
-      ? Boolean(await prisma.surveyResponse.findFirst({
-          where: {
-            email: submittedIdentity.email,
-            answers: { path: ["wantsToBecomeDonor"], equals: true }
-          },
-          select: { id: true }
-        }))
-      : false;
     const surveyDonor = surveyDonorCandidate
-      && (surveyDonorCandidate.status === "ACTIVE" || hasExistingSignup)
+      && surveyDonorCandidate.status === "ACTIVE"
       && identityMatches(submittedIdentity, surveyDonorCandidate)
       ? surveyDonorCandidate
       : null;
-    const donor = await prisma.donorProfile.findFirst({
-      where: { status: "ACTIVE", user: { email: submittedIdentity.email, isActive: true } },
-      include: { user: true }
-    });
-    const matchedDonor = donor && identityMatches(submittedIdentity, { firstName: donor.firstName, lastName: donor.lastName, phone: donor.phone, email: donor.user.email }) ? donor : null;
-    if (!surveyDonor && !matchedDonor) return { success: false, message: "Deze gegevens zijn niet herkend als een actief donateurschap. Controleer uw naam, mobiele nummer en e-mailadres, of kies dat u nog geen donateur bent." };
-    const person = surveyDonor ?? { firstName: matchedDonor!.firstName, lastName: matchedDonor!.lastName, phone: matchedDonor!.phone, email: matchedDonor!.user.email };
+    if (!surveyDonor) return { success: false, message: "Deze gegevens zijn niet herkend als een actief maanddonateurschap van Masjid Ghausia. Controleer uw gegevens, of kies dat u nog geen donateur bent." };
+    const person = surveyDonor;
     const code = String(randomInt(100000, 1000000));
-    const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, donorProfileId: matchedDonor?.id, surveyDonorId: surveyDonor?.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
+    const challenge = await prisma.surveyMemberAccess.create({ data: { surveyId: survey.id, surveyDonorId: surveyDonor.id, codeHash: hashValue(code), expiresAt: new Date(Date.now() + 15 * 60 * 1000) } });
     try {
-      await prepareEmailLog({ templateKey: "REGISTRATION_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: code }, throwOnSendError: true });
+      await prepareEmailLog({ templateKey: "SURVEY_VERIFICATION_CODE", recipient: person.email, entityType: "SurveyMemberAccess", entityId: challenge.id, data: { naam: person.firstName, verification_code: code }, throwOnSendError: true });
     } catch (error) {
       await prisma.surveyMemberAccess.delete({ where: { id: challenge.id } });
       console.error("Verificatiecode voor bestaande donateur kon niet worden verstuurd", error);
@@ -311,17 +314,37 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
   const wantsMonthlyDonation = wantsToBecomeDonor === true ? true : null;
   const amount = wantsMonthlyDonation ? Number(String(data.monthlyAmount).replace(",", ".")) : null;
   const answers: DonorSurveyAnswers = { isExistingDonor, wantsToBecomeDonor, wantsMonthlyDonation, monthlyAmountCents: amount === null ? null : Math.round(amount * 100), directDebitConsent: wantsMonthlyDonation === true && data.directDebitConsent === "on" };
-  const response = await prisma.$transaction(async (tx) => {
+  if (wantsToBecomeDonor) {
+    const existingByEmail = await prisma.surveyDonor.findUnique({ where: { email: common.email } });
+    if (existingByEmail?.status === "ACTIVE") return { success: false, message: "Er bestaat al een actief maanddonateurschap met dit e-mailadres. Kies bij de eerste vraag dat u al donateur bent." };
+  }
+  const result = await prisma.$transaction(async (tx) => {
     const created = await tx.surveyResponse.create({ data: { ...common, answers } });
-    if (wantsToBecomeDonor) await tx.surveyDonor.upsert({
+    const donor = wantsToBecomeDonor ? await tx.surveyDonor.upsert({
       where: { email: common.email },
-      update: { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" },
+      update: { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE", cancelledAt: null },
       create: { email: common.email, firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" }
-    });
-    return created;
+    }) : null;
+    return { response: created, donor };
   });
-  await notifySurveyOwner(survey, response.id);
-  const templateKey = isExistingDonor ? "SURVEY_EXISTING_DONOR_CONFIRMED" : wantsToBecomeDonor ? "SURVEY_MEMBERSHIP_INTEREST" : "SURVEY_NO_MEMBERSHIP";
-  await prepareEmailLog({ templateKey, recipient: common.email, entityType: "SurveyResponse", entityId: response.id, data: { naam: `${common.firstName} ${common.lastName}` } });
+  if (wantsToBecomeDonor && result.donor && answers.monthlyAmountCents) {
+    try {
+      let customerId = result.donor.mollieCustomerId;
+      if (!customerId) {
+        const customer = await createMollieCustomer({ name: `${common.firstName} ${common.lastName}`, email: common.email, donorId: result.donor.id });
+        customerId = customer.id;
+        await prisma.surveyDonor.update({ where: { id: result.donor.id }, data: { mollieCustomerId: customerId } });
+      }
+      const payment = await createMollieFirstPayment({ customerId, amountCents: answers.monthlyAmountCents, redirectUrl: absoluteUrl(`/enquete/${survey.slug}/machtiging?donor=${result.donor.id}`), webhookUrl: absoluteUrl("/api/mollie/webhook"), donorId: result.donor.id, responseId: result.response.id });
+      await prisma.monthlyDonationPayment.create({ data: { surveyDonorId: result.donor.id, surveyResponseId: result.response.id, molliePaymentId: payment.id, amountCents: answers.monthlyAmountCents, sequenceType: "first", status: payment.status, checkoutUrl: payment.checkoutUrl } });
+      redirect(payment.checkoutUrl);
+    } catch (error) {
+      if (error && typeof error === "object" && "digest" in error) throw error;
+      console.error("Mollie-maandmachtiging starten mislukt", error);
+      return { success: false, message: "De Mollie-machtiging kon niet worden geopend. Uw gegevens zijn bewaard; probeer het opnieuw.", errors: {} };
+    }
+  }
+  await notifySurveyOwner(survey, result.response.id);
+  await prepareEmailLog({ templateKey: "SURVEY_NO_MEMBERSHIP", recipient: common.email, entityType: "SurveyResponse", entityId: result.response.id, data: { naam: `${common.firstName} ${common.lastName}` } });
   return { success: true, message: survey.thankYouMessage || (isExistingDonor ? "Dank voor uw bevestiging. U ontvangt ook een bevestiging per e-mail." : wantsToBecomeDonor ? "Dank voor uw interesse. Uw antwoorden zijn ontvangen; er wordt nu nog niets afgeschreven." : "Dank voor uw tijd en voor het invullen van de enquête.") };
 }

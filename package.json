@@ -11,6 +11,7 @@
     "db": "node prisma/seed.cjs",
     "db:reset-data": "node scripts/reset-database.cjs",
     "db:keep-one-member": "node scripts/keep-one-member.cjs",
+    "db:clear-all-members": "node scripts/clear-all-members.cjs",
     "db:reset-counter": "node scripts/reset-registration-counter.cjs",
     "prisma:generate": "prisma generate",
     "prisma:format": "prisma format"
