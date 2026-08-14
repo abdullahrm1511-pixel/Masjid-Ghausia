@@ -15,6 +15,10 @@ type MollieCustomer = { id: string; name: string; email: string };
 type MollieMandate = { id: string; status: string; method: string };
 export type MollieSubscription = { id: string; status: string; customerId: string; nextPaymentDate?: string | null; amount: { currency: string; value: string } };
 
+function reachableWebhookUrl(url: string) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)/.test(url) ? undefined : url;
+}
+
 function apiKey() {
   const key = process.env.MOLLIE_API_KEY;
   if (!key) throw new Error("Mollie is nog niet ingesteld. Voeg MOLLIE_API_KEY toe aan de serverinstellingen.");
@@ -41,7 +45,7 @@ export async function createMolliePayment(input: { amountCents: number; descript
   const payment = await mollieRequest<MolliePayment>("/payments", {
     method: "POST",
     headers: { "Idempotency-Key": `donation-${input.responseId}` },
-    body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, description: input.description.slice(0, 255), redirectUrl: input.redirectUrl, webhookUrl: input.webhookUrl, metadata: { surveyResponseId: input.responseId } })
+    body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, description: input.description.slice(0, 255), redirectUrl: input.redirectUrl, webhookUrl: reachableWebhookUrl(input.webhookUrl), metadata: { surveyResponseId: input.responseId } })
   });
   const checkoutUrl = payment._links.checkout?.href;
   if (!checkoutUrl) throw new Error("Mollie heeft geen betaalpagina teruggegeven.");
@@ -61,7 +65,7 @@ export async function createMollieFirstPayment(input: { customerId: string; amou
   const payment = await mollieRequest<MolliePayment>(`/customers/${input.customerId}/payments`, {
     method: "POST",
     headers: { "Idempotency-Key": `monthly-first-${input.responseId}` },
-    body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, sequenceType: "first", description: "Eerste maanddonatie Masjid Ghausia", redirectUrl: input.redirectUrl, webhookUrl: input.webhookUrl, metadata: { kind: "monthly_donation_first", surveyDonorId: input.donorId, surveyResponseId: input.responseId } })
+    body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, sequenceType: "first", description: "Eerste maanddonatie Masjid Ghausia", redirectUrl: input.redirectUrl, webhookUrl: reachableWebhookUrl(input.webhookUrl), metadata: { kind: "monthly_donation_first", surveyDonorId: input.donorId, surveyResponseId: input.responseId } })
   });
   const checkoutUrl = payment._links.checkout?.href;
   if (!checkoutUrl) throw new Error("Mollie heeft geen machtigingspagina teruggegeven.");
@@ -78,7 +82,7 @@ export function createMollieSubscription(input: { customerId: string; mandateId:
   return mollieRequest<MollieSubscription>(`/customers/${input.customerId}/subscriptions`, {
     method: "POST",
     headers: { "Idempotency-Key": `monthly-subscription-${input.donorId}-${input.mandateId}-${input.amountCents}-${input.startDate}` },
-    body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, interval: "1 month", startDate: input.startDate, description: `Maanddonatie Masjid Ghausia ${input.donorId.slice(-8)}`, mandateId: input.mandateId, webhookUrl: input.webhookUrl, metadata: { kind: "monthly_donation", surveyDonorId: input.donorId } })
+    body: JSON.stringify({ amount: { currency: "EUR", value: (input.amountCents / 100).toFixed(2) }, interval: "1 month", startDate: input.startDate, description: `Maanddonatie Masjid Ghausia ${input.donorId.slice(-8)}`, mandateId: input.mandateId, webhookUrl: reachableWebhookUrl(input.webhookUrl), metadata: { kind: "monthly_donation", surveyDonorId: input.donorId } })
   });
 }
 

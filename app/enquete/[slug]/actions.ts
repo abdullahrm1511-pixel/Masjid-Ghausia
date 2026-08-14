@@ -150,6 +150,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     if (requestType === "CHANGE_AMOUNT" && Number(amount) < 5) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Het minimale maandbedrag is € 5." };
     if (requestType === "CHANGE_AMOUNT" && Number(amount) > 10000) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Het maandbedrag mag maximaal € 10.000 zijn." };
     if (requestType !== "CONFIRM" && !challenge.surveyDonorId) return { success: false, step: "EXISTING_OPTIONS", challengeId, accessToken, message: "Dit donateurschap kan hier nog niet automatisch worden aangepast." };
+    if (requestType === "CONFIRM" && challenge.surveyDonorId && challenge.surveyDonor?.status !== "ACTIVE") return { success: false, message: "Dit donateurschap is niet meer actief, dus er valt niets te bevestigen." };
     if (requestType === "CHANGE_AMOUNT" && challenge.surveyDonorId) {
       const amountCents = Math.round(Number(amount) * 100);
       const donor = challenge.surveyDonor;
@@ -192,6 +193,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
       await prisma.monthlyDonationAgreement.updateMany({ where: { surveyDonorId: challenge.surveyDonorId, status: "ACTIVE" }, data: { status: "CANCELLED", cancelledAt: new Date() } });
       await prepareEmailLog({ templateKey: "SURVEY_MEMBERSHIP_CANCELLED", recipient: person.email, entityType: "SurveyDonor", entityId: donor!.id, data: { naam: `${person.firstName} ${person.lastName}` } });
     }
+    await prisma.surveyMemberAccess.update({ where: { id: challenge.id }, data: { expiresAt: new Date(0) } });
     return { success: true, message: requestType === "CANCEL" ? "Uw donateurschap is opgezegd." : requestType === "CHANGE_AMOUNT" ? `Uw maandbedrag is aangepast naar € ${Number(amount).toFixed(2).replace(".", ",")}.` : "Dank voor uw bevestiging." };
   }
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";

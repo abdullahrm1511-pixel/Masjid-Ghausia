@@ -11,3 +11,4 @@ tmp
 
 .vercel
 .env*
+.claude/settings.local.json
