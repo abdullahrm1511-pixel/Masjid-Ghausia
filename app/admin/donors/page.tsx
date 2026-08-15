@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/display";
 import { donorStatusBadgeClass, donorStatusLabel } from "@/lib/labels";
 import { isMosqueDonation } from "@/lib/mosque-donation";
 import { isNearlyEighteen } from "@/lib/pricing";
+import { BulkStatusMenu } from "./BulkStatusMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -94,9 +95,12 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
           <h1 className="mt-2 text-3xl font-black text-slate-950">Donateurs</h1>
           <p className="mt-2 text-sm font-semibold text-slate-600">{selectedLabel}: {donors.length}</p>
         </div>
-        <Link className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-800 hover:bg-slate-100" href="/admin">
-          Terug naar dashboard
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-800 hover:bg-slate-100" href="/admin">
+            Terug naar dashboard
+          </Link>
+          <BulkStatusMenu />
+        </div>
       </div>
       <form className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
         {selectedStatus ? <input name="status" type="hidden" value={selectedStatus} /> : null}
