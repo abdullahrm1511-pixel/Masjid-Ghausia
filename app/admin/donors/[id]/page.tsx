@@ -79,8 +79,6 @@ export default async function DonorDetailPage({
   const primaryContact = partners.find((member) => member.relationship === "Primaire contactpersoon" && member.status === "ACTIVE_DEPENDENT");
   const visibleTabs = canManageSettings(session?.user.role) ? tabs : tabs.filter(([, value]) => value !== "status");
   const safeActiveTab: TabKey = visibleTabs.some(([, value]) => value === activeTab) ? activeTab : "profile";
-  const displayedAmount = dueTotal > 0 ? dueTotal : paidTotal;
-  const displayedAmountLabel = dueTotal > 0 ? "Open bedrag" : "Ontvangen";
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
@@ -94,8 +92,6 @@ export default async function DonorDetailPage({
               {donorStatusLabel(donor.status)}
             </span>
             {isCancelledForNonPayment ? <span className="rounded-md bg-red-100 px-3 py-2 text-sm font-bold text-red-900">Geannuleerd</span> : null}
-            {dueTotal > 0 ? <span className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-800">{formatCurrency(dueTotal)} open</span> : null}
-            {paidTotal > 0 ? <span className="rounded-md bg-teal-50 px-3 py-2 text-sm font-bold text-[#0f5f9f]">{formatCurrency(paidTotal)} ontvangen</span> : null}
           </div>
         </div>
         <Link className="inline-flex rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" href={`/admin/donors/${donor.id}/financial`}>
@@ -103,7 +99,7 @@ export default async function DonorDetailPage({
         </Link>
       </div>
 
-      <section className="mt-5 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
+      <section className="mt-5 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">{primaryContact ? "Primair contact" : "Primair"}</p>
           <p className="mt-1 font-black text-slate-950">
@@ -114,10 +110,6 @@ export default async function DonorDetailPage({
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">Betaalstatus</p>
           <p className={`mt-1 font-black ${dueTotal > 0 ? "text-red-700" : paidTotal > 0 ? "text-[#0f5f9f]" : "text-slate-950"}`}>{paymentStatusText}</p>
-        </div>
-        <div>
-          <p className="text-xs font-bold uppercase text-slate-500">{displayedAmountLabel}</p>
-          <p className={`mt-1 font-black ${dueTotal > 0 ? "text-red-700" : "text-slate-950"}`}>{formatCurrency(displayedAmount)}</p>
         </div>
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">Laatste betaling</p>
@@ -218,7 +210,6 @@ export default async function DonorDetailPage({
 
                 <dl className="grid content-start gap-3 rounded-md bg-teal-50 p-4 text-sm">
                   <div><dt className="font-semibold text-slate-600">Betaalstatus</dt><dd className={dueTotal > 0 ? "font-bold text-red-700" : paidTotal > 0 ? "font-bold text-[#0f5f9f]" : "font-bold text-slate-950"}>{paymentStatusText}</dd></div>
-                  <div><dt className="font-semibold text-slate-600">{displayedAmountLabel}</dt><dd className="text-xl font-black text-slate-950">{formatCurrency(displayedAmount)}</dd></div>
                   <div><dt className="font-semibold text-slate-600">Laatste betaling</dt><dd className="font-bold text-slate-950">{formatDate(latestPayment?.paidAt)}</dd></div>
                 </dl>
               </article>
