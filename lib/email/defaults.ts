@@ -20,7 +20,8 @@ export const EMAIL_PLACEHOLDERS = [
   "reset_link",
   "boete",
   "enquete_antwoord",
-  "enquete_titel"
+  "enquete_titel",
+  "kind_naam"
 ] as const;
 
 export type EmailTemplateKey =
@@ -38,6 +39,7 @@ export type EmailTemplateKey =
   | "PAYMENT_REMINDER"
   | "PAYMENT_REMINDER_SECOND"
   | "MOSQUE_DONATION_REMINDER"
+  | "ADULT_CHILD_REMINDER"
   | "ADMIN_NOTIFICATION"
   | "SURVEY_EXISTING_DONOR_CONFIRMED"
   | "SURVEY_VERIFICATION_CODE"
@@ -299,6 +301,29 @@ Wilt u dit bedrag op een geschikt moment overmaken naar:
 {{rekeningnummer}}
 
 Alvast hartelijk dank voor uw steun aan Masjid Ghausia.
+
+Met vriendelijke groet,
+St. GBC Masjid Ghausia`
+  },
+  {
+    key: "ADULT_CHILD_REMINDER",
+    name: "Herinnering aanmelding bij 18 jaar",
+    subject: "Formele herinnering: aanmelding lidmaatschap bij het bereiken van de 18-jarige leeftijd",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Hierbij ontvangt u een formele herinnering vanuit de administratie van St. GBC Masjid Ghausia.
+
+Volgens onze gegevens bereikt uw kind, {{kind_naam}}, op korte termijn de leeftijd van 18 jaar. Vanaf het bereiken van deze leeftijd wordt {{kind_naam}} niet langer automatisch als gezinslid meegerekend binnen uw bestaande lidmaatschap.
+
+Om het lidmaatschap bij St. GBC Masjid Ghausia, en de daaraan verbonden voorzieningen, ononderbroken te laten voortzetten, dient {{kind_naam}} zich zelfstandig aan te melden zodra de leeftijd van 18 jaar is bereikt. Wij verzoeken u vriendelijk doch met nadruk hier tijdig zorg voor te dragen.
+
+De aanmelding kan worden voltooid via ons donateursportaal:
+{{loginlink}}
+
+Ter referentie, uw huidige registratienummer is:
+{{registratienummer}}
+
+Heeft u vragen over deze procedure? Neemt u dan gerust contact op met het bestuur.
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`

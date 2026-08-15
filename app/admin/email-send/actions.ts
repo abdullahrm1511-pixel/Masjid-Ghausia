@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/display";
 import { DEFAULT_EMAIL_TEMPLATES, type EmailTemplateKey } from "@/lib/email/defaults";
 import { prepareEmailLog } from "@/lib/email/templates";
 import { canManageDonors } from "@/lib/permissions";
+import { isNearlyEighteen } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 
 async function requireAdmin() {
@@ -40,12 +41,13 @@ export async function sendBatchEmail(formData: FormData) {
 
   const donors = await prisma.donorProfile.findMany({
     where: { id: { in: selectedIds } },
-    include: { user: true, paymentObligations: true }
+    include: { user: true, paymentObligations: true, familyMembers: true }
   });
 
   const recipients = donors.filter((donor) => visibleEmail(donor.user.email));
   if (!recipients.length) redirect(`${path}${path.includes("?") ? "&" : "?"}error=Geen+geldige+e-mailadressen+gevonden`);
 
+  const siteUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001";
   for (const donor of recipients) {
     const openAmountCents = donor.paymentObligations
       .filter((item) => item.status === "DUE" && item.amountCents > 0)
@@ -53,6 +55,7 @@ export async function sendBatchEmail(formData: FormData) {
     const paidAmountCents = donor.paymentObligations
       .filter((item) => item.status === "PAID" && item.amountCents > 0)
       .reduce((sum, item) => sum + item.amountCents, 0);
+    const nearlyEighteenChild = donor.familyMembers.find((member) => member.type === "CHILD" && member.isActive && isNearlyEighteen(member.dateOfBirth));
 
     await prepareEmailLog({
       templateKey,
@@ -75,7 +78,8 @@ export async function sendBatchEmail(formData: FormData) {
         boete: "",
         contact_email: "info@stgbc.masjidghausia.nl",
         rekeningnummer: "NL72ABNA0808763342",
-        loginlink: `${process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001"}/login`,
+        kind_naam: nearlyEighteenChild ? `${nearlyEighteenChild.firstName} ${nearlyEighteenChild.lastName}`.trim() : "uw kind",
+        loginlink: templateKey === "ADULT_CHILD_REMINDER" ? `${siteUrl}/register` : `${siteUrl}/login`,
         organisatie: "St. GBC Masjid Ghausia",
         verification_link: "",
         verification_code: "",

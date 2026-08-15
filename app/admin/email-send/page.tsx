@@ -8,6 +8,7 @@ import { ensureDefaultEmailTemplates, renderEmailTemplate } from "@/lib/email/te
 import { normalizeIban } from "@/lib/iban";
 import { canManageDonors } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { isNearlyEighteen } from "@/lib/pricing";
 import { sendBatchEmail } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ const targetFilters = [
   ["Actieve donateurs", "active"],
   ["Inactief", "inactive"],
   ["Actie vereist", "action-required"],
+  ["Kind bijna 18", "child-nearly-18"],
   ["Alle donateurs", "all"]
 ] as const;
 
@@ -25,7 +27,8 @@ const sendTemplateKeys: EmailTemplateKey[] = [
   "PAYMENT_REMINDER_SECOND",
   "MOSQUE_DONATION_REMINDER",
   "CORRECTION_REQUIRED",
-  "CHANGE_REQUEST_RECEIVED"
+  "CHANGE_REQUEST_RECEIVED",
+  "ADULT_CHILD_REMINDER"
 ];
 
 function firstParam(value?: string | string[]) {
@@ -43,7 +46,13 @@ function targetWhere(target: string): Prisma.DonorProfileWhereInput {
   if (target === "active") return { status: "ACTIVE" };
   if (target === "inactive") return { status: "INACTIVE" };
   if (target === "action-required") return { status: "ACTION_REQUIRED" };
+  if (target === "child-nearly-18") return { familyMembers: { some: { type: "CHILD", isActive: true } } };
   return {};
+}
+
+function nearlyEighteenChildName(familyMembers: { type: string; isActive: boolean; dateOfBirth: Date; firstName: string; lastName: string }[]) {
+  const child = familyMembers.find((member) => member.type === "CHILD" && member.isActive && isNearlyEighteen(member.dateOfBirth));
+  return child ? `${child.firstName} ${child.lastName}`.trim() : "";
 }
 
 export default async function EmailSendPage({
@@ -78,12 +87,13 @@ export default async function EmailSendPage({
   const where: Prisma.DonorProfileWhereInput = {
     AND: [{ registrationNumber: { not: null } }, targetWhere(target), ...(searchWhere ? [searchWhere] : [])]
   };
-  const donors = await prisma.donorProfile.findMany({
+  const donorsRaw = await prisma.donorProfile.findMany({
     where,
-    include: { user: true, paymentObligations: true },
+    include: { user: true, paymentObligations: true, familyMembers: true },
     orderBy: [{ registrationNumber: "asc" }, { createdAt: "desc" }],
-    take: 200
+    take: target === "child-nearly-18" ? undefined : 200
   });
+  const donors = (target === "child-nearly-18" ? donorsRaw.filter((donor) => nearlyEighteenChildName(donor.familyMembers)) : donorsRaw).slice(0, 200);
   const templates = await prisma.emailTemplate.findMany({
     where: { key: { in: sendTemplateKeys } },
     orderBy: { key: "asc" }
@@ -92,6 +102,7 @@ export default async function EmailSendPage({
   const firstOpenAmount = firstDonor?.paymentObligations
     .filter((item) => item.status === "DUE" && item.amountCents > 0)
     .reduce((sum, item) => sum + item.amountCents, 0) ?? 0;
+  const siteUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001";
   const preview = firstDonor
     ? await renderEmailTemplate(selectedTemplate, {
         naam: `${firstDonor.firstName} ${firstDonor.lastName}`.trim(),
@@ -105,7 +116,8 @@ export default async function EmailSendPage({
         donatie_bedrag: formatCurrency(firstOpenAmount),
         rekeningnummer: "NL72ABNA0808763342",
         boete: "",
-        loginlink: `${process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001"}/login`,
+        kind_naam: nearlyEighteenChildName(firstDonor.familyMembers) || "uw kind",
+        loginlink: selectedTemplate === "ADULT_CHILD_REMINDER" ? `${siteUrl}/register` : `${siteUrl}/login`,
         organisatie: "St. GBC Masjid Ghausia"
       })
     : null;
