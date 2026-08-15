@@ -34,6 +34,7 @@ export function BulkStatusMenu() {
                 <option value="">Kies status</option>
                 <option value="INACTIVE">Inactief</option>
                 <option value="ACTIVE">Actief</option>
+                <option value="PAYMENT_REQUIRED">Betaling afwachtend</option>
               </select>
             </label>
             <label className="grid gap-1 text-xs font-bold text-slate-700">

@@ -9,7 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { syncFamilyActivityForDonorStatus } from "@/lib/household-activity";
 import { findDonorByRegistrationNumber } from "@/lib/membership";
 
-const bulkEditableStatuses = ["ACTIVE", "INACTIVE"] as const;
+const bulkEditableStatuses = ["ACTIVE", "INACTIVE", "PAYMENT_REQUIRED"] as const;
 
 export type BulkStatusState = {
   updated: number;
