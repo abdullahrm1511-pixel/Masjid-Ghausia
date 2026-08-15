@@ -132,6 +132,22 @@ export function calculateCurrentAnnualAmount(
   return config.annualIndividual18Plus;
 }
 
+export function annualRateReason(
+  donorProfile: Pick<DonorProfile, "dateOfBirth" | "maritalStatus">,
+  familyMembers: Array<Pick<FamilyMember, "dateOfBirth" | "type" | "isActive"> & { status?: string | null }>,
+  today = new Date()
+) {
+  if (ageOn(donorProfile.dateOfBirth, today) < 18) return "Hoofddonateur is minderjarig, nog geen jaarlijkse bijdrage.";
+
+  const activeFamily = familyMembers.filter((member) => contributesToHousehold(member.status));
+  const partner = activeFamily.find((member) => member.type === "PARTNER");
+  const under18Children = activeFamily.filter((member) => member.type === "CHILD" && ageOn(member.dateOfBirth, today) < 18);
+
+  if (partner) return "Gezinstarief: partner geregistreerd bij het lidmaatschap.";
+  if (under18Children.length > 0) return "Alleenstaande-oudertarief: minderjarige kinderen, geen partner.";
+  return "Individueel tarief: geen partner of minderjarige kinderen geregistreerd.";
+}
+
 export function calculateDonorCharges(
   donorProfile: Pick<DonorProfile, "firstName" | "lastName" | "dateOfBirth" | "maritalStatus" | "approvedAt">,
   familyMembers: Array<Pick<FamilyMember, "firstName" | "lastName" | "dateOfBirth" | "type" | "isActive"> & { status?: string | null }>,

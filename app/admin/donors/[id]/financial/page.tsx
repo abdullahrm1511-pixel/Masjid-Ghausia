@@ -6,7 +6,7 @@ import { formatIban } from "@/lib/iban";
 import { donorStatusBadgeClass, donorStatusLabel } from "@/lib/labels";
 import { isMosqueDonation, mosqueDonationSummary } from "@/lib/mosque-donation";
 import { prisma } from "@/lib/prisma";
-import { calculateCurrentAnnualAmount, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
+import { annualRateReason, calculateCurrentAnnualAmount, calculateDonorCharges, calculateTotalOneTimeContribution, getPricingConfig } from "@/lib/pricing";
 import { activateDonorManually, markAnnualPaymentDue, registerBankPayment, resetRegisteredPayments } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +62,8 @@ export default async function FinancialPage({
   const expectedOneTimeTotal = donor.approvedAt
     ? calculateTotalOneTimeContribution(donor, donor.familyMembers, pricing, oneTimeChargeDate) * 100
     : 0;
+  const oneTimeCharges = donor.approvedAt ? calculateDonorCharges(donor, donor.familyMembers, pricing, { today: oneTimeChargeDate }) : [];
+  const annualReason = annualRateReason(donor, donor.familyMembers, new Date(`${currentYear}-01-01T00:00:00.000Z`));
   const annualDueItems = regularDueItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
   const registeredAnnualDueTotal = annualDueItems.reduce((sum, item) => sum + item.amountCents, 0);
   const annualPaidItems = regularPaidItems.filter((item) => item.obligationType === "ANNUAL" && paymentYear(item) === currentYear);
@@ -152,8 +154,9 @@ export default async function FinancialPage({
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <dt className="text-sm font-bold text-slate-600">Jaarlijks</dt>
+                  <dt className="text-sm font-bold text-slate-600">Jaarlijks (€72 - €144)</dt>
                   <dd className={`mt-1 text-lg font-black ${annualIsPaid ? "text-slate-900" : annualTotal > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(annualTotal)}</dd>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{annualReason}</p>
                   <p className="mt-1 text-xs text-slate-600">
                     {annualIsPaid
                       ? `Betaald: ${formatCurrency(annualPaidTotal)}${latestAnnualPaid ? `, laatste betaling ${formatDate(latestAnnualPaid.paidAt)}` : ""}`
@@ -165,11 +168,16 @@ export default async function FinancialPage({
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <dt className="text-sm font-bold text-slate-600">Eenmalig</dt>
+                  <dt className="text-sm font-bold text-slate-600">Eenmalig (op basis van leeftijd bij aanmelding)</dt>
                   <dd className={`mt-1 text-lg font-black ${remainingOneTime > 0 ? "text-red-700" : "text-slate-900"}`}>{formatCurrency(oneTimeTotal)}</dd>
                   {donor.approvedAt ? (
                     <>
-                      <p className="mt-1 text-xs text-slate-600">Betaald {formatCurrency(displayedOneTimePaid)}, restant {formatCurrency(remainingOneTime)}</p>
+                      <div className="mt-2 grid gap-0.5">
+                        {oneTimeCharges.map((person) => (
+                          <p className="text-xs text-slate-600" key={person.name}>{person.name} ({person.age} jr): {formatCurrency(person.oneTimeContribution * 100)}</p>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-slate-600">Betaald {formatCurrency(displayedOneTimePaid)}, restant {formatCurrency(remainingOneTime)}</p>
                       <p className="mt-1 text-xs font-bold text-slate-600">Nieuwe leden worden pas actief na volledige betaling.</p>
                     </>
                   ) : (
