@@ -889,8 +889,12 @@ export async function commitImport(_previous: ImportResultState | null, formData
     return commitMemberPersonalDetailsImport(rows, adminId, fileName, String(formData.get("archiveBase64") ?? ""));
   }
 
+  const finalize = formData.get("finalize") !== "false";
   const summary: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
   const bankImportYears = new Set<number>();
+  for (const year of String(formData.get("allBankImportYears") ?? "").split(",").map(Number)) {
+    if (Number.isFinite(year) && year > 0) bankImportYears.add(year);
+  }
   const skippedDonorIds = new Set<string>();
 
   for (const row of rows) {
@@ -1004,8 +1008,10 @@ export async function commitImport(_previous: ImportResultState | null, formData
     }
   }
 
-  for (const year of bankImportYears) {
-    summary.inactive = (summary.inactive ?? 0) + await markUnpaidDonorsInactiveAfterWindow(adminId, year, skippedDonorIds);
+  if (finalize) {
+    for (const year of bankImportYears) {
+      summary.inactive = (summary.inactive ?? 0) + await markUnpaidDonorsInactiveAfterWindow(adminId, year, skippedDonorIds);
+    }
   }
 
   await syncRegistrationCounter(rows.map((row) => row.registrationNumber).filter(Boolean));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import type { ImportPreviewRow } from "@/lib/admin/import";
 import { previewImport, commitImport, type ImportPreviewState, type ImportResultState } from "./actions";
 import { formatCurrency, formatDate } from "@/lib/display";
@@ -9,6 +9,34 @@ import { formatIban } from "@/lib/iban";
 const initialPreview: ImportPreviewState = { rows: [], fileName: "" };
 const initialResult: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
 type PreviewFilter = "all" | "new" | "linked" | "duplicates" | "warnings" | "review" | "invalid" | "ignored" | "required";
+
+const MEMBER_GROUPS_PER_BATCH = 20;
+const ROWS_PER_BATCH = 75;
+
+function chunkRowsForCommit(allRows: ImportPreviewRow[]): ImportPreviewRow[][] {
+  if (!allRows.length) return [];
+  const isMemberImport = allRows.some((row) => row.importMode === "member-personal-details");
+  if (!isMemberImport) {
+    const chunks: ImportPreviewRow[][] = [];
+    for (let i = 0; i < allRows.length; i += ROWS_PER_BATCH) chunks.push(allRows.slice(i, i + ROWS_PER_BATCH));
+    return chunks;
+  }
+  // Keep every household (same registration number) together in one batch, otherwise
+  // a partner/child row can land in a later batch than its primary member and get
+  // skipped for "review" even though the primary already exists.
+  const groups = new Map<string, ImportPreviewRow[]>();
+  const order: string[] = [];
+  for (const row of allRows) {
+    const key = row.registrationNumber || `__row_${row.rowNumber}`;
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key)!.push(row);
+  }
+  const chunks: ImportPreviewRow[][] = [];
+  for (let i = 0; i < order.length; i += MEMBER_GROUPS_PER_BATCH) {
+    chunks.push(order.slice(i, i + MEMBER_GROUPS_PER_BATCH).flatMap((key) => groups.get(key)!));
+  }
+  return chunks;
+}
 
 const unignorableMessages = new Set(["Lidnummer ontbreekt", "Naam ontbreekt"]);
 
@@ -30,10 +58,57 @@ function actionLabel(action: string, isMemberImport = false, relationshipToMembe
 
 export function ImportForm() {
   const [preview, previewAction, previewPending] = useActionState(previewImport, initialPreview);
-  const [result, commitAction, commitPending] = useActionState(commitImport, initialResult);
   const [filter, setFilter] = useState<PreviewFilter>("all");
   const [rows, setRows] = useState<ImportPreviewRow[]>([]);
   useEffect(() => setRows(preview.rows), [preview.rows]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [result, setResult] = useState<ImportResultState>(initialResult);
+  const [commitPending, setCommitPending] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const handleCommit = async () => {
+    if (!formRef.current || commitPending) return;
+    const chunks = chunkRowsForCommit(rows);
+    if (!chunks.length) return;
+    setCommitPending(true);
+    setBatchProgress({ done: 0, total: chunks.length });
+    const baseFormData = new FormData(formRef.current);
+    const allBankImportYears = [...new Set(
+      rows
+        .filter((row) => row.importMode === "bank-transactions")
+        .map((row) => row.contributionYear ?? (row.paidAt ? new Date(row.paidAt).getFullYear() : new Date().getFullYear()))
+    )].join(",");
+    const aggregate: ImportResultState = { created: 0, linked: 0, invalid: 0, review: 0, duplicates: 0, inactive: 0 };
+    setResult(aggregate);
+    try {
+      for (let index = 0; index < chunks.length; index += 1) {
+        const chunkFormData = new FormData();
+        for (const [key, value] of baseFormData.entries()) {
+          if (key === "rows" || key === "archiveBase64") continue;
+          chunkFormData.append(key, value);
+        }
+        chunkFormData.set("rows", JSON.stringify(chunks[index]));
+        chunkFormData.set("archiveBase64", index === 0 ? String(baseFormData.get("archiveBase64") ?? "") : "");
+        chunkFormData.set("finalize", index === chunks.length - 1 ? "true" : "false");
+        chunkFormData.set("allBankImportYears", allBankImportYears);
+        const chunkResult = await commitImport(aggregate, chunkFormData);
+        aggregate.created += chunkResult.created;
+        aggregate.linked += chunkResult.linked;
+        aggregate.invalid += chunkResult.invalid;
+        aggregate.review += chunkResult.review;
+        aggregate.duplicates = (aggregate.duplicates ?? 0) + (chunkResult.duplicates ?? 0);
+        aggregate.inactive = (aggregate.inactive ?? 0) + (chunkResult.inactive ?? 0);
+        if (chunkResult.error) aggregate.error = chunkResult.error;
+        setResult({ ...aggregate });
+        setBatchProgress({ done: index + 1, total: chunks.length });
+        if (chunkResult.error) break;
+      }
+    } catch (error) {
+      setResult((current) => ({ ...current, error: error instanceof Error ? error.message : "Import mislukt. Probeer het later opnieuw." }));
+    } finally {
+      setCommitPending(false);
+    }
+  };
 
   const activeMessages = (row: ImportPreviewRow) => [...row.errors, ...row.reviewReasons, ...row.warnings].filter((message) => !(row.ignoredMessages ?? []).includes(message));
   const isBankImport = rows.some((row) => row.importMode === "bank-transactions");
@@ -134,19 +209,24 @@ export function ImportForm() {
       </form>
 
       {preview.rows.length ? (
-        <form action={commitAction} className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <form className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={(event) => event.preventDefault()} ref={formRef}>
           <input name="fileName" type="hidden" value={preview.fileName} />
           <textarea className="hidden" name="archiveBase64" readOnly value={preview.archiveBase64 ?? ""} />
-          <textarea className="hidden" name="rows" readOnly value={JSON.stringify(rows)} />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-black text-slate-950">Import preview</h2>
               <p className="mt-1 text-sm text-slate-600">{preview.fileName}</p>
             </div>
-            <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f] disabled:cursor-not-allowed disabled:opacity-60" disabled={commitPending || requiredRows > 0} type="submit">
-              {commitPending ? "Verwerken..." : "Import verwerken"}
+            <button className="rounded-lg bg-[#1483d6] px-5 py-3 font-bold text-white shadow-sm hover:bg-[#0f5f9f] disabled:cursor-not-allowed disabled:opacity-60" disabled={commitPending || requiredRows > 0} onClick={handleCommit} type="button">
+              {commitPending ? `Verwerken... (${batchProgress?.done ?? 0}/${batchProgress?.total ?? "?"})` : "Import verwerken"}
             </button>
           </div>
+          {commitPending && batchProgress && batchProgress.total > 1 ? (
+            <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-900">
+              Grote import wordt in {batchProgress.total} delen verwerkt om een time-out te voorkomen. Batch {batchProgress.done} van {batchProgress.total} afgerond — laat deze pagina open staan.
+            </div>
+          ) : null}
+          {result.error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{result.error}</p> : null}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9">
             <button className={filterButtonClass("all", "bg-slate-100")} onClick={() => setFilter("all")} type="button">
