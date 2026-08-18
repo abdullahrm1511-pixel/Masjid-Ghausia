@@ -39,6 +39,7 @@ export type EmailTemplateKey =
   | "PAYMENT_REMINDER"
   | "PAYMENT_REMINDER_SECOND"
   | "MOSQUE_DONATION_REMINDER"
+  | "MASJID_GHAUSIA_MEMBERSHIP_PROOF_REQUEST"
   | "ADULT_CHILD_REMINDER"
   | "ADMIN_NOTIFICATION"
   | "SURVEY_EXISTING_DONOR_CONFIRMED"
@@ -304,6 +305,29 @@ Alvast hartelijk dank voor uw steun aan Masjid Ghausia.
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`
+  },
+  {
+    key: "MASJID_GHAUSIA_MEMBERSHIP_PROOF_REQUEST",
+    name: "Bewijs donateurschap Masjid Ghausia",
+    subject: "Verzoek om bewijs van donateurschap Masjid Ghausia",
+    bodyText: `Assalamu alaikum {{naam}},
+
+Geacht lid,
+
+Volgens het geldende moskeereglement dient ieder lid van St. GBC tevens lid dan wel donateur te zijn van Masjid Ghausia.
+
+Wij verzoeken u daarom vriendelijk om een bewijs van uw donatie aan Masjid Ghausia per e-mail toe te sturen aan sgbc16@gmail.com. Dit kan bijvoorbeeld een donatie van € 5,00 of € 10,00 zijn.
+
+Het bewijs dient te bestaan uit een bankafschrift of betalingsbewijs waarop duidelijk uw naam en de betaling aan Masjid Ghausia zichtbaar zijn. Vermeld bij uw e-mail ook uw registratienummer: {{registratienummer}}.
+
+Wij verzoeken u vriendelijk om dit bewijs zo spoedig mogelijk toe te sturen, zodat wij uw lidmaatschapsgegevens volledig kunnen maken en controleren.
+
+Heeft u het bewijs al toegestuurd? Dan kunt u deze e-mail als niet verzonden beschouwen.
+
+Bij voorbaat dank voor uw medewerking.
+
+Met vriendelijke groet,
+Het bestuur van St. GBC`
   },
   {
     key: "ADULT_CHILD_REMINDER",

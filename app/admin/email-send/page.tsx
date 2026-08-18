@@ -26,6 +26,7 @@ const sendTemplateKeys: EmailTemplateKey[] = [
   "PAYMENT_REMINDER",
   "PAYMENT_REMINDER_SECOND",
   "MOSQUE_DONATION_REMINDER",
+  "MASJID_GHAUSIA_MEMBERSHIP_PROOF_REQUEST",
   "CORRECTION_REQUIRED",
   "CHANGE_REQUEST_RECEIVED",
   "ADULT_CHILD_REMINDER"
@@ -91,9 +92,9 @@ export default async function EmailSendPage({
     where,
     include: { user: true, paymentObligations: true, familyMembers: true },
     orderBy: [{ registrationNumber: "asc" }, { createdAt: "desc" }],
-    take: target === "child-nearly-18" ? undefined : 200
+    take: target === "child-nearly-18" || target === "all" ? undefined : 200
   });
-  const donors = (target === "child-nearly-18" ? donorsRaw.filter((donor) => nearlyEighteenChildName(donor.familyMembers)) : donorsRaw).slice(0, 200);
+  const donors = target === "child-nearly-18" ? donorsRaw.filter((donor) => nearlyEighteenChildName(donor.familyMembers)) : donorsRaw;
   const templates = await prisma.emailTemplate.findMany({
     where: { key: { in: sendTemplateKeys } },
     orderBy: { key: "asc" }
