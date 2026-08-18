@@ -15,14 +15,14 @@ export function SurveyForm({ survey, settings, sepaConfig, preview = false }: { 
   const [state, action, pending] = useActionState(submitSurvey, initialState);
   const [existing, setExisting] = useState<"yes" | "no" | null>(null);
   const [join, setJoin] = useState<"yes" | "no" | null>(null);
-  const [memberAction, setMemberAction] = useState("CONFIRM");
   const [anonymousDonation, setAnonymousDonation] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [monthlyAmount, setMonthlyAmount] = useState("");
-  const [requestedAmount, setRequestedAmount] = useState("");
+  const [existingBankAccount, setExistingBankAccount] = useState("");
+  const [existingAmount, setExistingAmount] = useState("");
   const [directDebitConsent, setDirectDebitConsent] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false); const [signatureAccepted,setSignatureAccepted]=useState(false); const [signerName,setSignerName]=useState("");
   const [oneTimeAmount, setOneTimeAmount] = useState("");
@@ -30,27 +30,6 @@ export function SurveyForm({ survey, settings, sepaConfig, preview = false }: { 
   const isOneTime = survey.templateKey === "ONE_TIME_DONATION";
 
   if (state.success) return <section className="survey-card survey-finished" aria-live="polite"><div className="survey-check">✓</div><p className="donor-eyebrow">Aanvraag afgerond</p><h1>Hartelijk dank</h1><p>{state.message}</p></section>;
-
-  if (state.step === "VERIFY_EXISTING") return <form action={action} className="survey-card">
-    <input name="surveyId" type="hidden" value={survey.id} /><input name="mode" type="hidden" value="VERIFY_EXISTING" /><input name="challengeId" type="hidden" value={state.challengeId ?? ""} />
-    <header className="survey-heading"><p className="donor-eyebrow">Beveiligde controle</p><h1>Bevestig dat u het bent</h1><p>{state.message}{state.maskedEmail ? ` Code verstuurd naar ${state.maskedEmail}.` : ""}</p></header>
-    <label>Verificatiecode<input autoComplete="one-time-code" inputMode="numeric" maxLength={6} name="verificationCode" pattern="[0-9]{6}" required /></label>
-    <button className="donor-submit-button survey-submit" disabled={pending} type="submit">{pending ? "Code controleren..." : "Code controleren"}</button>
-    <div className="text-center"><p className="text-sm text-slate-600">Geen code ontvangen? Controleer ook uw spammap.</p><button className="mt-2 font-bold text-[#0f5f9f] underline disabled:opacity-60" disabled={pending} formNoValidate name="intent" type="submit" value="RESEND_CODE">{pending ? "Even geduld..." : "Stuur de code opnieuw"}</button></div>
-  </form>;
-
-  if (state.step === "EXISTING_OPTIONS") return <form action={action} className="survey-card">
-    <input name="surveyId" type="hidden" value={survey.id} /><input name="mode" type="hidden" value="MEMBER_REQUEST" /><input name="challengeId" type="hidden" value={state.challengeId ?? ""} /><input name="accessToken" type="hidden" value={state.accessToken ?? ""} />
-    <header className="survey-heading"><p className="donor-eyebrow">Bestaande donateur herkend</p><h1>Wat wilt u doen?</h1><p>{state.message}</p></header>
-    <div className="survey-choices">
-      <label className="survey-choice"><input checked={memberAction === "CONFIRM"} name="memberAction" onChange={() => setMemberAction("CONFIRM")} type="radio" value="CONFIRM" /><span>Mijn donateurschap bevestigen</span></label>
-      <label className="survey-choice"><input checked={memberAction === "CHANGE_AMOUNT"} name="memberAction" onChange={() => setMemberAction("CHANGE_AMOUNT")} type="radio" value="CHANGE_AMOUNT" /><span>Mijn maandbedrag aanpassen</span></label>
-      <label className="survey-choice"><input checked={memberAction === "CANCEL"} name="memberAction" onChange={() => setMemberAction("CANCEL")} type="radio" value="CANCEL" /><span>Mijn donateurschap opzeggen</span></label>
-    </div>
-    {memberAction === "CHANGE_AMOUNT" ? <label>Nieuw maandbedrag (€)<input inputMode="decimal" name="requestedAmount" onChange={(event) => setRequestedAmount(event.target.value)} required step="0.01" type="number" value={requestedAmount} /></label> : null}
-    {memberAction === "CANCEL" ? <p className="survey-note">Uw donateurschap wordt direct opgezegd.</p> : null}
-    <button className="donor-submit-button survey-submit" disabled={pending} type="submit">{pending ? "Wijziging verwerken..." : "Wijziging bevestigen"}</button>
-  </form>;
 
   const error = (name: string) => state.errors?.[name] ? <p className="survey-error">{state.errors[name]}</p> : null;
   const canSubmit = isOneTime || existing === "yes" || join !== null;
@@ -75,7 +54,10 @@ export function SurveyForm({ survey, settings, sepaConfig, preview = false }: { 
       <fieldset className="survey-section"><legend><span>1</span> {settings.question1}</legend><div className="survey-choices">
         <Choice checked={existing === "yes"} label={settings.yesLabel} name="isExistingDonor" onChange={() => { setExisting("yes"); setJoin(null); }} value="yes" />
         <Choice checked={existing === "no"} label={settings.noLabel} name="isExistingDonor" onChange={() => { setExisting("no"); setJoin(null); }} value="no" />
-      </div>{existing === "yes" ? <p className="survey-note">{settings.existingDonorNote}</p> : null}{error("isExistingDonor")}</fieldset>
+      </div>{existing === "yes" ? <div className="survey-mandate survey-reveal"><p className="survey-note">{settings.existingDonorNote}</p>
+        <label>{settings.existingBankAccountLabel}<input autoComplete="off" maxLength={34} name="existingBankAccount" onChange={(event) => setExistingBankAccount(event.target.value)} placeholder="NL00BANK0123456789" required value={existingBankAccount} /></label>{error("existingBankAccount")}
+        <label>{settings.existingAmountLabel}<input inputMode="decimal" name="existingAmount" onChange={(event) => setExistingAmount(event.target.value)} placeholder="Bijvoorbeeld 10,00" required step="0.01" type="number" value={existingAmount} /></label>{error("existingAmount")}
+      </div> : null}{error("isExistingDonor")}</fieldset>
       {existing === "no" ? <fieldset className="survey-section survey-reveal"><legend><span>2</span> {settings.question2}</legend><div className="survey-choices">
         <Choice checked={join === "yes"} label={settings.joinYesLabel} name="wantsToBecomeDonor" onChange={() => setJoin("yes")} value="yes" />
         <Choice checked={join === "no"} label={settings.joinNoLabel} name="wantsToBecomeDonor" onChange={() => setJoin("no")} value="no" />

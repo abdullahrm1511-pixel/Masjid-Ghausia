@@ -27,6 +27,8 @@ export type FixedSurveySettings = {
   joinYesLabel: string;
   joinNoLabel: string;
   existingDonorNote: string;
+  existingBankAccountLabel: string;
+  existingAmountLabel: string;
   noMembershipNote: string;
   monthlyNoNote: string;
   monthlyAmountLabel: string;
@@ -53,7 +55,9 @@ export const defaultFixedSurveySettings: FixedSurveySettings = {
   noLabel: "Nee",
   joinYesLabel: "Ja, ik wil donateur worden",
   joinNoLabel: "Nee, op dit moment niet",
-  existingDonorNote: "Dank voor uw bevestiging. Dit is de laatste vraag; u kunt uw antwoord verzenden.",
+  existingDonorNote: "Vul hieronder uw rekeningnummer en het bedrag in dat u al maandelijks overmaakt. Dit is de laatste vraag; u hoeft niet opnieuw te betalen.",
+  existingBankAccountLabel: "IBAN-rekeningnummer waarmee u overmaakt",
+  existingAmountLabel: "Bedrag dat u maandelijks overmaakt (€)",
   noMembershipNote: "Dank voor uw tijd. Dit is de laatste vraag; u kunt uw antwoord verzenden.",
   monthlyNoNote: "Geen probleem. U kunt uw antwoord nu verzenden.",
   monthlyAmountLabel: "Zelfgekozen bedrag per maand (€)",
@@ -160,6 +164,7 @@ export type DonorSurveyAnswers = {
   wantsMonthlyDonation: boolean | null;
   monthlyAmountCents: number | null;
   directDebitConsent: boolean;
+  existingBankAccount?: string | null;
 };
 
 export type OneTimeDonationAnswers = {
