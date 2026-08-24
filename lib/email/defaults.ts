@@ -390,7 +390,7 @@ Masjid Ghausia`
     subject: "Dank voor uw bevestiging",
     bodyText: `Assalamu alaikum {{naam}},
 
-Hartelijk dank voor uw bevestiging dat u al donateur bent van Masjid Ghausia. Uw antwoord is goed ontvangen.
+Hartelijk dank voor uw bevestiging dat u al donateur bent van Masjid Ghausia en akkoord gaat met de doorlopende SEPA-incasso van het opgegeven bedrag en rekeningnummer. Uw ondertekende machtiging vindt u als bijlage bij deze e-mail; dit document kan indien nodig ook naar uw bank worden gestuurd als bewijs.
 
 Met vriendelijke groet,
 St. GBC Masjid Ghausia`

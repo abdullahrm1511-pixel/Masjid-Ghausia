@@ -7,9 +7,10 @@ import { prepareEmailLog } from "@/lib/email/templates";
 import { CUSTOM_SURVEY_TEMPLATE_KEY, parseSurveyQuestions, surveyAvailability, visibleSurveyQuestions, type DonorSurveyAnswers, type OneTimeDonationAnswers } from "@/lib/survey";
 import { absoluteUrl } from "@/lib/seo";
 import { createMollieCustomer, createMollieFirstPayment, createMolliePayment } from "@/lib/mollie";
-import { agreementTerms, getSepaConfig, sepaConfigComplete } from "@/lib/monthly-donation-agreement";
+import { agreementTerms, getSepaConfig, sepaConfigComplete, selfReportAgreementTerms } from "@/lib/monthly-donation-agreement";
+import { monthlyAgreementPdf } from "@/lib/pdf/monthly-donation-agreement";
 import { donationReturnPath } from "@/lib/donation-form-url";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { redirect } from "next/navigation";
 
 export type SurveyState = { success: boolean; message: string; errors?: Record<string, string> };
@@ -47,6 +48,9 @@ const donorSchema = z.object({
     if (!Number.isFinite(amount) || amount <= 0) ctx.addIssue({ code: "custom", path: ["existingAmount"], message: "Vul een geldig bedrag in." });
     else if (amount > 10000) ctx.addIssue({ code: "custom", path: ["existingAmount"], message: "Het bedrag mag maximaal € 10.000 zijn." });
     if (data.directDebitConsent !== "on") ctx.addIssue({ code: "custom", path: ["directDebitConsent"], message: "Uw bevestiging is nodig." });
+    if (data.termsAccepted !== "on") ctx.addIssue({ code: "custom", path: ["termsAccepted"], message: "Bevestig dat u de voorwaarden heeft gelezen." });
+    if (data.signatureAccepted !== "on") ctx.addIssue({ code: "custom", path: ["signatureAccepted"], message: "Bevestig uw digitale ondertekening." });
+    if (!data.signerName || !namePattern.test(data.signerName.trim())) ctx.addIssue({ code: "custom", path: ["signerName"], message: "Vul uw volledige naam als digitale ondertekening in." });
   }
   if (data.isExistingDonor === "no" && !data.wantsToBecomeDonor) ctx.addIssue({ code: "custom", path: ["wantsToBecomeDonor"], message: "Kies ja of nee." });
   if (data.wantsToBecomeDonor === "yes") {
@@ -213,23 +217,34 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     existingBankAccount: isExistingDonor ? String(data.existingBankAccount).trim().toUpperCase().replace(/\s+/g, "") : null
   };
   const sepaConfig = await getSepaConfig();
-  if (wantsToBecomeDonor && !sepaConfigComplete(sepaConfig)) return { success: false, message: "De officiële SEPA-gegevens worden nog ingesteld. Probeer het later opnieuw." };
-  if (wantsToBecomeDonor && data.termsVersion !== sepaConfig.termsVersion) return { success: false, message: "De voorwaarden zijn gewijzigd. Vernieuw de pagina en lees de actuele versie." };
-  if (wantsToBecomeDonor && normalizeIdentityText(data.signerName ?? "") !== normalizeIdentityText(`${common.firstName} ${common.lastName}`)) return { success: false, message: "De digitale ondertekening moet gelijk zijn aan uw ingevulde voor- en achternaam.", errors: { signerName: "Gebruik exact uw ingevulde voor- en achternaam." } };
+  if ((wantsToBecomeDonor || isExistingDonor) && !sepaConfigComplete(sepaConfig)) return { success: false, message: "De officiële SEPA-gegevens worden nog ingesteld. Probeer het later opnieuw." };
+  if ((wantsToBecomeDonor || isExistingDonor) && data.termsVersion !== sepaConfig.termsVersion) return { success: false, message: "De voorwaarden zijn gewijzigd. Vernieuw de pagina en lees de actuele versie." };
+  if ((wantsToBecomeDonor || isExistingDonor) && normalizeIdentityText(data.signerName ?? "") !== normalizeIdentityText(`${common.firstName} ${common.lastName}`)) return { success: false, message: "De digitale ondertekening moet gelijk zijn aan uw ingevulde voor- en achternaam.", errors: { signerName: "Gebruik exact uw ingevulde voor- en achternaam." } };
   if (wantsToBecomeDonor) {
     const existingByEmail = await prisma.surveyDonor.findUnique({ where: { email: common.email } });
     if (existingByEmail?.status === "ACTIVE") return { success: false, message: "Er bestaat al een actief maanddonateurschap met dit e-mailadres. Kies bij de eerste vraag dat u al donateur bent." };
   }
   const result = await prisma.$transaction(async (tx) => {
     const created = await tx.surveyResponse.create({ data: { ...common, answers } });
-    const donor = wantsToBecomeDonor ? await tx.surveyDonor.upsert({
+    const donor = (wantsToBecomeDonor || isExistingDonor) ? await tx.surveyDonor.upsert({
       where: { email: common.email },
-      update: { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE", cancelledAt: null },
-      create: { email: common.email, firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" }
+      update: isExistingDonor
+        ? { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, iban: answers.existingBankAccount, status: "ACTIVE", cancelledAt: null }
+        : { firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE", cancelledAt: null },
+      create: isExistingDonor
+        ? { email: common.email, firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, iban: answers.existingBankAccount, status: "ACTIVE" }
+        : { email: common.email, firstName: common.firstName, lastName: common.lastName, phone: common.phone, monthlyAmountCents: answers.monthlyAmountCents, directDebitConsent: answers.directDebitConsent, status: "PENDING_MOLLIE" }
     }) : null;
-    const agreement = donor && answers.monthlyAmountCents ? await tx.monthlyDonationAgreement.create({ data: { agreementNumber: `MG-${new Date().getUTCFullYear()}-${randomBytes(6).toString("hex").toUpperCase()}`, surveyDonorId: donor.id, surveyResponseId: created.id, termsVersion: sepaConfig.termsVersion, termsText: agreementTerms(sepaConfig, answers.monthlyAmountCents), signerName: data.signerName!.trim(), amountCents: answers.monthlyAmountCents, mandateConsent: true, termsAccepted: true, signatureAccepted: true, acceptedAt: new Date(), ipAddress: common.ipAddress, userAgent: common.userAgent, creditorLegalName: sepaConfig.legalName, creditorIdentifier: sepaConfig.creditorIdentifier, creditorAddress: sepaConfig.address, creditorEmail: sepaConfig.email } }) : null;
+    const agreement = donor && answers.monthlyAmountCents ? await tx.monthlyDonationAgreement.create({ data: { agreementNumber: `MG-${new Date().getUTCFullYear()}-${randomBytes(6).toString("hex").toUpperCase()}`, surveyDonorId: donor.id, surveyResponseId: created.id, termsVersion: sepaConfig.termsVersion, termsText: isExistingDonor ? selfReportAgreementTerms(sepaConfig, answers.monthlyAmountCents, answers.existingBankAccount!) : agreementTerms(sepaConfig, answers.monthlyAmountCents), signerName: data.signerName!.trim(), amountCents: answers.monthlyAmountCents, mandateConsent: true, termsAccepted: true, signatureAccepted: true, acceptedAt: new Date(), ipAddress: common.ipAddress, userAgent: common.userAgent, creditorLegalName: sepaConfig.legalName, creditorIdentifier: sepaConfig.creditorIdentifier, creditorAddress: sepaConfig.address, creditorEmail: sepaConfig.email, debtorIban: isExistingDonor ? answers.existingBankAccount : null, status: isExistingDonor ? "ACTIVE" : "PENDING_MOLLIE" } }) : null;
     return { response: created, donor, agreement };
   });
+  if (isExistingDonor && result.donor && result.agreement) {
+    const pdf = await monthlyAgreementPdf({ agreementNumber: result.agreement.agreementNumber, termsText: result.agreement.termsText, signerName: result.agreement.signerName, acceptedAt: result.agreement.acceptedAt, email: common.email, phone: common.phone, amountCents: result.agreement.amountCents, debtorIban: answers.existingBankAccount });
+    await prisma.monthlyDonationAgreement.update({ where: { id: result.agreement.id }, data: { pdfData: Uint8Array.from(pdf), documentSha256: createHash("sha256").update(pdf).digest("hex") } });
+    await prepareEmailLog({ templateKey: "SURVEY_EXISTING_DONOR_CONFIRMED", recipient: common.email, entityType: "SurveyResponse", entityId: result.response.id, data: { naam: `${common.firstName} ${common.lastName}` }, attachments: [{ filename: `SEPA-machtiging-${result.agreement.agreementNumber}.pdf`, content: pdf }] });
+    await notifySurveyOwner(survey, result.response.id);
+    return { success: true, message: survey.thankYouMessage || "Dank voor uw bevestiging. Uw gegevens en machtiging zijn genoteerd; u ontvangt ook een bevestiging met bijlage per e-mail." };
+  }
   if (wantsToBecomeDonor && result.donor && answers.monthlyAmountCents) {
     try {
       let customerId = result.donor.mollieCustomerId;
@@ -249,6 +264,6 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     }
   }
   await notifySurveyOwner(survey, result.response.id);
-  await prepareEmailLog({ templateKey: isExistingDonor ? "SURVEY_EXISTING_DONOR_CONFIRMED" : "SURVEY_NO_MEMBERSHIP", recipient: common.email, entityType: "SurveyResponse", entityId: result.response.id, data: { naam: `${common.firstName} ${common.lastName}` } });
-  return { success: true, message: survey.thankYouMessage || (isExistingDonor ? "Dank voor uw bevestiging. Uw gegevens zijn genoteerd; u hoeft niets te betalen. U ontvangt ook een bevestiging per e-mail." : wantsToBecomeDonor ? "Dank voor uw interesse. Uw antwoorden zijn ontvangen; er wordt nu nog niets afgeschreven." : "Dank voor uw tijd en voor het invullen van de enquête.") };
+  await prepareEmailLog({ templateKey: "SURVEY_NO_MEMBERSHIP", recipient: common.email, entityType: "SurveyResponse", entityId: result.response.id, data: { naam: `${common.firstName} ${common.lastName}` } });
+  return { success: true, message: survey.thankYouMessage || (wantsToBecomeDonor ? "Dank voor uw interesse. Uw antwoorden zijn ontvangen; er wordt nu nog niets afgeschreven." : "Dank voor uw tijd en voor het invullen van de enquête.") };
 }

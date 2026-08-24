@@ -718,6 +718,7 @@ model SurveyDonor {
   phone                 String
   monthlyAmountCents    Int?
   directDebitConsent    Boolean                    @default(false)
+  iban                  String?
   status                String                     @default("PENDING_MOLLIE")
   mollieCustomerId      String?                    @unique
   mollieMandateId       String?
@@ -754,6 +755,7 @@ model MonthlyDonationAgreement {
   creditorIdentifier   String
   creditorAddress      String
   creditorEmail        String
+  debtorIban           String?
   mollieCustomerId     String?
   mollieMandateId      String?
   mollieSubscriptionId String?

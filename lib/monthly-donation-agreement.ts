@@ -45,3 +45,24 @@ Versie voorwaarden: ${config.termsVersion}
 9. De ingevulde volledige naam geldt samen met de afzonderlijke akkoordverklaringen, datum/tijd en de voltooide Mollie-betaalstap als digitale bevestiging van deze machtiging.
 10. Vragen, correcties, opzeggingen of meldingen over een incasso kunnen worden gestuurd naar ${config.email}.`;
 }
+
+export function selfReportAgreementTerms(config: SepaConfig, amountCents: number, iban: string) {
+  const amount = `€ ${(amountCents / 100).toFixed(2).replace(".", ",")}`;
+  return `DOORLOPENDE SEPA-INCASSOMACHTIGING VOOR BESTAAND DONATEURSCHAP
+
+Incassant: ${config.legalName}
+Incassant-ID: ${config.creditorIdentifier}
+Adres: ${config.address}
+Contact: ${config.email}
+Rekeningnummer donateur (IBAN): ${iban}
+Versie voorwaarden: ${config.termsVersion}
+
+1. De donateur geeft hierbij ${config.legalName} een doorlopende SEPA Core-machtiging om ${amount} per maand van bovenstaand rekeningnummer af te schrijven.
+2. De donateur heeft aangegeven dit bedrag al maandelijks te doneren. Deze machtiging formaliseert die bijdrage als automatische incasso; er wordt geen eenmalige betaling verwerkt bij het afgeven van deze machtiging.
+3. De donatie is vrijwillig, heeft geen vaste einddatum en kent geen boete of sanctie. De donateur kan het bedrag wijzigen of de machtiging op ieder moment kosteloos opzeggen.
+4. Een wijziging geldt voor toekomstige incasso's. Een opzegging stopt het aanmaken van nieuwe incasso's; reeds verwerkte betaalopdrachten kunnen nog volgens de bankregels worden afgehandeld.
+5. Onder SEPA Core kan een geïncasseerd bedrag binnen acht weken zonder opgave van reden via de bank worden teruggeboekt. Bij een niet-toegestane incasso kan een melding tot dertien maanden na afschrijving mogelijk zijn. Deze wettelijke rechten blijven volledig bestaan.
+6. ${config.legalName} bewaart deze machtiging, het opgegeven rekeningnummer, akkoordgegevens en digitale ondertekening voor administratie, als bewijs richting de bank en voor naleving van verplichtingen.
+7. De ingevulde volledige naam geldt samen met de afzonderlijke akkoordverklaringen en datum/tijd als digitale bevestiging van deze machtiging.
+8. Vragen, correcties of opzeggingen kunnen worden gestuurd naar ${config.email}.`;
+}
