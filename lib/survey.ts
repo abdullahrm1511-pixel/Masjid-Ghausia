@@ -29,6 +29,7 @@ export type FixedSurveySettings = {
   existingDonorNote: string;
   existingBankAccountLabel: string;
   existingAmountLabel: string;
+  existingConsentText: string;
   noMembershipNote: string;
   monthlyNoNote: string;
   monthlyAmountLabel: string;
@@ -58,6 +59,7 @@ export const defaultFixedSurveySettings: FixedSurveySettings = {
   existingDonorNote: "Vul hieronder uw rekeningnummer en het bedrag in dat u al maandelijks overmaakt. Dit is de laatste vraag; u hoeft niet opnieuw te betalen.",
   existingBankAccountLabel: "IBAN-rekeningnummer waarmee u overmaakt",
   existingAmountLabel: "Bedrag dat u maandelijks overmaakt (€)",
+  existingConsentText: "Ik bevestig dat het hierboven ingevulde bedrag maandelijks via automatische incasso van deze rekening geïncasseerd mag blijven worden.",
   noMembershipNote: "Dank voor uw tijd. Dit is de laatste vraag; u kunt uw antwoord verzenden.",
   monthlyNoNote: "Geen probleem. U kunt uw antwoord nu verzenden.",
   monthlyAmountLabel: "Zelfgekozen bedrag per maand (€)",

@@ -46,6 +46,7 @@ const donorSchema = z.object({
     const amount = Number(String(data.existingAmount ?? "").replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) ctx.addIssue({ code: "custom", path: ["existingAmount"], message: "Vul een geldig bedrag in." });
     else if (amount > 10000) ctx.addIssue({ code: "custom", path: ["existingAmount"], message: "Het bedrag mag maximaal € 10.000 zijn." });
+    if (data.directDebitConsent !== "on") ctx.addIssue({ code: "custom", path: ["directDebitConsent"], message: "Uw bevestiging is nodig." });
   }
   if (data.isExistingDonor === "no" && !data.wantsToBecomeDonor) ctx.addIssue({ code: "custom", path: ["wantsToBecomeDonor"], message: "Kies ja of nee." });
   if (data.wantsToBecomeDonor === "yes") {
@@ -208,7 +209,7 @@ export async function submitSurvey(_previous: SurveyState, formData: FormData): 
     wantsToBecomeDonor,
     wantsMonthlyDonation,
     monthlyAmountCents: isExistingDonor ? existingAmountCents : (amount === null ? null : Math.round(amount * 100)),
-    directDebitConsent: wantsMonthlyDonation === true && data.directDebitConsent === "on",
+    directDebitConsent: (isExistingDonor || wantsMonthlyDonation === true) && data.directDebitConsent === "on",
     existingBankAccount: isExistingDonor ? String(data.existingBankAccount).trim().toUpperCase().replace(/\s+/g, "") : null
   };
   const sepaConfig = await getSepaConfig();

@@ -57,6 +57,7 @@ export function SurveyForm({ survey, settings, sepaConfig, preview = false }: { 
       </div>{existing === "yes" ? <div className="survey-mandate survey-reveal"><p className="survey-note">{settings.existingDonorNote}</p>
         <label>{settings.existingBankAccountLabel}<input autoComplete="off" maxLength={34} name="existingBankAccount" onChange={(event) => setExistingBankAccount(event.target.value)} placeholder="NL00BANK0123456789" required value={existingBankAccount} /></label>{error("existingBankAccount")}
         <label>{settings.existingAmountLabel}<input inputMode="decimal" name="existingAmount" onChange={(event) => setExistingAmount(event.target.value)} placeholder="Bijvoorbeeld 10,00" required step="0.01" type="number" value={existingAmount} /></label>{error("existingAmount")}
+        <label className="survey-consent"><input checked={directDebitConsent} name="directDebitConsent" onChange={(event) => setDirectDebitConsent(event.target.checked)} required type="checkbox" /><span>{settings.existingConsentText}</span></label>{error("directDebitConsent")}
       </div> : null}{error("isExistingDonor")}</fieldset>
       {existing === "no" ? <fieldset className="survey-section survey-reveal"><legend><span>2</span> {settings.question2}</legend><div className="survey-choices">
         <Choice checked={join === "yes"} label={settings.joinYesLabel} name="wantsToBecomeDonor" onChange={() => setJoin("yes")} value="yes" />
