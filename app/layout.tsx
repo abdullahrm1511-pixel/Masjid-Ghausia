@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="nl">
-      <body className={admin ? undefined : "donor-portal"}>
+      <body className={admin ? "admin-portal" : "donor-portal"}>
         <InteractionFeedback />
         <ResponsiveTables />
         <Navbar session={session} />

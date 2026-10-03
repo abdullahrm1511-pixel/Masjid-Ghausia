@@ -1,5 +1,5 @@
 /* Dedicated phone UI. Nothing in this file applies at laptop width. */
-@media (max-width: 639px) {
+@media (max-width: 767px) {
   html {
     text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
@@ -111,4 +111,208 @@
 
   .mobile-card-table tbody td[colspan]::before,
   .mobile-card-table tbody td:empty::before { display: none; }
+
+  /* Admin app shell, based on the supplied iPhone reference. */
+  .admin-portal {
+    --admin-mobile-blue: #0b82e6;
+    --admin-mobile-blue-dark: #0874cf;
+    --admin-mobile-bg: #f5f7fa;
+    --admin-mobile-border: #e2e8f0;
+    background: var(--admin-mobile-bg);
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .admin-portal .mobile-admin-header {
+    border: 0;
+    background: linear-gradient(135deg, var(--admin-mobile-blue-dark), var(--admin-mobile-blue));
+    box-shadow: 0 2px 12px rgba(15, 95, 170, 0.18);
+  }
+
+  .admin-portal .mobile-admin-header > nav {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: max(0.65rem, env(safe-area-inset-top)) 1rem 0.65rem;
+  }
+
+  .admin-portal .mobile-admin-header img { border: 2px solid rgba(255, 255, 255, 0.9); }
+  .admin-portal .mobile-admin-header .mobile-admin-menu { border: 0; background: transparent; }
+  .admin-portal .mobile-admin-header .mobile-admin-menu > summary {
+    width: 2.75rem;
+    justify-content: center;
+    padding: 0;
+    border-radius: 0.75rem;
+    font-size: 1.55rem;
+  }
+  .admin-portal .mobile-admin-header .mobile-menu-label { display: none; }
+  .admin-portal .mobile-admin-header .mobile-menu-icon { line-height: 1; }
+
+  .admin-portal .mobile-admin-header .mobile-admin-menu[open] > summary { background: rgba(255, 255, 255, 0.14); }
+  .admin-portal .mobile-admin-header .mobile-admin-menu > div {
+    position: fixed;
+    inset: 4.45rem 0 calc(4.6rem + env(safe-area-inset-bottom));
+    z-index: 50;
+    display: block;
+    overflow-y: auto;
+    border: 0;
+    background: linear-gradient(180deg, #087bd8, #075fa9);
+    padding: 0.75rem 1rem 1.5rem;
+    box-shadow: 0 18px 35px rgba(4, 45, 82, 0.28);
+  }
+
+  .admin-portal .mobile-admin-header .mobile-admin-menu > div > a,
+  .admin-portal .mobile-admin-header .mobile-admin-menu > div > form button {
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    border-radius: 0;
+    padding-inline: 0.5rem;
+  }
+
+  .mobile-admin-bottom-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid #dbe3ee;
+    background: rgba(255, 255, 255, 0.96);
+    padding: 0.4rem 0.35rem max(0.35rem, env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-admin-bottom-nav > a {
+    display: grid;
+    min-width: 0;
+    min-height: 3.65rem;
+    place-items: center;
+    align-content: center;
+    gap: 0.1rem;
+    border-radius: 0.65rem;
+    color: #64748b;
+    font-size: clamp(0.62rem, 2.7vw, 0.72rem);
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .mobile-admin-bottom-nav > a.is-active { color: #087ee0; }
+  .mobile-admin-bottom-icon { font-size: 1.35rem; line-height: 1; }
+
+  /* Consistent mobile page canvas for every admin route. */
+  .admin-portal main {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem 2rem !important;
+  }
+
+  .admin-portal main h1 {
+    font-size: clamp(1.7rem, 8vw, 2rem);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+  }
+
+  .admin-portal main h2 { font-size: 1.08rem; line-height: 1.35; }
+  .admin-portal main h3 { font-size: 1rem; line-height: 1.35; }
+
+  .admin-portal main > section,
+  .admin-portal main > div > section,
+  .admin-portal main article,
+  .admin-portal main form.rounded-xl,
+  .admin-portal main form.rounded-lg {
+    border-color: var(--admin-mobile-border);
+    border-radius: 0.9rem;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  }
+
+  .admin-portal main section,
+  .admin-portal main article { max-width: 100%; }
+
+  .admin-portal main .p-6 { padding: 1rem; }
+  .admin-portal main .p-5 { padding: 1rem; }
+  .admin-portal main .p-4 { padding: 0.85rem; }
+  .admin-portal main .mt-8 { margin-top: 1.25rem; }
+  .admin-portal main .mt-6 { margin-top: 1rem; }
+
+  .admin-portal main button,
+  .admin-portal main a.rounded-md,
+  .admin-portal main a.rounded-lg {
+    min-height: 2.9rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .admin-portal main form > button,
+  .admin-portal main form > div > button,
+  .admin-portal main section > button {
+    width: 100%;
+  }
+
+  .admin-portal main > div.flex.flex-wrap,
+  .admin-portal main > div > div.flex.flex-wrap {
+    display: grid;
+    width: 100%;
+  }
+
+  .admin-portal main > div.flex.flex-wrap > form,
+  .admin-portal main > div > div.flex.flex-wrap > form { width: 100%; }
+
+  .admin-portal input,
+  .admin-portal select,
+  .admin-portal textarea {
+    min-width: 0;
+    max-width: 100%;
+    border-radius: 0.75rem;
+    font-size: 16px;
+  }
+
+  /* Settings becomes a grouped native-style list. */
+  .admin-portal main > div.mt-8 { gap: 1rem; }
+  .admin-portal main > div.mt-8 > section { padding: 0.85rem 1rem; }
+  .admin-portal main > div.mt-8 > section > h2 {
+    padding: 0 0 0.7rem;
+    border-bottom: 1px solid #e7edf4;
+  }
+  .admin-portal main > div.mt-8 > section > div {
+    display: grid;
+    gap: 0;
+    margin-top: 0;
+  }
+  .admin-portal main > div.mt-8 > section > div > a {
+    position: relative;
+    border: 0;
+    border-bottom: 1px solid #edf1f5;
+    border-radius: 0;
+    padding: 0.9rem 1.75rem 0.9rem 0;
+    background: transparent;
+  }
+  .admin-portal main > div.mt-8 > section > div > a:last-child { border-bottom: 0; }
+  .admin-portal main > div.mt-8 > section > div > a::after {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    content: "›";
+    transform: translateY(-50%);
+    color: #64748b;
+    font-size: 1.6rem;
+  }
+  .admin-portal main > div.mt-8 > section > div > a p { margin-top: 0.15rem; line-height: 1.4; }
+
+  /* Tables keep all actions but visually match the supplied application cards. */
+  .admin-portal .mobile-card-table tbody { padding: 0; }
+  .admin-portal .mobile-card-table tbody tr {
+    border-color: var(--admin-mobile-border);
+    border-radius: 0.9rem;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  }
+  .admin-portal .mobile-card-table tbody td {
+    grid-template-columns: minmax(6.25rem, 36%) minmax(0, 1fr);
+    padding: 0.78rem 1rem !important;
+  }
+  .admin-portal .mobile-card-table tbody td:last-child a {
+    display: flex;
+    width: 100%;
+    min-height: 2.7rem;
+    align-items: center;
+    justify-content: flex-start;
+    color: #076dcc;
+  }
 }

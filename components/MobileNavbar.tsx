@@ -5,6 +5,7 @@ import { signOut } from "@/lib/auth";
 import { canManageDonors, canManageSettings, isAdminRole } from "@/lib/permissions";
 import { roleHomePath } from "@/lib/routes";
 import { absoluteUrl } from "@/lib/seo";
+import { MobileAdminBottomNav } from "@/components/MobileAdminBottomNav";
 
 const linkClass = "flex min-h-11 items-center rounded-lg px-3 py-2.5 font-semibold text-white/95 hover:bg-white/10";
 const sectionClass = "mt-2 border-t border-white/15 pt-2";
@@ -18,7 +19,8 @@ export function MobileNavbar({ session }: { session: Session | null }) {
   const headerClass = admin ? "border-[#0f5f9f] bg-[#1483d6]" : "border-[#c99a2e]/60 bg-[#07583f]";
 
   return (
-    <header className={`sticky top-0 z-30 border-b shadow-sm ${headerClass}`}>
+    <>
+    <header className={`sticky top-0 z-30 border-b shadow-sm ${headerClass} ${admin ? "mobile-admin-header" : ""}`}>
       <nav className="mx-auto grid max-w-7xl gap-3 px-3 py-3">
         <Link href={roleHomePath(role)} className="flex min-w-0 items-center gap-3 leading-tight">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full">
@@ -30,9 +32,9 @@ export function MobileNavbar({ session }: { session: Session | null }) {
           </span>
         </Link>
 
-        <details className="rounded-lg border border-white/20 bg-white/10">
+        <details className="mobile-admin-menu rounded-lg border border-white/20 bg-white/10">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 py-2.5 font-bold text-white marker:content-none">
-            Menu <span aria-hidden="true">⌄</span>
+            <span className="mobile-menu-label">Menu</span><span className="mobile-menu-icon" aria-hidden="true">☰</span>
           </summary>
           <div className="grid border-t border-white/15 p-2 text-sm">
             {!role ? <><Link className={linkClass} href="/over-masjid-ghausia">Over</Link><Link className={linkClass} href="/doneren">Doneren</Link><Link className={linkClass} href="/contact">Contact</Link><Link className={linkClass} href="/login">Inloggen</Link><Link className="mt-1 flex min-h-11 items-center rounded-lg bg-white px-3 py-2.5 font-bold text-[#0f5f9f]" href="/register">Inschrijven</Link></> : null}
@@ -72,5 +74,7 @@ export function MobileNavbar({ session }: { session: Session | null }) {
         </details>
       </nav>
     </header>
+    {admin ? <MobileAdminBottomNav /> : null}
+    </>
   );
 }

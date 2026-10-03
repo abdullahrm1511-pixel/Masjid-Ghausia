@@ -43,8 +43,8 @@ export function Navbar({ session }: { session: Session | null }) {
 
   return (
     <>
-      <div className="lg:hidden"><MobileNavbar session={session} /></div>
-      <div className="hidden lg:block">
+      <div className="md:hidden"><MobileNavbar session={session} /></div>
+      <div className="hidden md:block">
     <header className={`sticky top-0 z-30 border-b shadow-sm ${headerClass}`}>
       <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-3 lg:flex lg:items-center lg:justify-between">
         <Link href={homeHref} className="flex min-w-0 items-center gap-3 leading-tight">
