@@ -9,6 +9,7 @@ import { MobileAdminBottomNav } from "@/components/MobileAdminBottomNav";
 
 const linkClass = "flex min-h-11 items-center rounded-lg px-3 py-2.5 font-semibold text-white/95 hover:bg-white/10";
 const sectionClass = "mt-2 border-t border-white/15 pt-2";
+const groupLinkClass = "flex min-h-11 items-center border-t border-white/10 px-3 py-2.5 font-semibold text-white/90 hover:bg-white/10";
 
 export function MobileNavbar({ session }: { session: Session | null }) {
   const role = session?.user?.role;
@@ -46,21 +47,33 @@ export function MobileNavbar({ session }: { session: Session | null }) {
                 <Link className={linkClass} href="/admin/registrations">Registraties</Link>
                 {donorAdmin ? (
                   <>
-                    <div className={sectionClass}><p className="px-3 pb-1 text-xs font-black uppercase tracking-wide text-white/60">Donateurs</p></div>
-                    <Link className={linkClass} href="/admin/donors">Alle donateurs</Link>
-                    <Link className={linkClass} href="/admin/donors?status=ACTIVE">Actieve donateurs</Link>
-                    <Link className={linkClass} href="/admin/family-transitions">Gezinswijzigingen</Link>
-                    <Link className={linkClass} href="/admin/change-requests">Wijzigingsverzoeken</Link>
-                    <div className={sectionClass}><p className="px-3 pb-1 text-xs font-black uppercase tracking-wide text-white/60">E-mail</p></div>
-                    <Link className={linkClass} href="/admin/email-send">Verzenden</Link>
-                    <Link className={linkClass} href="/admin/email-templates">Templates</Link>
-                    <Link className={linkClass} href="/admin/email-log">E-maillog</Link>
-                    <div className={sectionClass}><p className="px-3 pb-1 text-xs font-black uppercase tracking-wide text-white/60">Instellingen</p></div>
-                    <Link className={linkClass} href="/admin/settings">Alle instellingen</Link>
-                    <Link className={linkClass} href="/admin/settings/pricing">Prijsinstellingen</Link>
-                    <Link className={linkClass} href="/admin/import">Import</Link>
-                    <Link className={linkClass} href="/admin/export">Export</Link>
-                    {settingsAdmin ? <Link className={linkClass} href="/admin/audit-log">Auditlog</Link> : null}
+                    <details className="mobile-menu-group">
+                      <summary><span>Donateurs</span><span aria-hidden="true">⌄</span></summary>
+                      <div>
+                        <Link className={groupLinkClass} href="/admin/donors">Alle donateurs</Link>
+                        <Link className={groupLinkClass} href="/admin/donors?status=ACTIVE">Actieve donateurs</Link>
+                        <Link className={groupLinkClass} href="/admin/family-transitions">Gezinswijzigingen</Link>
+                        <Link className={groupLinkClass} href="/admin/change-requests">Wijzigingsverzoeken</Link>
+                      </div>
+                    </details>
+                    <details className="mobile-menu-group">
+                      <summary><span>E-mail</span><span aria-hidden="true">⌄</span></summary>
+                      <div>
+                        <Link className={groupLinkClass} href="/admin/email-send">Verzenden</Link>
+                        <Link className={groupLinkClass} href="/admin/email-templates">Templates</Link>
+                        <Link className={groupLinkClass} href="/admin/email-log">E-maillog</Link>
+                      </div>
+                    </details>
+                    <details className="mobile-menu-group">
+                      <summary><span>Instellingen</span><span aria-hidden="true">⌄</span></summary>
+                      <div>
+                        <Link className={groupLinkClass} href="/admin/settings">Alle instellingen</Link>
+                        <Link className={groupLinkClass} href="/admin/settings/pricing">Prijsinstellingen</Link>
+                        <Link className={groupLinkClass} href="/admin/import">Import</Link>
+                        <Link className={groupLinkClass} href="/admin/export">Export</Link>
+                        {settingsAdmin ? <Link className={groupLinkClass} href="/admin/audit-log">Auditlog</Link> : null}
+                      </div>
+                    </details>
                   </>
                 ) : null}
               </>

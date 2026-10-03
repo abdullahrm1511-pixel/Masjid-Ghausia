@@ -167,6 +167,32 @@
     padding-inline: 0.5rem;
   }
 
+  .admin-portal .mobile-menu-group {
+    margin-top: 0.35rem;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .admin-portal .mobile-menu-group > summary {
+    display: flex;
+    min-height: 3rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 0.85rem;
+    color: white;
+    font-weight: 800;
+  }
+
+  .admin-portal .mobile-menu-group > summary::-webkit-details-marker { display: none; }
+  .admin-portal .mobile-menu-group > summary span:last-child { transition: transform 160ms ease; }
+  .admin-portal .mobile-menu-group[open] > summary span:last-child { transform: rotate(180deg); }
+  .admin-portal .mobile-menu-group > div { background: rgba(4, 60, 108, 0.25); }
+  .admin-portal .mobile-menu-group > div > a:last-child { border-bottom: 0; }
+
   .mobile-admin-bottom-nav {
     position: fixed;
     inset: auto 0 0;
