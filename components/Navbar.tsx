@@ -5,6 +5,7 @@ import { canManageDonors, canManageSettings, isAdminRole } from "@/lib/permissio
 import { roleHomePath } from "@/lib/routes";
 import { absoluteUrl } from "@/lib/seo";
 import type { Session } from "next-auth";
+import { MobileNavbar } from "@/components/MobileNavbar";
 
 export function Navbar({ session }: { session: Session | null }) {
   const role = session?.user?.role;
@@ -34,13 +35,16 @@ export function Navbar({ session }: { session: Session | null }) {
     ...(settingsAdmin ? ([["Auditlog", "/admin/audit-log"]] as const) : [])
   ] as const;
   const dropdownClass =
-    "hidden lg:block invisible absolute right-0 top-full z-20 min-w-60 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
+    "invisible absolute right-0 top-full z-20 min-w-60 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
   const navLink = "shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-white/90 hover:bg-white/10 hover:text-white";
   const headerClass = admin
     ? "border-[#0f5f9f] bg-[#1483d6]"
     : "border-[#c99a2e]/60 bg-[#07583f]";
 
   return (
+    <>
+      <div className="lg:hidden"><MobileNavbar session={session} /></div>
+      <div className="hidden lg:block">
     <header className={`sticky top-0 z-30 border-b shadow-sm ${headerClass}`}>
       <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-3 lg:flex lg:items-center lg:justify-between">
         <Link href={homeHref} className="flex min-w-0 items-center gap-3 leading-tight">
@@ -52,12 +56,7 @@ export function Navbar({ session }: { session: Session | null }) {
             <span className="mt-1 text-[0.68rem] font-semibold tracking-wide text-[#f2d789]">Begrafeniscommissie</span>
           </span>
         </Link>
-        <details className="group rounded-lg border border-white/20 bg-white/10 lg:contents">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-bold text-white marker:content-none lg:hidden">
-            Menu
-            <span className="text-lg transition group-open:rotate-180" aria-hidden="true">⌄</span>
-          </summary>
-        <div className="grid gap-1 border-t border-white/15 p-2 text-sm font-semibold lg:flex lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:border-0 lg:p-0">
+        <div className="mobile-nav-scroll -mx-4 flex gap-2 overflow-x-auto overflow-y-hidden px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">
           {!role ? (
             <>
               <Link className={navLink} href="/over-masjid-ghausia">
@@ -109,7 +108,7 @@ export function Navbar({ session }: { session: Session | null }) {
                   <Link className={`block ${navLink}`} href="/admin/donors">
                     Donateurs
                   </Link>
-                  <div className="invisible absolute left-0 top-full z-20 hidden min-w-64 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 lg:block">
+                  <div className="invisible absolute left-0 top-full z-20 min-w-64 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
                     {donorLinks.map(([label, href]) => (
                       <Link className="block rounded-md px-3 py-2 text-sm hover:bg-sky-50 hover:text-[#0f5f9f]" href={href} key={href}>
                         {label}
@@ -164,8 +163,9 @@ export function Navbar({ session }: { session: Session | null }) {
             </form>
           ) : null}
         </div>
-        </details>
       </nav>
     </header>
+      </div>
+    </>
   );
 }
