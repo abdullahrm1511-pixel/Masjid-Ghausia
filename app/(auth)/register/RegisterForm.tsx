@@ -458,10 +458,10 @@ export function RegisterForm({ error }: { error?: string }) {
           {state.message}
         </div>
       ) : null}
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {visibleStepIndexes.map((index) => (
           <button
-            className={`shrink-0 rounded-md border px-3 py-2 text-sm font-semibold ${step === index ? "border-[#0f766e] bg-[#0f766e] text-white shadow-sm" : "border-slate-300 bg-white text-slate-700 hover:border-[#0f766e]/40 hover:bg-emerald-50"}`}
+            className={`min-w-0 rounded-md border px-2 py-2.5 text-sm font-semibold sm:px-3 ${step === index ? "border-[#0f766e] bg-[#0f766e] text-white shadow-sm" : "border-slate-300 bg-white text-slate-700 hover:border-[#0f766e]/40 hover:bg-emerald-50"}`}
             key={steps[index]}
             onClick={() => {
               snapshotFormValues();

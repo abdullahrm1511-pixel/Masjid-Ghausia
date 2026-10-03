@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!isAdminRole(session?.user.role)) {
     return new NextResponse("Geen toegang", { status: 403 });
@@ -29,7 +29,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return new NextResponse(pdf, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="inschrijfoverzicht-${id}.pdf"`
+      "Content-Disposition": `${new URL(request.url).searchParams.get("view") === "1" ? "inline" : "attachment"}; filename="inschrijfoverzicht-${id}.pdf"`,
+      "Cache-Control": "private, no-store"
     }
   });
 }

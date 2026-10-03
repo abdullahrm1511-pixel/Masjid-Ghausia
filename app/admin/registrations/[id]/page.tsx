@@ -46,7 +46,7 @@ export default async function RegistrationDetailPage({ params }: { params: Promi
           {donor.registrationNumber ? <p className="mt-1 font-semibold text-[#0f5f9f]">Lidnummer: {donor.registrationNumber}</p> : null}
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link className="rounded-md border border-slate-300 px-4 py-3 font-semibold text-slate-800" href={`/admin/registrations/${request.id}/pdf`}>
+          <Link className="rounded-md border border-slate-300 px-4 py-3 text-center font-semibold text-slate-800" href={`/admin/registrations/${request.id}/pdf?view=1`} target="_blank">
             PDF downloaden
           </Link>
           <form action={approveRegistration}>

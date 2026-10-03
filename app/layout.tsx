@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
 import { InteractionFeedback } from "@/components/InteractionFeedback";
+import { ResponsiveTables } from "@/components/ResponsiveTables";
 import { isAdminRole } from "@/lib/permissions";
 import { defaultDescription, jsonLd, organizationJsonLd, seoKeywords, siteName, siteUrl, websiteJsonLd } from "@/lib/seo";
 import "./globals.css";
@@ -57,6 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="nl">
       <body className={admin ? undefined : "donor-portal"}>
         <InteractionFeedback />
+        <ResponsiveTables />
         <Navbar session={session} />
         <script
           type="application/ld+json"

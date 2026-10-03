@@ -191,7 +191,7 @@ export default async function DashboardPage() {
             Mijn account bekijken
           </Link>
           {latestRegistration ? (
-            <Link className="ml-3 mt-5 inline-flex rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50" href="/dashboard/registration-pdf">
+            <Link className="mt-5 inline-flex w-full justify-center rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-slate-800 hover:bg-slate-50 sm:ml-3 sm:w-auto" href="/dashboard/registration-pdf?view=1" target="_blank">
               Inschrijfoverzicht downloaden
             </Link>
           ) : null}

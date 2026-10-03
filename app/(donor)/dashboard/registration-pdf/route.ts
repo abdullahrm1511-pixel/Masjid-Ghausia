@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(httpRequest: Request) {
   const session = await auth();
   if (!session?.user.id) {
     return new NextResponse("Niet ingelogd", { status: 401 });
@@ -28,7 +28,8 @@ export async function GET() {
   return new NextResponse(pdf, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="inschrijfoverzicht-stgbc.pdf"'
+      "Content-Disposition": `${new URL(httpRequest.url).searchParams.get("view") === "1" ? "inline" : "attachment"}; filename="inschrijfoverzicht-stgbc.pdf"`,
+      "Cache-Control": "private, no-store"
     }
   });
 }
