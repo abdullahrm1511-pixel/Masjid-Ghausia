@@ -81,12 +81,12 @@ export default async function DonorDetailPage({
   const safeActiveTab: TabKey = visibleTabs.some(([, value]) => value === activeTab) ? activeTab : "profile";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
+    <main className="mx-auto min-w-0 max-w-6xl px-4 py-6 sm:py-10">
       <BackButton fallbackHref="/admin/donors" />
-      <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mt-5 grid min-w-0 gap-4 sm:flex sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-bold uppercase tracking-wide text-[#1483d6]">Lidmaatschap</p>
-          <h1 className="mt-1 text-4xl font-bold text-slate-900">{donor.registrationNumber ?? "Geen lidnummer"}</h1>
+          <h1 className="mt-1 break-words text-3xl font-bold text-slate-900 sm:text-4xl">{donor.registrationNumber ?? "Geen lidnummer"}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={`rounded-md px-3 py-2 text-sm font-bold ${donorStatusBadgeClass(donor.status)}`}>
               {donorStatusLabel(donor.status)}
@@ -94,7 +94,7 @@ export default async function DonorDetailPage({
             {isCancelledForNonPayment ? <span className="rounded-md bg-red-100 px-3 py-2 text-sm font-bold text-red-900">Geannuleerd</span> : null}
           </div>
         </div>
-        <Link className="inline-flex rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" href={`/admin/donors/${donor.id}/financial`}>
+        <Link className="inline-flex w-full justify-center rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white sm:w-auto" href={`/admin/donors/${donor.id}/financial`}>
           Financieel overzicht
         </Link>
       </div>
@@ -121,10 +121,10 @@ export default async function DonorDetailPage({
 
       <div className="mt-8">
         <div>
-          <nav className="flex flex-wrap gap-2">
+          <nav className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" aria-label="Onderdelen van het ledenprofiel">
             {visibleTabs.map(([label, value]) => (
               <Link
-                className={`rounded-md border px-3 py-2 text-sm font-semibold ${
+                className={`min-w-0 rounded-md border px-2 py-2.5 text-center text-sm font-semibold sm:px-3 ${
                   safeActiveTab === value ? "border-[#1483d6] bg-[#1483d6] text-white" : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                 }`}
                 href={`/admin/donors/${donor.id}?tab=${value}`}
@@ -329,7 +329,22 @@ export default async function DonorDetailPage({
                   Beheren
                 </Link>
               </div>
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4 grid gap-3 sm:hidden">
+                {donor.paymentObligations.length ? donor.paymentObligations.map((item) => (
+                  <article className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4" key={item.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-bold text-slate-950">{obligationTypeLabel(item.obligationType)}</p>
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${paymentStatusBadgeClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>
+                    </div>
+                    <dl className="mt-3 grid gap-2 text-sm">
+                      <div><dt className="font-semibold text-slate-500">Bedrag</dt><dd className="font-bold">{formatCurrency(item.amountCents)}</dd></div>
+                      <div><dt className="font-semibold text-slate-500">Datum</dt><dd>{formatDate(item.paidAt ?? item.dueDate)}</dd></div>
+                      <div className="min-w-0"><dt className="font-semibold text-slate-500">Bron</dt><dd className="break-words">{item.source || "-"}</dd></div>
+                    </dl>
+                  </article>
+                )) : <p className="text-sm text-slate-600">Geen betalingen of verplichtingen geregistreerd.</p>}
+              </div>
+              <div className="mt-4 hidden overflow-x-auto sm:block">
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className="bg-slate-50 text-slate-700">
                     <tr>

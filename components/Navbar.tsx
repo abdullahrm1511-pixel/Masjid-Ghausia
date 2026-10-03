@@ -52,7 +52,12 @@ export function Navbar({ session }: { session: Session | null }) {
             <span className="mt-1 text-[0.68rem] font-semibold tracking-wide text-[#f2d789]">Begrafeniscommissie</span>
           </span>
         </Link>
-        <div className="mobile-nav-scroll -mx-4 flex gap-2 overflow-x-auto overflow-y-hidden px-4 pb-1 text-sm font-semibold lg:mx-0 lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:overflow-visible lg:px-0 lg:pb-0">
+        <details className="group rounded-lg border border-white/20 bg-white/10 lg:contents">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-bold text-white marker:content-none lg:hidden">
+            Menu
+            <span className="text-lg transition group-open:rotate-180" aria-hidden="true">⌄</span>
+          </summary>
+        <div className="grid gap-1 border-t border-white/15 p-2 text-sm font-semibold lg:flex lg:flex-1 lg:flex-wrap lg:items-center lg:justify-end lg:border-0 lg:p-0">
           {!role ? (
             <>
               <Link className={navLink} href="/over-masjid-ghausia">
@@ -159,6 +164,7 @@ export function Navbar({ session }: { session: Session | null }) {
             </form>
           ) : null}
         </div>
+        </details>
       </nav>
     </header>
   );

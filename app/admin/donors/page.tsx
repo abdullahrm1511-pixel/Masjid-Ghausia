@@ -93,9 +93,9 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
           <h1 className="mt-2 text-3xl font-black text-slate-950">Donateurs</h1>
           <p className="mt-2 text-sm font-semibold text-slate-600">{selectedLabel}: {donors.length}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-800 hover:bg-slate-100" href="/admin">
-            Terug naar dashboard
+        <div className="grid w-full gap-2 sm:flex sm:w-auto sm:items-center">
+          <Link className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 font-bold text-slate-800 hover:bg-slate-100" href="/admin">
+            <span aria-hidden="true">←</span> Terug naar dashboard
           </Link>
           <BulkStatusMenu />
         </div>
@@ -122,7 +122,41 @@ export default async function DonorsPage({ searchParams }: { searchParams: Promi
           </Link>
         ))}
       </div>
-      <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="mt-5 grid gap-3 md:hidden">
+        {donors.map((donor) => {
+          const hasOpenAmount = donor.paymentObligations.some((item) => item.status === "DUE" && item.amountCents > 0);
+          const hasNearlyAdultChild = donor.familyMembers.some((member) => member.type === "CHILD" && member.isActive && isNearlyEighteen(member.dateOfBirth));
+          const primaryContact = donor.familyMembers.find((member) => member.relationship === "Primaire contactpersoon" && member.status === "ACTIVE_DEPENDENT");
+          const displayName = primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : `${donor.firstName} ${donor.lastName}`;
+          return (
+            <article className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" key={donor.id}>
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{donor.registrationNumber ?? "Geen lidnummer"}</p>
+                  <h2 className="mt-1 break-words text-lg font-black text-slate-950">{displayName}</h2>
+                </div>
+                <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${donorStatusBadgeClass(donor.status)}`}>
+                  {donorStatusLabel(donor.status)}
+                </span>
+              </div>
+              <dl className="mt-4 grid min-w-0 gap-2 text-sm">
+                <div className="min-w-0"><dt className="font-semibold text-slate-500">IBAN</dt><dd className="break-all font-bold text-slate-900">{formatIban(donor.iban)}</dd></div>
+                <div><dt className="font-semibold text-slate-500">Betaalstatus</dt><dd className={hasOpenAmount ? "font-bold text-red-700" : "font-bold text-teal-700"}>{hasOpenAmount ? "Openstaand" : "Geen openstaand bedrag"}</dd></div>
+              </dl>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {primaryContact ? <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-bold text-teal-800">Primair contact</span> : null}
+                {hasNearlyAdultChild ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">Kind bijna 18</span> : null}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link className="rounded-lg bg-[#1483d6] px-3 py-2.5 text-center font-bold text-white" href={`/admin/donors/${donor.id}`}>Profiel</Link>
+                <Link className="rounded-lg border border-slate-300 px-3 py-2.5 text-center font-bold text-slate-800" href={`/admin/donors/${donor.id}/financial`}>Financieel</Link>
+              </div>
+            </article>
+          );
+        })}
+        {donors.length === 0 ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-600">Geen donateurs gevonden.</p> : null}
+      </div>
+      <div className="mt-5 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
