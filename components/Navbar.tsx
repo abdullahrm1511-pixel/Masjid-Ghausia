@@ -34,7 +34,7 @@ export function Navbar({ session }: { session: Session | null }) {
     ...(settingsAdmin ? ([["Auditlog", "/admin/audit-log"]] as const) : [])
   ] as const;
   const dropdownClass =
-    "invisible absolute right-0 top-full z-20 min-w-60 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
+    "hidden lg:block invisible absolute right-0 top-full z-20 min-w-60 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
   const navLink = "shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-white/90 hover:bg-white/10 hover:text-white";
   const headerClass = admin
     ? "border-[#0f5f9f] bg-[#1483d6]"
@@ -109,7 +109,7 @@ export function Navbar({ session }: { session: Session | null }) {
                   <Link className={`block ${navLink}`} href="/admin/donors">
                     Donateurs
                   </Link>
-                  <div className="invisible absolute left-0 top-full z-20 min-w-64 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                  <div className="invisible absolute left-0 top-full z-20 hidden min-w-64 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 lg:block">
                     {donorLinks.map(([label, href]) => (
                       <Link className="block rounded-md px-3 py-2 text-sm hover:bg-sky-50 hover:text-[#0f5f9f]" href={href} key={href}>
                         {label}
