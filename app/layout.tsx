@@ -6,6 +6,7 @@ import { ResponsiveTables } from "@/components/ResponsiveTables";
 import { isAdminRole } from "@/lib/permissions";
 import { defaultDescription, jsonLd, organizationJsonLd, seoKeywords, siteName, siteUrl, websiteJsonLd } from "@/lib/seo";
 import "./globals.css";
+import "./mobile.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
