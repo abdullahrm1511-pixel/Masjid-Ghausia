@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/display";
 import type { FuneralFormData } from "@/lib/funeral-application";
 import { CopyLink } from "../CopyLink";
 import { deleteFuneralApplication, updateFuneralPdfDetails } from "../actions";
+import { ShareAvgMailPdf } from "./ShareAvgMailPdf";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function FuneralApplicationDetail({ params, searchParams }:
               <a className="rounded-md bg-[#1483d6] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/pdf?view=1`} rel="noreferrer" target="_blank">Gegevens-PDF openen / markeren</a>
               <a className="rounded-md bg-[#0f766e] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/avg-pdf?view=1`} rel="noreferrer" target="_blank">AVG-PDF openen / markeren</a>
               <a className="rounded-md bg-[#0f5f9f] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/avg-mail-pdf?view=1`} rel="noreferrer" target="_blank">AVG-mail-PDF openen / markeren</a>
+              <ShareAvgMailPdf applicationId={application.id} filename={`AVG-${data.deceasedFirstName}-${data.deceasedLastName}-om-te-mailen.pdf`} />
               <p className="rounded-md bg-slate-100 p-3 text-xs leading-5 text-slate-600">Op iPhone: open de PDF en gebruik de deelknop of Markering om te schrijven, tekenen, ondertekenen en een bewerkte kopie in Bestanden te bewaren.</p>
               {application.documents.map(document => <a className="rounded-md border border-slate-300 bg-white px-4 py-3 text-center font-semibold text-[#0f5f9f]" href={`/admin/settings/funeral-applications/${application.id}/documents/${document.id}`} key={document.id}>{documentLabel(document.kind)} downloaden</a>)}
             </div>
