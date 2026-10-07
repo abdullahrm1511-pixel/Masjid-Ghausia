@@ -703,5 +703,13 @@ a[data-global-navigating="true"] {
 .funeral-notice a { font-weight:800; text-decoration:underline; }
 .funeral-warning { border:2px solid #dc2626; border-radius:1rem; background:#fef2f2; padding:1rem; color:#991b1b; line-height:1.55; }
 .funeral-warning strong { display:block; margin-bottom:.25rem; font-size:1rem; }
+.funeral-submit-bar { display:flex; align-items:center; justify-content:space-between; gap:1rem; border:1px solid #bae6fd; border-radius:1rem; background:#f0f9ff; padding:.85rem 1rem; color:#334155; font-size:.9rem; }
+.funeral-submit-bar .donor-submit-button { width:auto; min-width:13rem; flex:none; }
+.funeral-error-summary { border:2px solid #dc2626; border-radius:1rem; background:#fff1f2; padding:1rem; color:#991b1b; }
+.funeral-error-summary ul { display:grid; gap:.35rem; margin:.6rem 0 0 1.1rem; list-style:disc; }
+.funeral-error-summary button { text-align:left; text-decoration:underline; }
+.funeral-client-error { border-left:4px solid #dc2626; background:#fff1f2; padding:.8rem 1rem; color:#991b1b; font-weight:800; }
+.funeral-card [aria-invalid="true"] { border-color:#dc2626; background:#fff7f7; box-shadow:0 0 0 2px rgba(220,38,38,.12); }
 .funeral-complete { min-height:22rem; align-content:center; justify-items:center; text-align:center; }
+@media (max-width:639px) { .funeral-submit-bar { position:sticky; top:.5rem; z-index:10; display:grid; box-shadow:0 8px 24px rgba(15,23,42,.14); } .funeral-submit-bar .donor-submit-button { width:100%; min-width:0; } }
 @media (min-width:640px) { .funeral-grid { grid-template-columns:1fr 1fr; } .funeral-options { grid-template-columns:repeat(3,1fr); } .funeral-options p { grid-column:1/-1; } }

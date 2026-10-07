@@ -1,6 +1,6 @@
 import { readFile } from "fs/promises";
 import path from "path";
-import { PDFDocument, PDFName, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFForm, StandardFonts } from "pdf-lib";
 import type { FuneralFormData } from "@/lib/funeral-application";
 
 function safeFilenamePart(value: string) {
@@ -19,6 +19,19 @@ function formatDutchDate(value?: string) {
   if (!value) return "";
   const [year, month, day] = value.split("-");
   return year && month && day ? `${Number(day)}-${Number(month)}-${year}` : value;
+}
+
+function flattenSignatureFields(form: PDFForm) {
+  const signatureNames = new Set(["Handtekening ondernemer", "Handtekening", "Handtekening uitvaartondernemer"]);
+  const allFields = form.getFields();
+  const mutableForm = form as PDFForm & { getFields: () => ReturnType<PDFForm["getFields"]> };
+  const originalGetFields = form.getFields.bind(form);
+  mutableForm.getFields = () => allFields.filter(field => signatureNames.has(field.getName()));
+  try {
+    form.flatten({ updateFieldAppearances: false });
+  } finally {
+    mutableForm.getFields = originalGetFields;
+  }
 }
 
 async function createFilledAvgPdf(data: FuneralFormData) {
@@ -60,7 +73,6 @@ async function createFilledAvgPdf(data: FuneralFormData) {
     "BSN Erfgenaam": data.applicantBsn,
     "Telefoon Erfgenaam": data.applicantPhone,
     "Email Erfgenaam": data.applicantEmail,
-    "Naam begraafplaats": data.burialLocation,
     "Datum begrafenis": formatDutchDate(data.funeralDate),
     "Tijd begrafenis": data.funeralTime ?? "",
     "11-yyyymmdd-nr": data.coffinRegistrationNumber ?? "",
@@ -84,15 +96,15 @@ async function createFilledAvgPdf(data: FuneralFormData) {
 
 export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
   const { pdf, form } = await createFilledAvgPdf(data);
-  // Zet alle formulierweergaven vast. Zo kan een PDF-printer de bestaande
-  // handtekeningafbeeldingen niet opnieuw (en veel te groot) schalen.
-  form.flatten();
+  // Alleen de bestaande handtekeningafbeeldingen worden vastgezet. De overige
+  // velden blijven intact, zodat alle vooraf ingevulde templategegevens behouden blijven.
+  flattenSignatureFields(form);
   return Buffer.from(await pdf.save({ useObjectStreams: true }));
 }
 
 export async function generateAvgFuneralApplicationMailPdf(data: FuneralFormData) {
   const { pdf, form } = await createFilledAvgPdf(data);
-  form.flatten();
+  flattenSignatureFields(form);
 
   // Maak een zelfstandige, compacte versie met de externe gegevens en pagina 7 t/m 10.
   const output = await PDFDocument.create();
@@ -111,7 +123,6 @@ export async function generateAvgFuneralApplicationMailPdf(data: FuneralFormData
     summary.drawText(label, { x: 55, y, size: 10, font: boldFont });
     summary.drawText(value, { x: 55, y: y - 22, size: 11, font });
   });
-  pdf.getPages().slice(6, 10).forEach(page => page.node.delete(PDFName.of("Annots")));
   const pages = await output.copyPages(pdf, [6, 7, 8, 9]);
   pages.forEach(page => output.addPage(page));
   return Buffer.from(await output.save({ useObjectStreams: true }));
