@@ -1,6 +1,23 @@
 import { readFile } from "fs/promises";
 import path from "path";
-import { PDFDocument, PDFForm, StandardFonts } from "pdf-lib";
+import {
+  drawObject,
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFForm,
+  PDFHexString,
+  PDFName,
+  PDFNumber,
+  PDFRef,
+  PDFStream,
+  PDFString,
+  popGraphicsState,
+  pushGraphicsState,
+  scale,
+  StandardFonts,
+  translate
+} from "pdf-lib";
 import type { FuneralFormData } from "@/lib/funeral-application";
 
 function safeFilenamePart(value: string) {
@@ -31,6 +48,59 @@ function flattenSignatureFields(form: PDFForm) {
     form.flatten({ updateFieldAppearances: false });
   } finally {
     mutableForm.getFields = originalGetFields;
+  }
+}
+
+function flattenSignatureStamps(pdf: PDFDocument) {
+  for (const page of pdf.getPages()) {
+    const annotations = page.node.Annots();
+    if (!annotations) continue;
+    const keptAnnotations = [];
+
+    for (const annotationRef of annotations.asArray()) {
+      const annotation = pdf.context.lookup(annotationRef);
+      if (!(annotation instanceof PDFDict)) {
+        keptAnnotations.push(annotationRef);
+        continue;
+      }
+      const subtype = annotation.get(PDFName.of("Subtype"));
+      const titleObject = annotation.get(PDFName.of("T"));
+      const title = titleObject instanceof PDFString || titleObject instanceof PDFHexString ? titleObject.decodeText() : "";
+      const isSignatureStamp = subtype === PDFName.of("Stamp") && title.toLowerCase() === "sadel";
+      const isPopup = subtype === PDFName.of("Popup");
+
+      if (isSignatureStamp) {
+        const appearanceDictionary = annotation.lookupMaybe(PDFName.of("AP"), PDFDict);
+        const normalAppearance = appearanceDictionary?.get(PDFName.of("N"));
+        const appearanceRef = normalAppearance instanceof PDFRef ? normalAppearance : undefined;
+        const appearance = appearanceRef ? pdf.context.lookup(appearanceRef, PDFStream) : undefined;
+        const rectangle = annotation.lookupMaybe(PDFName.of("Rect"), PDFArray);
+        const boundingBox = appearance?.dict.lookupMaybe(PDFName.of("BBox"), PDFArray);
+
+        if (appearanceRef && appearance && rectangle && boundingBox) {
+          const [x1, y1, x2, y2] = [0, 1, 2, 3].map(index => rectangle.lookup(index, PDFNumber).asNumber());
+          const [bx1, by1, bx2, by2] = [0, 1, 2, 3].map(index => boundingBox.lookup(index, PDFNumber).asNumber());
+          const width = Math.abs(x2 - x1);
+          const height = Math.abs(y2 - y1);
+          const appearanceWidth = Math.abs(bx2 - bx1);
+          const appearanceHeight = Math.abs(by2 - by1);
+          const xObjectKey = page.node.newXObject("FixedSignature", appearanceRef);
+          page.pushOperators(
+            pushGraphicsState(),
+            translate(Math.min(x1, x2), Math.min(y1, y2)),
+            scale(width / appearanceWidth, height / appearanceHeight),
+            translate(-Math.min(bx1, bx2), -Math.min(by1, by2)),
+            drawObject(xObjectKey),
+            popGraphicsState()
+          );
+        }
+        continue;
+      }
+
+      if (!isPopup) keptAnnotations.push(annotationRef);
+    }
+
+    page.node.set(PDFName.of("Annots"), pdf.context.obj(keptAnnotations));
   }
 }
 
@@ -99,12 +169,14 @@ export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
   // Alleen de bestaande handtekeningafbeeldingen worden vastgezet. De overige
   // velden blijven intact, zodat alle vooraf ingevulde templategegevens behouden blijven.
   flattenSignatureFields(form);
+  flattenSignatureStamps(pdf);
   return Buffer.from(await pdf.save({ useObjectStreams: true }));
 }
 
 export async function generateAvgFuneralApplicationMailPdf(data: FuneralFormData) {
   const { pdf, form } = await createFilledAvgPdf(data);
   flattenSignatureFields(form);
+  flattenSignatureStamps(pdf);
 
   // Maak een zelfstandige, compacte versie met de externe gegevens en pagina 7 t/m 10.
   const output = await PDFDocument.create();
