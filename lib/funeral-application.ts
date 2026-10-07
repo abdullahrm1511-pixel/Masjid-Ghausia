@@ -15,4 +15,7 @@ export type FuneralFormData = {
   applicantBirthPlace: string; applicantStreet: string; applicantHouseNumber: string; applicantPostalCode: string;
   applicantCity: string; applicantCountry: string; applicantBsn: string; applicantPhone: string; applicantEmail: string;
   burialLocation: string; gravePeriod: string; graveType: string; signatureName: string; acceptedCosts: boolean;
+  funeralDate?: string;
+  funeralTime?: string;
+  coffinRegistrationNumber?: string;
 };

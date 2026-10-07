@@ -60,7 +60,10 @@ export async function generateFuneralApplicationPdf(data: FuneralFormData, submi
   form.getCheckBox(graveFields[data.graveType]).check();
   form.updateFieldAppearances(font);
   const page = pdf.getPages()[0];
-  page.drawRectangle({ x: 70, y: 7, width: 170, height: 18, color: rgb(1, 1, 1) });
-  page.drawText(`Datum: ${submittedAt.toLocaleDateString("nl-NL")}`, { x: 72, y: 13, size: 9, font });
+  page.drawRectangle({ x: 65, y: 4, width: 475, height: 30, color: rgb(1, 1, 1) });
+  page.drawText(`Ingediend: ${submittedAt.toLocaleDateString("nl-NL")}`, { x: 68, y: 21, size: 8, font });
+  const funeralDate = data.funeralDate ? data.funeralDate.split("-").reverse().map(value => String(Number(value))).join("-") : "-";
+  page.drawText(`Begrafenis: ${funeralDate} ${data.funeralTime || "-"}`, { x: 190, y: 21, size: 8, font });
+  page.drawText(`Kist registratienr.: ${data.coffinRegistrationNumber || "-"}`, { x: 68, y: 9, size: 8, font });
   return Buffer.from(await pdf.save());
 }

@@ -15,6 +15,12 @@ export function avgFuneralApplicationMailFilename(data: FuneralFormData) {
   return `AVG-${safeFilenamePart(`${data.deceasedFirstName} ${data.deceasedLastName}`)}-om-te-mailen.pdf`;
 }
 
+function formatDutchDate(value?: string) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${Number(day)}-${Number(month)}-${year}` : value;
+}
+
 async function createFilledAvgPdf(data: FuneralFormData) {
   const source = await readFile(path.join(process.cwd(), "public", "templates", "avg-zuiderbegraafplaats-2026.pdf"));
   const pdf = await PDFDocument.load(source);
@@ -55,6 +61,9 @@ async function createFilledAvgPdf(data: FuneralFormData) {
     "Telefoon Erfgenaam": data.applicantPhone,
     "Email Erfgenaam": data.applicantEmail,
     "Naam begraafplaats": data.burialLocation,
+    "Datum begrafenis": formatDutchDate(data.funeralDate),
+    "Tijd begrafenis": data.funeralTime ?? "",
+    "11-yyyymmdd-nr": data.coffinRegistrationNumber ?? "",
     "Handtekening aanvrager": data.signatureName,
     "Graf uitvoering": ({ "Standaard graf": "Standaard Graf", "Graf met kelder": "Graf met kelder", "Graf met gesloten kelder": "Graf met Gesloten kelder" } as Record<string, string>)[data.graveType]
   };
@@ -74,7 +83,10 @@ async function createFilledAvgPdf(data: FuneralFormData) {
 }
 
 export async function generateAvgFuneralApplicationPdf(data: FuneralFormData) {
-  const { pdf } = await createFilledAvgPdf(data);
+  const { pdf, form } = await createFilledAvgPdf(data);
+  // Zet alle formulierweergaven vast. Zo kan een PDF-printer de bestaande
+  // handtekeningafbeeldingen niet opnieuw (en veel te groot) schalen.
+  form.flatten();
   return Buffer.from(await pdf.save({ useObjectStreams: true }));
 }
 
@@ -82,8 +94,23 @@ export async function generateAvgFuneralApplicationMailPdf(data: FuneralFormData
   const { pdf, form } = await createFilledAvgPdf(data);
   form.flatten();
 
-  // Maak een zelfstandige, compacte uitsnede van pagina 7 t/m 10 voor verzending.
+  // Maak een zelfstandige, compacte versie met de externe gegevens en pagina 7 t/m 10.
   const output = await PDFDocument.create();
+  const font = await output.embedFont(StandardFonts.Helvetica);
+  const boldFont = await output.embedFont(StandardFonts.HelveticaBold);
+  const summary = output.addPage([595.28, 841.89]);
+  summary.drawText("Aanvullende begrafenisgegevens", { x: 55, y: 760, size: 18, font: boldFont });
+  summary.drawText(`${data.deceasedFirstName} ${data.deceasedLastName}`, { x: 55, y: 728, size: 12, font });
+  const summaryValues = [
+    ["Datum begrafenis", formatDutchDate(data.funeralDate) || "-"],
+    ["Tijd begrafenis", data.funeralTime || "-"],
+    ["Kist registratienummer", data.coffinRegistrationNumber || "-"]
+  ];
+  summaryValues.forEach(([label, value], index) => {
+    const y = 665 - (index * 62);
+    summary.drawText(label, { x: 55, y, size: 10, font: boldFont });
+    summary.drawText(value, { x: 55, y: y - 22, size: 11, font });
+  });
   pdf.getPages().slice(6, 10).forEach(page => page.node.delete(PDFName.of("Annots")));
   const pages = await output.copyPages(pdf, [6, 7, 8, 9]);
   pages.forEach(page => output.addPage(page));

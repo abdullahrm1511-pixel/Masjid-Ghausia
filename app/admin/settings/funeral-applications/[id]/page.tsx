@@ -4,12 +4,13 @@ import { absoluteUrl } from "@/lib/seo";
 import { formatDate } from "@/lib/display";
 import type { FuneralFormData } from "@/lib/funeral-application";
 import { CopyLink } from "../CopyLink";
-import { deleteFuneralApplication } from "../actions";
+import { deleteFuneralApplication, updateFuneralPdfDetails } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function FuneralApplicationDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function FuneralApplicationDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pdfDetails?: string }> }) {
   const { id } = await params;
+  const query = await searchParams;
   const application = await prisma.funeralApplication.findUnique({ where: { id }, include: { documents: { orderBy: { uploadedAt: "asc" } } } });
   if (!application) notFound();
   const data = application.formData as FuneralFormData | null;
@@ -28,6 +29,20 @@ export default async function FuneralApplicationDetail({ params }: { params: Pro
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><h2 className="text-xl font-bold">Ingevulde gegevens</h2><p className="text-sm text-slate-600">Ingediend op {formatDate(application.submittedAt)}</p></div>
             <div className="grid w-full gap-3 sm:w-auto sm:min-w-64">
+              <form action={updateFuneralPdfDetails} className="grid gap-4 rounded-lg border border-sky-200 bg-sky-50 p-4 sm:min-w-[28rem]">
+                <input name="id" type="hidden" value={application.id} />
+                <div>
+                  <h3 className="font-bold text-slate-900">Gegevens voor de PDF-bestanden</h3>
+                  <p className="mt-1 text-sm text-slate-600">Sla deze gegevens eerst op. De drie downloads hieronder worden daarna automatisch bijgewerkt.</p>
+                </div>
+                {query.pdfDetails === "saved" ? <p className="rounded-md bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-800">Opgeslagen. De PDF-bestanden zijn bijgewerkt.</p> : null}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-1 text-sm font-semibold text-slate-700">Datum begrafenis<input className="min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 font-normal text-slate-900" defaultValue={data.funeralDate ?? ""} name="funeralDate" type="date" /></label>
+                  <label className="grid gap-1 text-sm font-semibold text-slate-700">Tijd begrafenis<input className="min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 font-normal text-slate-900" defaultValue={data.funeralTime ?? ""} name="funeralTime" type="time" /></label>
+                </div>
+                <label className="grid gap-1 text-sm font-semibold text-slate-700">Kist registratienummer<input className="min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 font-normal text-slate-900" defaultValue={data.coffinRegistrationNumber ?? ""} name="coffinRegistrationNumber" placeholder="Bijvoorbeeld: 11-20261003-001" type="text" /></label>
+                <button className="rounded-md bg-[#1483d6] px-4 py-3 font-semibold text-white" type="submit">Opslaan en PDF-bestanden bijwerken</button>
+              </form>
               <a className="rounded-md bg-[#1483d6] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/pdf?view=1`} rel="noreferrer" target="_blank">Gegevens-PDF openen / markeren</a>
               <a className="rounded-md bg-[#0f766e] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/avg-pdf?view=1`} rel="noreferrer" target="_blank">AVG-PDF openen / markeren</a>
               <a className="rounded-md bg-[#0f5f9f] px-4 py-3 text-center font-semibold text-white" href={`/admin/settings/funeral-applications/${application.id}/avg-mail-pdf?view=1`} rel="noreferrer" target="_blank">AVG-mail-PDF openen / markeren</a>
